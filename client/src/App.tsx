@@ -1,5 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DomainsPage } from './pages/DomainsPage';
+import { ThemeProvider } from './components/theme-provider';
+import { ThemeToggle } from './components/ui/theme-toggle';
+import { Toaster } from './components/ui/toaster';
 import { api } from './lib/api';
 
 const queryClient = new QueryClient({
@@ -20,18 +23,22 @@ if (apiKey) {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-background">
-        <header className="border-b">
-          <div className="container mx-auto py-4 px-4">
-            <h1 className="text-xl font-semibold">Selfmx</h1>
-          </div>
-        </header>
-        <main>
-          <DomainsPage />
-        </main>
-      </div>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <div className="min-h-screen bg-background">
+          <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
+            <div className="container mx-auto flex items-center justify-between py-4 px-4">
+              <h1 className="text-xl font-semibold tracking-tight">Selfmx</h1>
+              <ThemeToggle />
+            </div>
+          </header>
+          <main>
+            <DomainsPage />
+          </main>
+        </div>
+        <Toaster />
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

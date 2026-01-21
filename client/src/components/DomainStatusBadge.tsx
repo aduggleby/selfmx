@@ -6,10 +6,10 @@ interface DomainStatusBadgeProps {
 }
 
 const statusStyles: Record<DomainStatus, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  verifying: 'bg-blue-100 text-blue-800',
-  verified: 'bg-green-100 text-green-800',
-  failed: 'bg-red-100 text-red-800',
+  pending: 'bg-[var(--status-pending-bg)] text-[var(--status-pending-text)]',
+  verifying: 'bg-[var(--status-verifying-bg)] text-[var(--status-verifying-text)]',
+  verified: 'bg-[var(--status-verified-bg)] text-[var(--status-verified-text)]',
+  failed: 'bg-[var(--status-failed-bg)] text-[var(--status-failed-text)]',
 };
 
 export function DomainStatusBadge({ status }: DomainStatusBadgeProps) {

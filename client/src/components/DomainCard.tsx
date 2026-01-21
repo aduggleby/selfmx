@@ -16,7 +16,7 @@ export function DomainCard({ domain, onDelete, isDeleting }: DomainCardProps) {
   const hasDnsRecords = domain.dnsRecords && domain.dnsRecords.length > 0;
 
   return (
-    <Card>
+    <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-lg font-medium">{domain.name}</CardTitle>
         <DomainStatusBadge status={domain.status} />
@@ -32,11 +32,11 @@ export function DomainCard({ domain, onDelete, isDeleting }: DomainCardProps) {
         </div>
 
         {domain.failureReason && (
-          <p className="text-sm text-red-600 mb-4">{domain.failureReason}</p>
+          <p className="text-sm text-[var(--status-failed-text)] mb-4">{domain.failureReason}</p>
         )}
 
         {domain.status === 'verifying' && (
-          <p className="text-sm text-blue-600 mb-4">
+          <p className="text-sm text-[var(--status-verifying-text)] mb-4">
             DNS records are being verified. This may take a few minutes.
           </p>
         )}

@@ -100,8 +100,8 @@ test.describe('Status Badges', () => {
 
     const badge = page.getByText('pending', { exact: true });
     await expect(badge).toBeVisible();
-    await expect(badge).toHaveClass(/bg-yellow-100/);
-    await expect(badge).toHaveClass(/text-yellow-800/);
+    await expect(badge).toHaveClass(/bg-\[var\(--status-pending-bg\)\]/);
+    await expect(badge).toHaveClass(/text-\[var\(--status-pending-text\)\]/);
   });
 
   test('displays verifying status badge with blue styling', async ({ page, apiMock }) => {
@@ -112,8 +112,8 @@ test.describe('Status Badges', () => {
 
     const badge = page.getByText('verifying', { exact: true });
     await expect(badge).toBeVisible();
-    await expect(badge).toHaveClass(/bg-blue-100/);
-    await expect(badge).toHaveClass(/text-blue-800/);
+    await expect(badge).toHaveClass(/bg-\[var\(--status-verifying-bg\)\]/);
+    await expect(badge).toHaveClass(/text-\[var\(--status-verifying-text\)\]/);
   });
 
   test('displays verified status badge with green styling', async ({ page, apiMock }) => {
@@ -124,8 +124,8 @@ test.describe('Status Badges', () => {
 
     const badge = page.getByText('verified', { exact: true });
     await expect(badge).toBeVisible();
-    await expect(badge).toHaveClass(/bg-green-100/);
-    await expect(badge).toHaveClass(/text-green-800/);
+    await expect(badge).toHaveClass(/bg-\[var\(--status-verified-bg\)\]/);
+    await expect(badge).toHaveClass(/text-\[var\(--status-verified-text\)\]/);
   });
 
   test('displays failed status badge with red styling', async ({ page, apiMock }) => {
@@ -136,8 +136,8 @@ test.describe('Status Badges', () => {
 
     const badge = page.getByText('failed', { exact: true });
     await expect(badge).toBeVisible();
-    await expect(badge).toHaveClass(/bg-red-100/);
-    await expect(badge).toHaveClass(/text-red-800/);
+    await expect(badge).toHaveClass(/bg-\[var\(--status-failed-bg\)\]/);
+    await expect(badge).toHaveClass(/text-\[var\(--status-failed-text\)\]/);
   });
 
   test('displays verifying status message', async ({ page, apiMock }) => {
@@ -173,8 +173,8 @@ test.describe('Add Domain', () => {
     await page.getByPlaceholder('example.com').fill('newdomain.com');
     await page.getByRole('button', { name: 'Add Domain' }).click();
 
-    // Wait for the domain to appear
-    await expect(page.getByText('newdomain.com')).toBeVisible();
+    // Wait for the domain to appear (use heading to avoid matching toast)
+    await expect(page.getByRole('heading', { name: 'newdomain.com' })).toBeVisible();
     await expect(page.getByText('No domains yet')).not.toBeVisible();
   });
 
@@ -253,7 +253,7 @@ test.describe('Add Domain', () => {
     await page.getByPlaceholder('example.com').fill('  trimmed.com  ');
     await page.getByRole('button', { name: 'Add Domain' }).click();
 
-    await expect(page.getByText('trimmed.com')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'trimmed.com' })).toBeVisible();
   });
 });
 
@@ -493,7 +493,7 @@ test.describe('Pagination', () => {
 });
 
 test.describe('Loading States', () => {
-  test('shows loading message while fetching domains', async ({ page }) => {
+  test('shows skeleton loaders while fetching domains', async ({ page }) => {
     // Add delay to domain list response
     await page.route('**/v1/domains?*', async (route) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -506,7 +506,8 @@ test.describe('Loading States', () => {
 
     await page.goto('/');
 
-    await expect(page.getByText('Loading domains...')).toBeVisible();
+    // Check for skeleton loaders (they have the animate-pulse class)
+    await expect(page.locator('.animate-pulse').first()).toBeVisible();
   });
 });
 
@@ -560,7 +561,8 @@ test.describe('Form Interaction', () => {
     await input.fill('enter-submit.com');
     await input.press('Enter');
 
-    await expect(page.getByText('enter-submit.com')).toBeVisible();
+    // Check for the domain card heading (not the toast)
+    await expect(page.getByRole('heading', { name: 'enter-submit.com' })).toBeVisible();
   });
 });
 

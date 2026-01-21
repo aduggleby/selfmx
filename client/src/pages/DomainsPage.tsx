@@ -1,9 +1,26 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { useDomains, useCreateDomain, useDeleteDomain } from '@/hooks/useDomains';
 import { DomainCard } from '@/components/DomainCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function DomainCardSkeleton() {
+  return (
+    <Card className="shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-5 w-16 rounded-full" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-4 w-48 mb-4" />
+        <Skeleton className="h-9 w-20" />
+      </CardContent>
+    </Card>
+  );
+}
 
 export function DomainsPage() {
   const [newDomain, setNewDomain] = useState('');
@@ -20,17 +37,19 @@ export function DomainsPage() {
 
     try {
       await createMutation.mutateAsync(newDomain.trim());
+      toast.success(`Domain ${newDomain.trim()} added`);
       setNewDomain('');
-    } catch {
-      // Error is handled by mutation
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add domain');
     }
   };
 
   const handleDelete = async (id: string) => {
     try {
       await deleteMutation.mutateAsync(id);
-    } catch {
-      // Error is handled by mutation
+      toast.success('Domain deleted');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete domain');
     }
   };
 
@@ -56,17 +75,22 @@ export function DomainsPage() {
               {createMutation.isPending ? 'Adding...' : 'Add Domain'}
             </Button>
           </form>
-          {createMutation.error && (
-            <p className="text-red-600 mt-2 text-sm">
-              {createMutation.error.message}
-            </p>
-          )}
         </CardContent>
       </Card>
 
-      {isLoading && <p>Loading domains...</p>}
+      {isLoading && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(3)].map((_, i) => (
+            <DomainCardSkeleton key={i} />
+          ))}
+        </div>
+      )}
 
-      {error && <p className="text-red-600">Error loading domains: {error.message}</p>}
+      {error && (
+        <p className="text-[var(--status-failed-text)]">
+          Error loading domains: {error.message}
+        </p>
+      )}
 
       {data && (
         <>
