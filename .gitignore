@@ -42,6 +42,7 @@ publish/
 
 # Ando build system
 .ando/
+.env.ando
 
 # Test artifacts
 playwright-report/
