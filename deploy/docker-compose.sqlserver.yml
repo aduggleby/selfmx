@@ -1,0 +1,56 @@
+# SQL Server override for SelfMX deployment
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.sqlserver.yml up
+#
+# Required environment variables:
+#   MSSQL_SA_PASSWORD - SQL Server SA password (must meet complexity requirements)
+#
+# The SA password must have at least 8 characters including uppercase, lowercase,
+# numbers, and special characters.
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: selfmx-sqlserver
+    hostname: sqlserver
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+      - MSSQL_PID=Developer
+      - MSSQL_COLLATION=SQL_Latin1_General_CP1_CI_AS
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - selfmx-net
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$${MSSQL_SA_PASSWORD}" -Q "SELECT 1" -C -N -b
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  selfmx:
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      # Override database provider to use SQL Server
+      - Database__Provider=sqlserver
+      # SQL Server connection strings (all point to same database)
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=SelfMX;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;MultipleActiveResultSets=true
+      - ConnectionStrings__AuditConnection=Server=sqlserver;Database=SelfMX;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True
+      - ConnectionStrings__HangfireConnection=Server=sqlserver;Database=SelfMX;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True
+
+volumes:
+  sqlserver_data:
