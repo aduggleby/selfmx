@@ -1,4 +1,4 @@
-import { test as base, Page, Route } from '@playwright/test';
+import { test as base, Page } from '@playwright/test';
 
 // Mock data types matching the API schemas
 export interface DnsRecord {
@@ -72,9 +72,21 @@ export class ApiMock {
   private page: Page;
   private createDomainHandler: ((name: string) => Domain | { error: { code: string; message: string } }) | null = null;
   private deleteDomainHandler: ((id: string) => boolean) | null = null;
+  private isAuthenticated = true;
+  private loginHandler: ((password: string) => boolean) | null = null;
 
   constructor(page: Page) {
     this.page = page;
+  }
+
+  // Set authentication state
+  setAuthenticated(authenticated: boolean) {
+    this.isAuthenticated = authenticated;
+  }
+
+  // Custom login handler for testing specific scenarios
+  onLogin(handler: (password: string) => boolean) {
+    this.loginHandler = handler;
   }
 
   // Set initial domains
@@ -94,6 +106,84 @@ export class ApiMock {
 
   // Setup all route handlers
   async setup() {
+    // Auth check
+    await this.page.route('**/v1/admin/me', async (route) => {
+      if (this.isAuthenticated) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ email: 'admin@example.com' }),
+        });
+      } else {
+        await route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'unauthorized', message: 'Not authenticated' } }),
+        });
+      }
+    });
+
+    // Login
+    await this.page.route('**/v1/admin/login', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
+      }
+
+      const body = route.request().postDataJSON();
+      const password = body?.password;
+
+      if (this.loginHandler) {
+        const success = this.loginHandler(password);
+        if (success) {
+          this.isAuthenticated = true;
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ message: 'Login successful' }),
+          });
+        } else {
+          await route.fulfill({
+            status: 401,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: { code: 'invalid_credentials', message: 'Invalid password' } }),
+          });
+        }
+        return;
+      }
+
+      // Default: accept any non-empty password
+      if (password && password.length > 0) {
+        this.isAuthenticated = true;
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'Login successful' }),
+        });
+      } else {
+        await route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'invalid_credentials', message: 'Invalid password' } }),
+        });
+      }
+    });
+
+    // Logout
+    await this.page.route('**/v1/admin/logout', async (route) => {
+      if (route.request().method() !== 'POST') {
+        await route.continue();
+        return;
+      }
+
+      this.isAuthenticated = false;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Logged out' }),
+      });
+    });
+
     // List domains
     await this.page.route('**/v1/domains?*', async (route) => {
       const url = new URL(route.request().url());

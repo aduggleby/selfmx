@@ -47,29 +47,35 @@ class ApiClient {
     try {
       response = await fetch(requestUrl, {
         ...options,
+        credentials: 'include',
         headers,
       });
-    } catch (error) {
+    } catch {
       throw new Error(
         `API unreachable at ${apiHost}. Check that the server and port are running.`
       );
     }
 
     if (!response.ok) {
+      if (response.status === 401) {
+        window.dispatchEvent(new Event('selfmx:unauthorized'));
+      }
       let message = `Request failed with status ${response.status} from ${apiHost}.`;
       try {
         const errorBody = await response.json();
         message = errorBody?.error?.message || message;
-      } catch (error) {
+      } catch {
         // Ignore JSON parse errors and keep fallback message.
       }
-      throw new Error(message);
+      const err = new Error(message) as Error & { status: number };
+      err.status = response.status;
+      throw err;
     }
 
     let data: unknown;
     try {
       data = await response.json();
-    } catch (error) {
+    } catch {
       throw new Error(
         `API returned invalid JSON from ${apiHost}. Check that the server and port are running.`
       );
@@ -111,23 +117,29 @@ class ApiClient {
     try {
       response = await fetch(requestUrl, {
         method: 'DELETE',
+        credentials: 'include',
         headers,
       });
-    } catch (error) {
+    } catch {
       throw new Error(
         `API unreachable at ${apiHost}. Check that the server and port are running.`
       );
     }
 
     if (!response.ok) {
+      if (response.status === 401) {
+        window.dispatchEvent(new Event('selfmx:unauthorized'));
+      }
       let message = `Delete failed with status ${response.status} from ${apiHost}.`;
       try {
         const errorBody = await response.json();
         message = errorBody?.error?.message || message;
-      } catch (error) {
+      } catch {
         // Ignore JSON parse errors and keep fallback message.
       }
-      throw new Error(message);
+      const err = new Error(message) as Error & { status: number };
+      err.status = response.status;
+      throw err;
     }
   }
 
@@ -142,6 +154,74 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(request),
     });
+  }
+
+  async login(password: string): Promise<void> {
+    const requestUrl = getApiUrl('/admin/login');
+    const apiHost = getApiHost('/admin/login');
+    let response: Response;
+
+    try {
+      response = await fetch(requestUrl, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+    } catch {
+      throw new Error(
+        `API unreachable at ${apiHost}. Check that the server and port are running.`
+      );
+    }
+
+    if (!response.ok) {
+      let message = 'Login failed';
+      try {
+        const errorBody = await response.json();
+        message = errorBody?.error?.message || message;
+      } catch {
+        // Ignore JSON parse errors
+      }
+      const err = new Error(message) as Error & { status: number };
+      err.status = response.status;
+      throw err;
+    }
+  }
+
+  async logout(): Promise<void> {
+    const requestUrl = getApiUrl('/admin/logout');
+    try {
+      await fetch(requestUrl, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // Ignore logout errors - user should still be logged out locally
+    }
+  }
+
+  async checkAuth(): Promise<{ email: string }> {
+    const requestUrl = getApiUrl('/admin/me');
+    const apiHost = getApiHost('/admin/me');
+    let response: Response;
+
+    try {
+      response = await fetch(requestUrl, {
+        credentials: 'include',
+      });
+    } catch {
+      throw new Error(
+        `API unreachable at ${apiHost}. Check that the server and port are running.`
+      );
+    }
+
+    if (!response.ok) {
+      const err = new Error('Not authenticated') as Error & { status: number };
+      err.status = response.status;
+      throw err;
+    }
+
+    return response.json();
   }
 }
 
