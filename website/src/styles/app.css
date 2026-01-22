@@ -1,0 +1,77 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-serif: "Source Serif 4", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+
+  /* Green brand colors */
+  --color-brand-50: oklch(0.97 0.02 145);
+  --color-brand-100: oklch(0.93 0.04 145);
+  --color-brand-200: oklch(0.86 0.08 145);
+  --color-brand-300: oklch(0.76 0.12 145);
+  --color-brand-400: oklch(0.64 0.16 145);
+  --color-brand-500: oklch(0.55 0.18 145);
+  --color-brand-600: oklch(0.48 0.16 145);
+  --color-brand-700: oklch(0.4 0.14 145);
+  --color-brand-800: oklch(0.34 0.12 145);
+  --color-brand-900: oklch(0.28 0.1 145);
+}
+
+/* Apply serif font to all headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-serif);
+}
+
+/* Force dark theme for all code blocks (consistent appearance in light/dark mode) */
+.prose pre {
+  background-color: var(--shiki-dark-bg, #24292e) !important;
+}
+
+.prose pre code {
+  background-color: transparent !important;
+}
+
+/* Force Shiki dark theme colors for syntax highlighting */
+.prose pre span {
+  color: var(--shiki-dark) !important;
+}
+
+/* Architecture diagram styling */
+.diagram {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* Code block styling */
+.code-block {
+  position: relative;
+}
+
+.code-block pre {
+  margin: 0;
+  background: transparent !important;
+}
+
+.code-block code {
+  font-size: 0.875rem;
+  line-height: 1.625;
+}
+
+/* Shiki dual theme support */
+.shiki span {
+  color: var(--shiki-light);
+}
+
+.dark .shiki span {
+  color: var(--shiki-dark);
+}

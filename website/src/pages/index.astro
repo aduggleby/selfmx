@@ -1,0 +1,204 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import CodeBlock from "../components/CodeBlock.astro";
+
+const quickStartCode = `# Pull the Docker image
+docker pull ghcr.io/aduggleby/selfmx:latest
+
+# Run with default configuration
+docker run -d \\
+  -p 2525:2525 \\
+  -p 8080:8080 \\
+  -e DATABASE_URL=postgres://user:pass@host/selfmx \\
+  -e API_KEY=your-secret-key \\
+  ghcr.io/aduggleby/selfmx:latest`;
+
+const sendEmailCode = `curl -X POST https://api.yourdomain.com/v1/send \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "from": "sender@yourdomain.com",
+    "to": "recipient@example.com",
+    "subject": "Hello from SelfMX",
+    "html": "<p>Your email content here</p>"
+  }'`;
+
+const features = [
+  { title: "Self-Hosted", desc: "Full control over your email infrastructure. Your data stays on your servers." },
+  { title: "REST API", desc: "Simple HTTP API for sending emails from any language or platform." },
+  { title: "Multi-Tenant", desc: "Support for multiple domains and API keys with isolated configurations." },
+  { title: "Webhooks", desc: "Real-time notifications for delivery status, bounces, and complaints." },
+  { title: "Templates", desc: "Built-in templating engine for dynamic email content." },
+  { title: "Audit Trail", desc: "Complete logging of all email activity for compliance and debugging." },
+];
+---
+
+<BaseLayout
+  title="SelfMX - Self-hosted Email API"
+  description="Send transactional emails from your own infrastructure. Self-hosted alternative to SendGrid and Mailgun with full API control."
+>
+  <section id="top" class="mb-10 md:mb-16">
+    <div class="mb-4 pt-24">
+      <a
+        href="/changelog"
+        class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+      >
+        v1.0.0
+      </a>
+    </div>
+    <h1 class="mb-4 max-w-4xl text-3xl font-bold text-zinc-900 sm:mb-6 sm:text-8xl dark:text-white">
+      Send email from your infrastructure
+    </h1>
+    <blockquote
+      class="mb-18 border-l-2 border-zinc-200 pl-4 text-sm text-zinc-400 italic dark:border-zinc-700 dark:text-zinc-500"
+    >
+      Self-hosted transactional email API - like SendGrid, but yours.
+    </blockquote>
+    <p class="mb-8 font-serif text-zinc-600 sm:text-3xl dark:text-zinc-400">
+      SelfMX is a complete email sending solution that runs on your servers. Deploy once, send emails through a simple
+      REST API, and maintain full control over your email infrastructure.
+    </p>
+  </section>
+
+  <section id="features" class="mb-10 md:mb-16">
+    <h2 class="mb-2 text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">Features</h2>
+    <p class="mb-4 text-zinc-500 sm:mb-6 dark:text-zinc-400">
+      Everything you need to send transactional emails reliably.
+    </p>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        features.map((feature) => (
+          <div class="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
+            <h3 class="mb-1 font-semibold text-zinc-900 dark:text-white">{feature.title}</h3>
+            <p class="text-sm text-zinc-600 dark:text-zinc-400">{feature.desc}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section id="getting-started" class="mb-10 md:mb-16">
+    <h2 class="mb-2 text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">Getting started</h2>
+    <p class="mb-4 text-zinc-500 sm:mb-6 dark:text-zinc-400">Deploy SelfMX with Docker and start sending emails.</p>
+
+    <div class="mb-6">
+      <h3 class="mb-3 text-lg font-semibold text-zinc-800 dark:text-zinc-200">Step 1: Deploy SelfMX</h3>
+      <CodeBlock code={quickStartCode} lang="bash" filename="terminal" />
+    </div>
+
+    <div class="mb-6">
+      <h3 class="mb-3 text-lg font-semibold text-zinc-800 dark:text-zinc-200">Step 2: Send an Email</h3>
+      <CodeBlock code={sendEmailCode} lang="bash" filename="send-email" />
+    </div>
+
+    <p class="text-sm text-zinc-500 dark:text-zinc-400">
+      See the <a href="/getting-started" class="text-green-600 hover:underline dark:text-green-400"
+        >full documentation</a
+      > for detailed configuration options and API reference.
+    </p>
+  </section>
+
+  <section id="architecture" class="mb-10 md:mb-16">
+    <h2 class="mb-2 text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">How it works</h2>
+    <p class="mb-4 text-zinc-500 sm:mb-6 dark:text-zinc-400">
+      SelfMX receives API requests, processes email content, and delivers through SMTP.
+    </p>
+
+    <div
+      class="overflow-x-auto rounded-xl border border-zinc-200 bg-zinc-50 p-4 sm:p-6 dark:border-zinc-700 dark:bg-zinc-900"
+    >
+      <pre
+        class="diagram text-zinc-700 dark:text-zinc-300">{`
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              YOUR APPLICATION                                   │
+│                                                                                 │
+│    Send email via REST API: POST /v1/send                                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              YOUR SERVER                                        │
+│  ┌──────────────────────────────────────────────────────────────────────────┐   │
+│  │                              SelfMX                                       │  │
+│  │                                                                           │  │
+│  │   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                   │  │
+│  │   │   REST API  │───▶│   Queue     │───▶│   SMTP      │                   │  │
+│  │   │   :8080     │    │  Processor  │    │  Sender     │                   │  │
+│  │   └─────────────┘    └─────────────┘    └─────────────┘                   │  │
+│  │          │                  │                  │                          │  │
+│  │          ▼                  ▼                  ▼                          │  │
+│  │   ┌─────────────────────────────────────────────────────────────────┐    │  │
+│  │   │                     PostgreSQL Database                          │    │  │
+│  │   │              (emails, logs, templates, api keys)                 │    │  │
+│  │   └─────────────────────────────────────────────────────────────────┘    │  │
+│  └──────────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                       │  SMTP
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              RECIPIENT                                          │
+│                      Email delivered to inbox                                   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+      `}</pre>
+    </div>
+  </section>
+
+  <section id="links" class="mb-10 md:mb-16">
+    <h2 class="mb-2 text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">Resources</h2>
+    <p class="mb-4 text-zinc-500 sm:mb-6 dark:text-zinc-400">Documentation, source code, and container images.</p>
+
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <a
+        href="https://github.com/aduggleby/selfmx"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 transition-colors hover:border-green-300 hover:bg-green-50 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-green-700 dark:hover:bg-green-900/20"
+      >
+        <svg class="h-8 w-8 text-zinc-700 dark:text-zinc-300" fill="currentColor" viewBox="0 0 24 24">
+          <path
+            fill-rule="evenodd"
+            d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+            clip-rule="evenodd"></path>
+        </svg>
+        <div>
+          <div class="font-semibold text-zinc-900 dark:text-white">GitHub Repository</div>
+          <div class="text-sm text-zinc-500 dark:text-zinc-400">Source code & documentation</div>
+        </div>
+      </a>
+      <a
+        href="/getting-started"
+        class="flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 transition-colors hover:border-green-300 hover:bg-green-50 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-green-700 dark:hover:bg-green-900/20"
+      >
+        <svg class="h-8 w-8 text-zinc-700 dark:text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+          ></path>
+        </svg>
+        <div>
+          <div class="font-semibold text-zinc-900 dark:text-white">Documentation</div>
+          <div class="text-sm text-zinc-500 dark:text-zinc-400">Complete guides & API reference</div>
+        </div>
+      </a>
+      <a
+        href="https://ghcr.io/aduggleby/selfmx"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 transition-colors hover:border-green-300 hover:bg-green-50 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-green-700 dark:hover:bg-green-900/20"
+      >
+        <svg class="h-8 w-8 text-zinc-700 dark:text-zinc-300" fill="currentColor" viewBox="0 0 24 24">
+          <path
+            d="M4.5 3A1.5 1.5 0 003 4.5v15A1.5 1.5 0 004.5 21h15a1.5 1.5 0 001.5-1.5v-15A1.5 1.5 0 0019.5 3h-15zM8 7a1 1 0 012 0v10a1 1 0 01-2 0V7zm6 0a1 1 0 012 0v10a1 1 0 01-2 0V7z"
+          ></path>
+        </svg>
+        <div>
+          <div class="font-semibold text-zinc-900 dark:text-white">Docker Image</div>
+          <div class="text-sm text-zinc-500 dark:text-zinc-400">ghcr.io/aduggleby/selfmx</div>
+        </div>
+      </a>
+    </div>
+  </section>
+</BaseLayout>
