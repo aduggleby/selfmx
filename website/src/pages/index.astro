@@ -2,7 +2,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import CodeBlock from "../components/CodeBlock.astro";
 
-const installCode = `ssh user@server 'curl -fsSL https://selfmx.com/install.sh | bash -s'`;
+const installCode = `curl -fsSL https://selfmx.com/install.sh | bash -s user@your-server-ip`;
 
 const sendEmailCode = `curl -X POST https://mail.yourdomain.com/v1/emails \\
   -H "Authorization: Bearer re_your_api_key" \\

@@ -8,16 +8,10 @@ SelfMX can be installed on any Ubuntu 22.04+ server with a single command. The i
 
 ## Quick Install
 
-Run this command from your local machine to install on a remote server:
+Run this command from your local machine:
 
 ```bash
-ssh user@server 'curl -fsSL https://selfmx.com/install.sh | bash -s'
-```
-
-Or run directly on the server as root:
-
-```bash
-curl -fsSL https://selfmx.com/install.sh | bash -s
+curl -fsSL https://selfmx.com/install.sh | bash -s user@your-server-ip
 ```
 
 The interactive installer will prompt you for:
