@@ -21,17 +21,7 @@ var project = Dotnet.Project("./src/SelfMX.Api/SelfMX.Api.csproj");
 var testProject = Dotnet.Project("./tests/SelfMX.Api.Tests/SelfMX.Api.Tests.csproj");
 var frontend = Directory("./client");
 
-// Read version from csproj (default to 1.0.0 if not found)
-var csprojPath = Path.Combine(Environment.CurrentDirectory, "src/SelfMX.Api/SelfMX.Api.csproj");
-var version = "1.0.0";
-if (File.Exists(csprojPath))
-{
-    var csprojContent = File.ReadAllText(csprojPath);
-    var versionMatch = System.Text.RegularExpressions.Regex.Match(csprojContent, @"<Version>(\d+\.\d+\.\d+)</Version>");
-    if (versionMatch.Success)
-        version = versionMatch.Groups[1].Value;
-}
-Log.Info($"Building SelfMX version: {version}");
+Log.Info($"Building SelfMX version: {project.Version}");
 
 // Install .NET SDK
 Dotnet.SdkInstall();
@@ -65,14 +55,14 @@ if (push)
 
     // Build Docker image using existing Dockerfile
     Docker.Build("./Dockerfile", o => o
-        .WithTag($"selfmx:{version}")
+        .WithTag($"selfmx:{project.Version}")
         .WithTag("selfmx:latest")
         .WithContext("."));
 
     // Push to GitHub Container Registry
     Log.Info("Pushing to GitHub Container Registry...");
     GitHub.PushImage("selfmx", o => o
-        .WithTag(version)
+        .WithTag(project.Version)
         .WithOwner("aduggleby"));
 
     GitHub.PushImage("selfmx", o => o
@@ -80,7 +70,7 @@ if (push)
         .WithOwner("aduggleby"));
 
     // Tag and push git
-    Git.Tag($"v{version}", o => o.WithSkipIfExists());
+    Git.Tag($"v{project.Version}", o => o.WithSkipIfExists());
     Git.Push();
     Git.PushTags();
 
