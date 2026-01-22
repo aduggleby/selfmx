@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
+using SelfMX.Api.Services;
 using SelfMX.Api.Settings;
 
 namespace SelfMX.Api.Authentication;
@@ -11,26 +12,29 @@ public class ApiKeyAuthHandler : AuthenticationHandler<AuthenticationSchemeOptio
     private const string ApiKeyHeader = "Authorization";
     private const string BearerPrefix = "Bearer ";
     private readonly AppSettings _settings;
+    private readonly ApiKeyService _apiKeyService;
     private readonly ILogger<ApiKeyAuthHandler> _logger;
 
     public ApiKeyAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory loggerFactory,
         UrlEncoder encoder,
-        IOptions<AppSettings> settings)
+        IOptions<AppSettings> settings,
+        ApiKeyService apiKeyService)
         : base(options, loggerFactory, encoder)
     {
         _settings = settings.Value;
+        _apiKeyService = apiKeyService;
         _logger = loggerFactory.CreateLogger<ApiKeyAuthHandler>();
     }
 
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         if (!Request.Headers.TryGetValue(ApiKeyHeader, out var authHeader))
         {
-            _logger.LogWarning("Auth failed: missing header, IP={Ip}, Path={Path}",
+            _logger.LogDebug("Auth: no Authorization header, IP={Ip}, Path={Path}",
                 Context.Connection.RemoteIpAddress, Request.Path);
-            return Task.FromResult(AuthenticateResult.Fail("Missing Authorization header"));
+            return AuthenticateResult.NoResult();
         }
 
         var headerValue = authHeader.ToString();
@@ -38,23 +42,64 @@ public class ApiKeyAuthHandler : AuthenticationHandler<AuthenticationSchemeOptio
         {
             _logger.LogWarning("Auth failed: invalid format, IP={Ip}, Path={Path}",
                 Context.Connection.RemoteIpAddress, Request.Path);
-            return Task.FromResult(AuthenticateResult.Fail("Invalid Authorization header format"));
+            return AuthenticateResult.Fail("Invalid Authorization header format");
         }
 
         var apiKey = headerValue[BearerPrefix.Length..];
+        var ipAddress = Context.Connection.RemoteIpAddress?.ToString();
 
-        if (!BCrypt.Net.BCrypt.Verify(apiKey, _settings.ApiKeyHash))
+        // Try multi-key validation first (new system)
+        if (apiKey.StartsWith("re_"))
         {
-            _logger.LogWarning("Auth failed: invalid key, IP={Ip}, Path={Path}",
-                Context.Connection.RemoteIpAddress, Request.Path);
-            return Task.FromResult(AuthenticateResult.Fail("Invalid API key"));
+            var validatedKey = await _apiKeyService.ValidateAsync(apiKey, ipAddress, Context.RequestAborted);
+            if (validatedKey is not null)
+            {
+                var claims = new List<Claim>
+                {
+                    new(ClaimTypes.Name, validatedKey.Name),
+                    new("ActorType", validatedKey.IsAdmin ? "admin" : "api_key"),
+                    new("KeyPrefix", validatedKey.KeyPrefix),
+                    new("KeyId", validatedKey.Id)
+                };
+
+                // Add allowed domains as claims (for non-admin keys)
+                if (!validatedKey.IsAdmin)
+                {
+                    foreach (var domain in validatedKey.AllowedDomains)
+                    {
+                        claims.Add(new Claim("AllowedDomain", domain.DomainId));
+                    }
+                }
+
+                var identity = new ClaimsIdentity(claims, Scheme.Name);
+                var principal = new ClaimsPrincipal(identity);
+                var ticket = new AuthenticationTicket(principal, Scheme.Name);
+
+                return AuthenticateResult.Success(ticket);
+            }
         }
 
-        var claims = new[] { new Claim(ClaimTypes.Name, "api-user") };
-        var identity = new ClaimsIdentity(claims, Scheme.Name);
-        var principal = new ClaimsPrincipal(identity);
-        var ticket = new AuthenticationTicket(principal, Scheme.Name);
+        // Fallback to legacy single-key mode (backward compatibility)
+        if (!string.IsNullOrEmpty(_settings.ApiKeyHash))
+        {
+            if (BCrypt.Net.BCrypt.Verify(apiKey, _settings.ApiKeyHash))
+            {
+                var claims = new List<Claim>
+                {
+                    new(ClaimTypes.Name, "legacy-api-user"),
+                    new("ActorType", "admin") // Legacy keys have full access
+                };
 
-        return Task.FromResult(AuthenticateResult.Success(ticket));
+                var identity = new ClaimsIdentity(claims, Scheme.Name);
+                var principal = new ClaimsPrincipal(identity);
+                var ticket = new AuthenticationTicket(principal, Scheme.Name);
+
+                return AuthenticateResult.Success(ticket);
+            }
+        }
+
+        _logger.LogWarning("Auth failed: invalid key, IP={Ip}, Path={Path}",
+            ipAddress, Request.Path);
+        return AuthenticateResult.Fail("Invalid API key");
     }
 }

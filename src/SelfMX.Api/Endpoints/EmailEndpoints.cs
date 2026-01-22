@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using SelfMX.Api.Contracts.Requests;
 using SelfMX.Api.Contracts.Responses;
@@ -14,10 +15,13 @@ public static class EmailEndpoints
         return group;
     }
 
-    private static async Task<Results<Ok<SendEmailResponse>, BadRequest<object>, UnprocessableEntity<object>>> SendEmail(
+    private static async Task<Results<Ok<SendEmailResponse>, BadRequest<object>, UnprocessableEntity<object>, ForbidHttpResult>> SendEmail(
         SendEmailRequest request,
         DomainService domainService,
+        ApiKeyService apiKeyService,
+        AuditService auditService,
         ISesService sesService,
+        ClaimsPrincipal user,
         CancellationToken ct = default)
     {
         // Validate request
@@ -26,6 +30,15 @@ public static class EmailEndpoints
             string.IsNullOrWhiteSpace(request.Subject) ||
             (string.IsNullOrWhiteSpace(request.Html) && string.IsNullOrWhiteSpace(request.Text)))
         {
+            auditService.Log(new AuditEntry(
+                Action: "email.send",
+                ActorType: user.FindFirst("ActorType")?.Value ?? "unknown",
+                ActorId: user.FindFirst("KeyPrefix")?.Value,
+                ResourceType: "email",
+                ResourceId: null,
+                StatusCode: 400,
+                ErrorMessage: "Invalid request: missing required fields"
+            ));
             return TypedResults.BadRequest(ApiError.InvalidRequest.ToResponse());
         }
 
@@ -33,6 +46,15 @@ public static class EmailEndpoints
         var fromParts = request.From.Split('@');
         if (fromParts.Length != 2)
         {
+            auditService.Log(new AuditEntry(
+                Action: "email.send",
+                ActorType: user.FindFirst("ActorType")?.Value ?? "unknown",
+                ActorId: user.FindFirst("KeyPrefix")?.Value,
+                ResourceType: "email",
+                ResourceId: null,
+                StatusCode: 400,
+                ErrorMessage: "Invalid From address format"
+            ));
             return TypedResults.BadRequest(new ApiError("invalid_from", "Invalid From address format").ToResponse());
         }
 
@@ -41,7 +63,31 @@ public static class EmailEndpoints
 
         if (domain is null || domain.Status != DomainStatus.Verified)
         {
+            auditService.Log(new AuditEntry(
+                Action: "email.send",
+                ActorType: user.FindFirst("ActorType")?.Value ?? "unknown",
+                ActorId: user.FindFirst("KeyPrefix")?.Value,
+                ResourceType: "email",
+                ResourceId: null,
+                StatusCode: 422,
+                ErrorMessage: $"Domain not verified: {domainName}"
+            ));
             return TypedResults.UnprocessableEntity(ApiError.DomainNotVerified.ToResponse());
+        }
+
+        // Check domain scope for non-admin API keys
+        if (!apiKeyService.CanAccessDomain(user, domain.Id))
+        {
+            auditService.Log(new AuditEntry(
+                Action: "email.send",
+                ActorType: user.FindFirst("ActorType")?.Value ?? "unknown",
+                ActorId: user.FindFirst("KeyPrefix")?.Value,
+                ResourceType: "email",
+                ResourceId: null,
+                StatusCode: 403,
+                ErrorMessage: $"API key not authorized for domain: {domainName}"
+            ));
+            return TypedResults.Forbid();
         }
 
         var messageId = await sesService.SendEmailAsync(
@@ -54,6 +100,16 @@ public static class EmailEndpoints
             request.Bcc,
             request.ReplyTo,
             ct);
+
+        auditService.Log(new AuditEntry(
+            Action: "email.send",
+            ActorType: user.FindFirst("ActorType")?.Value ?? "unknown",
+            ActorId: user.FindFirst("KeyPrefix")?.Value,
+            ResourceType: "email",
+            ResourceId: messageId,
+            StatusCode: 200,
+            Details: new { Domain = domainName, RecipientCount = request.To.Length }
+        ));
 
         return TypedResults.Ok(new SendEmailResponse(messageId));
     }

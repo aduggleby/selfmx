@@ -1,8 +1,10 @@
+using System.Threading.RateLimiting;
 using Amazon;
 using Amazon.SimpleEmailV2;
 using Hangfire;
 using Hangfire.Storage.SQLite;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SelfMX.Api.Authentication;
@@ -20,10 +22,16 @@ builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("App"))
 builder.Services.Configure<AwsSettings>(builder.Configuration.GetSection("Aws"));
 builder.Services.Configure<CloudflareSettings>(builder.Configuration.GetSection("Cloudflare"));
 
-// SQLite with WAL mode
+// SQLite with WAL mode - main database
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(
         builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=selfmx.db",
+        sqlite => sqlite.CommandTimeout(30)));
+
+// Separate audit database to prevent SQLite lock contention
+builder.Services.AddDbContext<AuditDbContext>(options =>
+    options.UseSqlite(
+        builder.Configuration.GetConnectionString("AuditConnection") ?? "Data Source=audit.db",
         sqlite => sqlite.CommandTimeout(30)));
 
 // Hangfire with SQLite
@@ -39,10 +47,34 @@ builder.Services.AddHangfireServer(options =>
     options.Queues = ["default"];
 });
 
-// Authentication
-builder.Services.AddAuthentication("ApiKey")
+// Dual Authentication: Cookie (admin UI) + API Key (programmatic)
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultScheme = "ApiKey";
+        options.DefaultChallengeScheme = "ApiKey";
+    })
+    .AddCookie("Cookie", options =>
+    {
+        options.Cookie.Name = "SelfMX.Admin";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.ExpireTimeSpan = TimeSpan.FromDays(30);
+        options.SlidingExpiration = true;
+        options.Events.OnRedirectToLogin = context =>
+        {
+            context.Response.StatusCode = 401;
+            return Task.CompletedTask;
+        };
+    })
     .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthHandler>("ApiKey", null);
-builder.Services.AddAuthorization();
+
+// Authorization policies
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireClaim("ActorType", "admin"));
+});
 
 // AWS SES
 builder.Services.AddSingleton<IAmazonSimpleEmailServiceV2>(sp =>
@@ -72,10 +104,41 @@ builder.Services.AddHttpClient<ICloudflareService, CloudflareService>();
 builder.Services.AddScoped<DomainService>();
 builder.Services.AddScoped<ISesService, SesService>();
 builder.Services.AddSingleton<IDnsVerificationService, DnsVerificationService>();
+builder.Services.AddScoped<ApiKeyService>();
+builder.Services.AddSingleton<AuditService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditService>());
+builder.Services.AddHttpContextAccessor();
 
 // Health checks
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<AppDbContext>("database");
+    .AddDbContextCheck<AppDbContext>("database")
+    .AddDbContextCheck<AuditDbContext>("audit-database");
+
+// Rate limiting: Fixed window for login (5/min), sliding window for API (100/min)
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+    options.OnRejected = async (context, ct) =>
+    {
+        context.HttpContext.Response.ContentType = "application/json";
+        await context.HttpContext.Response.WriteAsJsonAsync(ApiError.RateLimited.ToResponse(), ct);
+    };
+
+    options.AddFixedWindowLimiter("login", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.PermitLimit = 5;
+        opt.QueueLimit = 0;
+    });
+
+    options.AddSlidingWindowLimiter("api", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.PermitLimit = 100;
+        opt.SegmentsPerWindow = 6;
+        opt.QueueLimit = 0;
+    });
+});
 
 // CORS for frontend
 builder.Services.AddCors(options =>
@@ -84,7 +147,8 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? ["http://localhost:5173"])
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials(); // Required for cookie auth
     });
 });
 
@@ -106,13 +170,15 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.EnsureCreatedAsync();
-
-    // Enable WAL mode
     await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
+
+    var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+    await auditDb.Database.EnsureCreatedAsync();
+    await auditDb.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
 }
 
 app.UseCors();
-app.UseMiddleware<RateLimitMiddleware>();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -121,9 +187,20 @@ app.MapHealthChecks("/health");
 app.MapGet("/", () => new HealthResponse("ok", DateTime.UtcNow));
 
 // API v1 routes
-var v1 = app.MapGroup("/v1").RequireAuthorization();
-v1.MapDomainEndpoints();
-v1.MapEmailEndpoints();
+var v1 = app.MapGroup("/v1");
+
+// Admin auth endpoints - rate limited for brute force protection
+v1.MapAdminEndpoints().RequireRateLimiting("login");
+
+// Authenticated endpoints - require valid API key or cookie
+var authenticated = v1.RequireAuthorization().RequireRateLimiting("api");
+authenticated.MapDomainEndpoints();
+authenticated.MapEmailEndpoints();
+
+// Admin-only endpoints - require admin actor type
+var adminOnly = v1.RequireAuthorization("AdminOnly").RequireRateLimiting("api");
+adminOnly.MapApiKeyEndpoints();
+adminOnly.MapAuditEndpoints();
 
 // Hangfire dashboard (development only)
 if (app.Environment.IsDevelopment())

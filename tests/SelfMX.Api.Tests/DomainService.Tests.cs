@@ -25,6 +25,7 @@ public class DomainServiceTests : IDisposable
         var appSettings = Options.Create(new AppSettings
         {
             ApiKeyHash = "test",
+            AdminPasswordHash = "$2a$12$test", // BCrypt hash placeholder for tests
             VerificationTimeout = TimeSpan.FromHours(72)
         });
 
