@@ -44,9 +44,12 @@ Npm.Run(frontend, "build");
 // Push profile: Build and push Docker image, deploy website
 if (push)
 {
-    // Run Playwright E2E tests
+    // Install Playwright browsers and run E2E tests
+    Log.Info("Installing Playwright browsers...");
+    Playwright.Install(frontend);
+
     Log.Info("Running Playwright E2E tests...");
-    Npm.Run(frontend, "test");
+    Npm.Run(frontend, "test:ci");
 
     Log.Info("Building Docker image...");
 

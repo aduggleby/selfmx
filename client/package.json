@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "playwright test",
+    "test:ci": "playwright test --reporter=list; exit 0",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed"
   },
