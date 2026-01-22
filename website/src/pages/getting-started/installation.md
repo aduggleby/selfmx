@@ -11,7 +11,7 @@ SelfMX can be installed on any Ubuntu 22.04+ server with a single command. The i
 Run this command on your server as root:
 
 ```bash
-curl -fsSL https://selfmx.com/install.sh | bash
+curl -fsSL https://selfmx.com/install.sh | bash -s
 ```
 
 The interactive installer will prompt you for:
@@ -23,7 +23,7 @@ The interactive installer will prompt you for:
 
 ## Requirements
 
-- **Ubuntu 22.04 LTS** or newer (24.04 recommended)
+- **Ubuntu 22.04 LTS** or newer (tested on Hetzner with Ubuntu 24.04)
 - **Root access** - The script must run as root
 - **5GB disk space** minimum
 - **Ports 80 and 443** available for Caddy
@@ -52,7 +52,7 @@ export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 export AWS_REGION="us-east-1"
 export AUTO_CONFIRM=1
 
-curl -fsSL https://selfmx.com/install.sh | bash
+curl -fsSL https://selfmx.com/install.sh | bash -s
 ```
 
 ## After Installation
@@ -74,7 +74,7 @@ Log in with your admin password to:
 To update an existing installation, run the installer again:
 
 ```bash
-curl -fsSL https://selfmx.com/install.sh | bash
+curl -fsSL https://selfmx.com/install.sh | bash -s
 ```
 
 Select **[U] Update** when prompted to preserve your configuration.
