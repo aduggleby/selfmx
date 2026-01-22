@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright
+playwright-report/
+test-results/
+.playwright-mcp/
+
+# Syncthing conflict files
+*.sync-conflict-*
+
+# Screenshots and temp files
+*.png
+take-screenshot.mjs
