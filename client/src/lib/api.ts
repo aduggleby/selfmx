@@ -10,6 +10,16 @@ import {
 
 const API_BASE = '/v1';
 
+const getApiUrl = (path: string) => {
+  if (typeof window === 'undefined') return `${API_BASE}${path}`;
+  return new URL(`${API_BASE}${path}`, window.location.origin).toString();
+};
+
+const getApiHost = (path: string) => {
+  if (typeof window === 'undefined') return 'server';
+  return new URL(`${API_BASE}${path}`, window.location.origin).host;
+};
+
 class ApiClient {
   private apiKey: string | null = null;
 
@@ -30,17 +40,40 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.apiKey}`;
     }
 
-    const response = await fetch(`${API_BASE}${path}`, {
-      ...options,
-      headers,
-    });
+    const requestUrl = getApiUrl(path);
+    const apiHost = getApiHost(path);
+    let response: Response;
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error?.error?.message || 'Request failed');
+    try {
+      response = await fetch(requestUrl, {
+        ...options,
+        headers,
+      });
+    } catch (error) {
+      throw new Error(
+        `API unreachable at ${apiHost}. Check that the server and port are running.`
+      );
     }
 
-    const data = await response.json();
+    if (!response.ok) {
+      let message = `Request failed with status ${response.status} from ${apiHost}.`;
+      try {
+        const errorBody = await response.json();
+        message = errorBody?.error?.message || message;
+      } catch (error) {
+        // Ignore JSON parse errors and keep fallback message.
+      }
+      throw new Error(message);
+    }
+
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch (error) {
+      throw new Error(
+        `API returned invalid JSON from ${apiHost}. Check that the server and port are running.`
+      );
+    }
     return schema.parse(data);
   }
 
@@ -71,14 +104,30 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.apiKey}`;
     }
 
-    const response = await fetch(`${API_BASE}/domains/${id}`, {
-      method: 'DELETE',
-      headers,
-    });
+    const requestUrl = getApiUrl(`/domains/${id}`);
+    const apiHost = getApiHost(`/domains/${id}`);
+    let response: Response;
+
+    try {
+      response = await fetch(requestUrl, {
+        method: 'DELETE',
+        headers,
+      });
+    } catch (error) {
+      throw new Error(
+        `API unreachable at ${apiHost}. Check that the server and port are running.`
+      );
+    }
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error?.error?.message || 'Delete failed');
+      let message = `Delete failed with status ${response.status} from ${apiHost}.`;
+      try {
+        const errorBody = await response.json();
+        message = errorBody?.error?.message || message;
+      } catch (error) {
+        // Ignore JSON parse errors and keep fallback message.
+      }
+      throw new Error(message);
     }
   }
 

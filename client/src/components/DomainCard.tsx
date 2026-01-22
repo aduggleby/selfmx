@@ -19,43 +19,50 @@ export function DomainCard({ domain, onDelete, isDeleting }: DomainCardProps) {
   return (
     <Card
       className={cn(
-        'group',
-        'motion-safe:animate-[scale-in_0.2s_ease-out]',
-        'hover:shadow-[var(--shadow-elevation-high)] hover:shadow-blue-500/5',
-        'hover:-translate-y-0.5'
+        'group relative overflow-hidden border-border/70',
+        'motion-safe:animate-[fade-slide_0.35s_ease-out]',
+        'hover:shadow-[var(--shadow-elevation-high)]',
+        'hover:-translate-y-1'
       )}
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-lg font-medium">{domain.name}</CardTitle>
-        <DomainStatusBadge status={domain.status} />
-      </CardHeader>
-      <CardContent>
-        <div className="text-sm text-muted-foreground mb-4">
-          Created: {new Date(domain.createdAt).toLocaleDateString()}
+      <div className="absolute inset-x-0 top-0 h-1 bg-primary" />
+      <CardHeader className="flex flex-col gap-3 pb-3">
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="text-lg font-semibold">{domain.name}</CardTitle>
+          <DomainStatusBadge status={domain.status} />
+        </div>
+        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+          <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1">
+            Added {new Date(domain.createdAt).toLocaleDateString()}
+          </span>
           {domain.verifiedAt && (
-            <span className="ml-4">
-              Verified: {new Date(domain.verifiedAt).toLocaleDateString()}
+            <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1">
+              Verified {new Date(domain.verifiedAt).toLocaleDateString()}
             </span>
           )}
         </div>
+      </CardHeader>
+      <CardContent>
 
         {domain.failureReason && (
-          <p className="text-sm text-[var(--status-failed-text)] mb-4">{domain.failureReason}</p>
+          <p className="mb-4 rounded-2xl border border-[var(--status-failed-text)]/30 bg-[var(--status-failed-bg)]/70 px-4 py-3 text-sm text-[var(--status-failed-text)]">
+            {domain.failureReason}
+          </p>
         )}
 
         {domain.status === 'verifying' && (
-          <p className="text-sm text-[var(--status-verifying-text)] mb-4">
+          <p className="mb-4 rounded-2xl border border-[var(--status-verifying-text)]/30 bg-[var(--status-verifying-bg)]/70 px-4 py-3 text-sm text-[var(--status-verifying-text)]">
             DNS records are being verified. This may take a few minutes.
           </p>
         )}
 
         {hasDnsRecords && (
-          <div className="mb-4">
+          <div className="mb-5">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowDns(!showDns)}
-              className="mb-2"
+              className="mb-3 rounded-full px-4"
             >
               {showDns ? 'Hide DNS Records' : 'Show DNS Records'}
             </Button>
@@ -77,6 +84,7 @@ export function DomainCard({ domain, onDelete, isDeleting }: DomainCardProps) {
           size="sm"
           onClick={() => onDelete(domain.id)}
           disabled={isDeleting}
+          className="rounded-full px-4"
         >
           {isDeleting ? 'Deleting...' : 'Delete'}
         </Button>

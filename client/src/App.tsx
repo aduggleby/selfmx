@@ -35,19 +35,30 @@ function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
+        <div className="relative min-h-screen">
           <header
             className={cn(
-              'sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm transition-shadow duration-200',
+              'sticky top-0 z-50 border-b border-border/70',
+              'bg-background',
+              'transition-shadow duration-200',
               scrolled && 'shadow-[var(--shadow-elevation-low)]'
             )}
           >
-            <div className="container mx-auto flex items-center justify-between py-4 px-4">
-              <h1 className="text-xl font-semibold tracking-tight">Selfmx</h1>
-              <ThemeToggle />
+            <div className="container mx-auto flex flex-col gap-3 py-5 px-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-3">
+                <div>
+                  <h1 className="font-display text-2xl leading-none">SelfMX</h1>
+                  <p className="text-xs text-muted-foreground">
+                    Self Hosted ESP Layer
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <ThemeToggle />
+              </div>
             </div>
           </header>
-          <main>
+          <main className="relative">
             <DomainsPage />
           </main>
         </div>

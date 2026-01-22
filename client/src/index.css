@@ -40,101 +40,124 @@
   50% { opacity: 0.2; transform: scale(1.05); }
 }
 
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes fade-slide {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer-diagonal {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
 :root {
-  --radius: 0.625rem;
-  --background: oklch(0.995 0.002 240);
-  --foreground: oklch(0.13 0.02 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.13 0.02 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.13 0.02 260);
-  --primary: oklch(0.55 0.24 263);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.97 0.01 255);
-  --secondary-foreground: oklch(0.25 0.05 260);
-  --muted: oklch(0.96 0.005 240);
-  --muted-foreground: oklch(0.45 0.02 260);
-  --accent: oklch(0.96 0.02 255);
-  --accent-foreground: oklch(0.25 0.05 260);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.92 0.005 240);
-  --input: oklch(0.92 0.005 240);
-  --ring: oklch(0.55 0.24 263);
+  --radius: 1rem;
+  --background: oklch(0.98 0.02 90);
+  --foreground: oklch(0.17 0.04 40);
+  --card: oklch(0.995 0.015 90);
+  --card-foreground: oklch(0.17 0.04 40);
+  --popover: oklch(0.99 0.02 90);
+  --popover-foreground: oklch(0.17 0.04 40);
+  --primary: oklch(0.62 0.18 185);
+  --primary-foreground: oklch(0.99 0.01 90);
+  --secondary: oklch(0.95 0.03 70);
+  --secondary-foreground: oklch(0.25 0.05 45);
+  --muted: oklch(0.95 0.015 80);
+  --muted-foreground: oklch(0.45 0.04 50);
+  --accent: oklch(0.92 0.06 35);
+  --accent-foreground: oklch(0.25 0.05 35);
+  --destructive: oklch(0.58 0.2 25);
+  --destructive-foreground: oklch(0.99 0.01 90);
+  --border: oklch(0.88 0.02 70);
+  --input: oklch(0.9 0.02 70);
+  --ring: oklch(0.62 0.18 185);
 
   /* Blue scale for colored shadows */
-  --blue-400: oklch(0.70 0.17 255);
-  --blue-500: oklch(0.62 0.21 260);
-  --blue-600: oklch(0.55 0.24 263);
+  --blue-400: oklch(0.68 0.16 200);
+  --blue-500: oklch(0.6 0.18 190);
+  --blue-600: oklch(0.52 0.2 185);
 
   /* Status colors */
-  --status-pending-bg: oklch(0.95 0.08 85);
-  --status-pending-text: oklch(0.45 0.12 85);
-  --status-verifying-bg: oklch(0.93 0.06 250);
-  --status-verifying-text: oklch(0.4 0.15 250);
-  --status-verified-bg: oklch(0.93 0.08 155);
-  --status-verified-text: oklch(0.35 0.15 155);
-  --status-failed-bg: oklch(0.93 0.08 25);
-  --status-failed-text: oklch(0.45 0.18 25);
+  --status-pending-bg: oklch(0.94 0.08 95);
+  --status-pending-text: oklch(0.48 0.12 95);
+  --status-verifying-bg: oklch(0.9 0.05 210);
+  --status-verifying-text: oklch(0.4 0.14 210);
+  --status-verified-bg: oklch(0.9 0.08 155);
+  --status-verified-text: oklch(0.36 0.16 155);
+  --status-failed-bg: oklch(0.93 0.09 28);
+  --status-failed-text: oklch(0.5 0.18 28);
 
   /* Multi-layer shadows for depth */
-  --shadow-elevation-low: 0 1px 2px oklch(0% 0 0 / 0.04), 0 1px 4px oklch(0% 0 0 / 0.04);
-  --shadow-elevation-medium: 0 2px 4px oklch(0% 0 0 / 0.04), 0 4px 12px oklch(0% 0 0 / 0.08);
-  --shadow-elevation-high: 0 4px 8px oklch(0% 0 0 / 0.04), 0 12px 32px oklch(0% 0 0 / 0.12);
+  --shadow-elevation-low: 0 1px 2px oklch(0% 0 0 / 0.06), 0 2px 6px oklch(0% 0 0 / 0.06);
+  --shadow-elevation-medium: 0 8px 18px oklch(0% 0 0 / 0.08), 0 2px 6px oklch(0% 0 0 / 0.05);
+  --shadow-elevation-high: 0 18px 40px oklch(0% 0 0 / 0.12), 0 4px 12px oklch(0% 0 0 / 0.08);
 
   /* Colored shadows for brand elements */
-  --shadow-primary-glow: 0 4px 14px oklch(0.55 0.24 263 / 0.25);
-  --shadow-primary-glow-hover: 0 6px 20px oklch(0.55 0.24 263 / 0.35);
-  --shadow-destructive-glow: 0 4px 14px oklch(0.55 0.22 25 / 0.25);
+  --shadow-primary-glow: none;
+  --shadow-primary-glow-hover: none;
+  --shadow-destructive-glow: none;
+
+  --canvas-1: oklch(0.98 0.02 90);
+  --canvas-2: oklch(0.96 0.04 75);
+  --canvas-3: oklch(0.94 0.03 115);
 }
 
 .dark {
   /* Enhanced surface gradation for visual hierarchy */
-  --background: oklch(0.12 0.015 260);
-  --foreground: oklch(0.96 0.005 240);
-  --card: oklch(0.16 0.015 260);
-  --card-foreground: oklch(0.96 0.005 240);
-  --card-elevated: oklch(0.20 0.015 260);
-  --popover: oklch(0.18 0.015 260);
-  --popover-foreground: oklch(0.96 0.005 240);
-  --primary: oklch(0.70 0.17 255);
-  --primary-foreground: oklch(0.15 0.02 260);
-  --secondary: oklch(0.22 0.015 260);
-  --secondary-foreground: oklch(0.96 0.005 240);
-  --muted: oklch(0.14 0.01 260);
-  --muted-foreground: oklch(0.65 0.02 260);
-  --accent: oklch(0.25 0.015 260);
-  --accent-foreground: oklch(0.96 0.005 240);
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(0.96 0.005 240);
-  --border: oklch(0.24 0.01 260);
-  --input: oklch(0.22 0.015 260);
-  --ring: oklch(0.70 0.17 255);
+  --background: oklch(0.14 0.02 240);
+  --foreground: oklch(0.95 0.01 90);
+  --card: oklch(0.18 0.02 240);
+  --card-foreground: oklch(0.95 0.01 90);
+  --card-elevated: oklch(0.22 0.02 240);
+  --popover: oklch(0.2 0.02 240);
+  --popover-foreground: oklch(0.95 0.01 90);
+  --primary: oklch(0.68 0.16 185);
+  --primary-foreground: oklch(0.2 0.03 240);
+  --secondary: oklch(0.24 0.02 240);
+  --secondary-foreground: oklch(0.95 0.01 90);
+  --muted: oklch(0.2 0.02 240);
+  --muted-foreground: oklch(0.7 0.02 90);
+  --accent: oklch(0.28 0.03 25);
+  --accent-foreground: oklch(0.95 0.01 90);
+  --destructive: oklch(0.6 0.18 25);
+  --destructive-foreground: oklch(0.96 0.01 90);
+  --border: oklch(0.28 0.02 240);
+  --input: oklch(0.26 0.02 240);
+  --ring: oklch(0.68 0.16 185);
 
   /* Blue scale for dark mode shadows */
-  --blue-400: oklch(0.70 0.17 255);
-  --blue-500: oklch(0.62 0.21 260);
-  --blue-600: oklch(0.55 0.24 263);
+  --blue-400: oklch(0.68 0.16 190);
+  --blue-500: oklch(0.62 0.18 185);
+  --blue-600: oklch(0.56 0.2 180);
 
   /* Dark mode status colors */
-  --status-pending-bg: oklch(0.28 0.06 85);
-  --status-pending-text: oklch(0.8 0.1 85);
-  --status-verifying-bg: oklch(0.25 0.05 250);
-  --status-verifying-text: oklch(0.75 0.12 250);
-  --status-verified-bg: oklch(0.25 0.06 155);
-  --status-verified-text: oklch(0.8 0.12 155);
-  --status-failed-bg: oklch(0.28 0.06 25);
-  --status-failed-text: oklch(0.85 0.12 25);
+  --status-pending-bg: oklch(0.35 0.08 95);
+  --status-pending-text: oklch(0.85 0.1 95);
+  --status-verifying-bg: oklch(0.3 0.05 210);
+  --status-verifying-text: oklch(0.8 0.12 210);
+  --status-verified-bg: oklch(0.32 0.08 155);
+  --status-verified-text: oklch(0.86 0.12 155);
+  --status-failed-bg: oklch(0.34 0.08 28);
+  --status-failed-text: oklch(0.88 0.12 28);
 
   /* Dark mode shadow adjustments - use subtle white outlines for definition */
-  --shadow-elevation-low: 0 1px 2px oklch(0% 0 0 / 0.2), 0 0 0 1px oklch(100% 0 0 / 0.03);
-  --shadow-elevation-medium: 0 2px 8px oklch(0% 0 0 / 0.3), 0 0 0 1px oklch(100% 0 0 / 0.05);
-  --shadow-elevation-high: 0 8px 24px oklch(0% 0 0 / 0.4), 0 0 0 1px oklch(100% 0 0 / 0.05);
+  --shadow-elevation-low: 0 1px 2px oklch(0% 0 0 / 0.35), 0 0 0 1px oklch(100% 0 0 / 0.03);
+  --shadow-elevation-medium: 0 6px 18px oklch(0% 0 0 / 0.35), 0 0 0 1px oklch(100% 0 0 / 0.05);
+  --shadow-elevation-high: 0 18px 36px oklch(0% 0 0 / 0.5), 0 0 0 1px oklch(100% 0 0 / 0.06);
 
   /* Brighter glows for dark mode */
-  --shadow-primary-glow: 0 4px 14px oklch(0.70 0.17 255 / 0.3);
-  --shadow-primary-glow-hover: 0 6px 20px oklch(0.70 0.17 255 / 0.4);
-  --shadow-destructive-glow: 0 4px 14px oklch(0.55 0.2 25 / 0.3);
+  --shadow-primary-glow: none;
+  --shadow-primary-glow-hover: none;
+  --shadow-destructive-glow: none;
+
+  --canvas-1: oklch(0.16 0.02 240);
+  --canvas-2: oklch(0.2 0.02 240);
+  --canvas-3: oklch(0.22 0.03 220);
 }
 
 @theme inline {
@@ -172,8 +195,27 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Cal Sans', 'CalSans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     margin: 0;
     min-height: 100vh;
+    background-color: var(--background);
+  }
+
+  h1, h2, h3 {
+    font-family: 'Cal Sans', 'CalSans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    letter-spacing: -0.015em;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'Cal Sans', 'CalSans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .surface-glow {
+    box-shadow: var(--shadow-elevation-medium), 0 0 0 1px oklch(100% 0 0 / 0.35);
+  }
+  .glass-panel {
+    background: color-mix(in oklch, var(--card) 75%, transparent);
+    backdrop-filter: blur(16px);
   }
 }

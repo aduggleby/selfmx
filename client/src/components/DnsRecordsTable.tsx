@@ -10,25 +10,28 @@ export function DnsRecordsTable({ records }: DnsRecordsTableProps) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/70">
       <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-2 px-2 font-medium">Type</th>
-            <th className="text-left py-2 px-2 font-medium">Name</th>
-            <th className="text-left py-2 px-2 font-medium">Value</th>
+        <thead className="bg-muted/60">
+          <tr className="border-b border-border/60 text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            <th className="py-3 px-3 text-left font-medium">Type</th>
+            <th className="py-3 px-3 text-left font-medium">Name</th>
+            <th className="py-3 px-3 text-left font-medium">Value</th>
           </tr>
         </thead>
         <tbody>
           {records.map((record, index) => (
-            <tr key={index} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-              <td className="py-2 px-2">
-                <code className="bg-muted px-1 rounded text-xs">{record.type}</code>
+            <tr
+              key={index}
+              className="border-b border-border/60 last:border-0 hover:bg-muted/40 transition-colors"
+            >
+              <td className="py-3 px-3">
+                <code className="rounded-full bg-muted px-2 py-1 text-xs">{record.type}</code>
               </td>
-              <td className="py-2 px-2">
+              <td className="py-3 px-3">
                 <code className="text-xs break-all">{record.name}</code>
               </td>
-              <td className="py-2 px-2">
+              <td className="py-3 px-3">
                 <code className="text-xs break-all">{record.value}</code>
               </td>
             </tr>

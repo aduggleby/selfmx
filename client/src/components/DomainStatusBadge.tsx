@@ -12,8 +12,7 @@ const statusStyles: Record<DomainStatus, string> = {
   ),
   verifying: cn(
     'bg-[var(--status-verifying-bg)] text-[var(--status-verifying-text)]',
-    'ring-1 ring-inset ring-[var(--status-verifying-text)]/20',
-    'relative overflow-hidden'
+    'ring-1 ring-inset ring-[var(--status-verifying-text)]/25'
   ),
   verified: cn(
     'bg-[var(--status-verified-bg)] text-[var(--status-verified-text)]',
@@ -30,11 +29,10 @@ export function DomainStatusBadge({ status }: DomainStatusBadgeProps) {
     return (
       <span
         className={cn(
-          'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide',
+          'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide',
           statusStyles[status]
         )}
       >
-        <span className="absolute inset-0 rounded-full motion-safe:animate-[pulse-ring_2s_ease-in-out_infinite] bg-[var(--status-verifying-text)]/10" />
         <span className="relative">{status}</span>
       </span>
     );
@@ -43,7 +41,7 @@ export function DomainStatusBadge({ status }: DomainStatusBadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide',
+        'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide',
         statusStyles[status]
       )}
     >
