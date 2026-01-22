@@ -2,8 +2,8 @@
 // build.csando - SelfMX Build and Release Script
 //
 // Profiles:
-// - (default): Build backend, frontend, website, and run tests
-// - push: Also builds Docker image, pushes to ghcr.io, deploys website
+// - (default): Build backend, frontend, and run tests
+// - push: Also builds Docker image, pushes to ghcr.io, builds and deploys website
 //
 // Usage:
 //   ando              # Build and test only
@@ -40,10 +40,6 @@ Log.Info("Building React frontend...");
 Node.Install();
 Npm.Ci(frontend);
 Npm.Run(frontend, "build");
-
-// Build documentation website
-Log.Info("Building documentation website...");
-Ando.Build(Directory("./website"));
 
 // Push profile: Build and push Docker image, deploy website
 if (push)
