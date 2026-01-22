@@ -1,0 +1,51 @@
+# Dependencies
+**/node_modules
+**/bin
+**/obj
+
+# Build outputs
+**/dist
+**/publish
+
+# Development files
+.git
+.gitignore
+*.md
+docs/
+plans/
+
+# IDE
+.vscode
+.idea
+*.swp
+.claude/
+
+# Environment and secrets
+.env
+.env.*
+appsettings.Development.json
+
+# Test artifacts
+**/coverage
+**/*.test.*
+**/e2e
+**/playwright-report
+**/test-results
+
+# Docker files (prevent recursive context)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Deploy scripts (not needed in image)
+deploy/
+
+# Temp and logs
+*.log
+tmp/
+temp/
+
+# Database files (will be mounted as volume)
+*.db
+*.db-wal
+*.db-shm

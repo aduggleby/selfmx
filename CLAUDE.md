@@ -8,7 +8,7 @@ SelfMX is a self-hosted email sending platform providing a Resend-compatible API
 
 ## Build & Test Commands
 
-### Backend (.NET 10)
+### Backend (.NET 9)
 
 ```bash
 dotnet build SelfMX.slnx           # Build solution
@@ -36,6 +36,17 @@ Run both servers simultaneously:
 - Terminal 2: `cd client && npm run dev`
 
 Frontend at `http://localhost:5173` proxies API calls to backend at `http://localhost:5000`.
+
+### Ando Build System
+
+```bash
+ando                      # Build backend, frontend, run tests
+ando -p push --dind       # Build + push Docker image to ghcr.io
+ando verify               # Validate build script
+ando clean                # Remove build artifacts
+```
+
+Find Ando documentation at https://andobuild.com
 
 ## Architecture
 

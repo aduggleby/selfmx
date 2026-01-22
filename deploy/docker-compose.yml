@@ -1,0 +1,89 @@
+version: "3.9"
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: selfmx-caddy
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - selfmx-net
+    depends_on:
+      selfmx:
+        condition: service_healthy
+    environment:
+      - SELFMX_DOMAIN=${SELFMX_DOMAIN}
+      - SELFMX_EMAIL=${SELFMX_EMAIL}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  selfmx:
+    image: ghcr.io/aduggleby/selfmx:${SELFMX_VERSION:-latest}
+    container_name: selfmx-app
+    restart: unless-stopped
+    expose:
+      - "5000"
+    volumes:
+      - selfmx_data:/app/data
+    networks:
+      - selfmx-net
+    environment:
+      # Database connections (includes audit.db per multi-tenant API keys plan)
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/selfmx.db
+      - ConnectionStrings__HangfireConnection=Data Source=/app/data/selfmx-hangfire.db
+      - ConnectionStrings__AuditConnection=Data Source=/app/data/audit.db
+      # Admin authentication (BCrypt hash for browser UI login)
+      - App__AdminPasswordHash=${SELFMX_ADMIN_PASSWORD_HASH}
+      - App__SessionExpirationDays=30
+      # Rate limiting
+      - App__MaxLoginAttemptsPerMinute=5
+      - App__MaxApiRequestsPerMinute=100
+      - App__VerificationTimeout=72:00:00
+      - App__VerificationPollInterval=00:05:00
+      # AWS SES configuration
+      - Aws__Region=${AWS_REGION:-us-east-1}
+      - Aws__AccessKeyId=${AWS_ACCESS_KEY_ID}
+      - Aws__SecretAccessKey=${AWS_SECRET_ACCESS_KEY}
+      # Cloudflare (optional)
+      - Cloudflare__ApiToken=${CLOUDFLARE_API_TOKEN:-}
+      - Cloudflare__ZoneId=${CLOUDFLARE_ZONE_ID:-}
+      # CORS
+      - Cors__Origins__0=https://${SELFMX_DOMAIN}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+networks:
+  selfmx-net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  selfmx_data:
