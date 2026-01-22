@@ -130,20 +130,105 @@ echo "Version bumped: $CURRENT_VERSION -> $NEW_VERSION"
 echo "  - src/SelfMX.Api/SelfMX.Api.csproj"
 
 # =============================================================================
+# Run Claude to update changelog
+# =============================================================================
+
+echo ""
+echo "Running Claude to update changelog..."
+echo ""
+
+CLAUDE_PROMPT=$(cat <<'PROMPT_EOF'
+You have just bumped the SelfMX version. Your task is to add a changelog entry for this release.
+
+## Version Information
+- Previous version: $CURRENT_VERSION
+- New version: $NEW_VERSION
+- Bump type: $BUMP_TYPE
+
+## Tasks
+
+### 1. Review Recent Changes
+
+Look at recent git commits since the last version to understand what changed:
+```bash
+git log --oneline HEAD~20..HEAD
+```
+
+### 2. Update Changelog
+
+Add a new entry to `website/src/pages/changelog.md` for version $NEW_VERSION.
+
+Insert the new entry at the TOP of the changelog (after the frontmatter), using this format:
+
+```markdown
+## [$NEW_VERSION] - $(date +%Y-%m-%d)
+
+### Added
+- [New features added]
+
+### Changed
+- [Changes to existing functionality]
+
+### Fixed
+- [Bug fixes]
+
+---
+
+```
+
+Guidelines:
+- Only include sections (Added/Changed/Fixed/Removed) that have actual changes
+- Focus on user-facing changes, not internal refactoring
+- Keep descriptions concise but informative
+- If this is a patch release with minor changes, a simple list is fine
+
+### 3. Verify the changelog builds
+
+After editing, verify the website builds:
+```bash
+cd website && npm run build
+```
+
+## Output
+
+Provide a brief summary of the changelog entry you added.
+PROMPT_EOF
+)
+
+# Substitute variables into the prompt
+CLAUDE_PROMPT="${CLAUDE_PROMPT//\$CURRENT_VERSION/$CURRENT_VERSION}"
+CLAUDE_PROMPT="${CLAUDE_PROMPT//\$NEW_VERSION/$NEW_VERSION}"
+CLAUDE_PROMPT="${CLAUDE_PROMPT//\$BUMP_TYPE/$BUMP_TYPE}"
+CLAUDE_PROMPT="${CLAUDE_PROMPT//\$(date +%Y-%m-%d)/$(date +%Y-%m-%d)}"
+
+echo "=========================================="
+echo "Claude will now update the changelog."
+echo "This runs with --dangerously-skip-permissions to avoid prompts."
+echo "=========================================="
+echo ""
+
+# Run Claude with -p (non-interactive, auto-exits) and skip permission prompts
+cd "$REPO_ROOT"
+claude -p "$CLAUDE_PROMPT" --dangerously-skip-permissions
+
+# =============================================================================
 # Commit and push the version bump
 # =============================================================================
 
 echo ""
-echo "Committing version bump..."
+echo "Committing version bump and changelog..."
 echo ""
 
 cd "$REPO_ROOT"
 
-# Stage the changed file
-git add "$CSPROJ"
+# Stage all changes (csproj and changelog)
+git add -A
 
 # Create commit with version bump message
-git commit -m "chore: bump version to $NEW_VERSION"
+git commit -m "chore: bump version to $NEW_VERSION
+
+- Updated version in src/SelfMX.Api/SelfMX.Api.csproj
+- Updated changelog"
 
 echo ""
 echo "Pushing to remote..."
