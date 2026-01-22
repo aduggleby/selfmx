@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DomainStatusBadge } from './DomainStatusBadge';
 import { DnsRecordsTable } from './DnsRecordsTable';
+import { cn } from '@/lib/utils';
 import type { Domain } from '@/lib/schemas';
 
 interface DomainCardProps {
@@ -16,7 +17,14 @@ export function DomainCard({ domain, onDelete, isDeleting }: DomainCardProps) {
   const hasDnsRecords = domain.dnsRecords && domain.dnsRecords.length > 0;
 
   return (
-    <Card className="hover:shadow-lg hover:shadow-blue-500/10 transition-shadow duration-200">
+    <Card
+      className={cn(
+        'group',
+        'motion-safe:animate-[scale-in_0.2s_ease-out]',
+        'hover:shadow-[var(--shadow-elevation-high)] hover:shadow-blue-500/5',
+        'hover:-translate-y-0.5'
+      )}
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-lg font-medium">{domain.name}</CardTitle>
         <DomainStatusBadge status={domain.status} />
@@ -51,7 +59,16 @@ export function DomainCard({ domain, onDelete, isDeleting }: DomainCardProps) {
             >
               {showDns ? 'Hide DNS Records' : 'Show DNS Records'}
             </Button>
-            {showDns && <DnsRecordsTable records={domain.dnsRecords!} />}
+            <div
+              className={cn(
+                'grid transition-all duration-200 ease-out',
+                showDns ? 'grid-rows-[1fr] opacity-100 visible' : 'grid-rows-[0fr] opacity-0 invisible'
+              )}
+            >
+              <div className="overflow-hidden">
+                <DnsRecordsTable records={domain.dnsRecords!} />
+              </div>
+            </div>
           </div>
         )}
 

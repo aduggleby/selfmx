@@ -110,8 +110,10 @@ test.describe('Status Badges', () => {
     ]);
     await page.goto('/');
 
-    const badge = page.getByText('verifying', { exact: true });
-    await expect(badge).toBeVisible();
+    const badgeText = page.getByText('verifying', { exact: true });
+    await expect(badgeText).toBeVisible();
+    // For verifying status, the text is wrapped in a relative span, so check parent for styling
+    const badge = badgeText.locator('..');
     await expect(badge).toHaveClass(/bg-\[var\(--status-verifying-bg\)\]/);
     await expect(badge).toHaveClass(/text-\[var\(--status-verifying-text\)\]/);
   });
@@ -355,6 +357,8 @@ test.describe('DNS Records', () => {
 
     // Click to hide
     await page.getByRole('button', { name: 'Hide DNS Records' }).click();
+    // Wait for animation to complete (200ms transition + buffer)
+    await page.waitForTimeout(300);
     await expect(page.getByText('token1._domainkey.example.com')).not.toBeVisible();
     await expect(page.getByRole('button', { name: 'Show DNS Records' })).toBeVisible();
   });
@@ -506,8 +510,8 @@ test.describe('Loading States', () => {
 
     await page.goto('/');
 
-    // Check for skeleton loaders (they have the animate-pulse class)
-    await expect(page.locator('.animate-pulse').first()).toBeVisible();
+    // Check for skeleton loaders (they use shimmer animation with gradient)
+    await expect(page.locator('[class*="animate-"]').first()).toBeVisible();
   });
 });
 
@@ -576,11 +580,11 @@ test.describe('Multiple Domain States', () => {
     ]);
     await page.goto('/');
 
-    // All domains visible
-    await expect(page.getByText('domain-a.com')).toBeVisible();
-    await expect(page.getByText('domain-b.com')).toBeVisible();
-    await expect(page.getByText('domain-c.com')).toBeVisible();
-    await expect(page.getByText('domain-d.com')).toBeVisible();
+    // All domains visible (use heading to avoid matching DNS records)
+    await expect(page.getByRole('heading', { name: 'domain-a.com' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'domain-b.com' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'domain-c.com' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'domain-d.com' })).toBeVisible();
 
     // All status badges visible (using exact match to avoid matching domain names)
     await expect(page.getByText('pending', { exact: true })).toBeVisible();

@@ -2,6 +2,44 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Animation keyframes */
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-ring {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.2; transform: scale(1.05); }
+}
+
 :root {
   --radius: 0.625rem;
   --background: oklch(0.995 0.002 240);
@@ -38,26 +76,38 @@
   --status-verified-text: oklch(0.35 0.15 155);
   --status-failed-bg: oklch(0.93 0.08 25);
   --status-failed-text: oklch(0.45 0.18 25);
+
+  /* Multi-layer shadows for depth */
+  --shadow-elevation-low: 0 1px 2px oklch(0% 0 0 / 0.04), 0 1px 4px oklch(0% 0 0 / 0.04);
+  --shadow-elevation-medium: 0 2px 4px oklch(0% 0 0 / 0.04), 0 4px 12px oklch(0% 0 0 / 0.08);
+  --shadow-elevation-high: 0 4px 8px oklch(0% 0 0 / 0.04), 0 12px 32px oklch(0% 0 0 / 0.12);
+
+  /* Colored shadows for brand elements */
+  --shadow-primary-glow: 0 4px 14px oklch(0.55 0.24 263 / 0.25);
+  --shadow-primary-glow-hover: 0 6px 20px oklch(0.55 0.24 263 / 0.35);
+  --shadow-destructive-glow: 0 4px 14px oklch(0.55 0.22 25 / 0.25);
 }
 
 .dark {
-  --background: oklch(0.14 0.015 260);
+  /* Enhanced surface gradation for visual hierarchy */
+  --background: oklch(0.12 0.015 260);
   --foreground: oklch(0.96 0.005 240);
-  --card: oklch(0.18 0.015 260);
+  --card: oklch(0.16 0.015 260);
   --card-foreground: oklch(0.96 0.005 240);
+  --card-elevated: oklch(0.20 0.015 260);
   --popover: oklch(0.18 0.015 260);
   --popover-foreground: oklch(0.96 0.005 240);
   --primary: oklch(0.70 0.17 255);
   --primary-foreground: oklch(0.15 0.02 260);
   --secondary: oklch(0.22 0.015 260);
   --secondary-foreground: oklch(0.96 0.005 240);
-  --muted: oklch(0.22 0.015 260);
+  --muted: oklch(0.14 0.01 260);
   --muted-foreground: oklch(0.65 0.02 260);
   --accent: oklch(0.25 0.015 260);
   --accent-foreground: oklch(0.96 0.005 240);
   --destructive: oklch(0.55 0.2 25);
   --destructive-foreground: oklch(0.96 0.005 240);
-  --border: oklch(0.28 0.015 260);
+  --border: oklch(0.24 0.01 260);
   --input: oklch(0.22 0.015 260);
   --ring: oklch(0.70 0.17 255);
 
@@ -75,6 +125,16 @@
   --status-verified-text: oklch(0.8 0.12 155);
   --status-failed-bg: oklch(0.28 0.06 25);
   --status-failed-text: oklch(0.85 0.12 25);
+
+  /* Dark mode shadow adjustments - use subtle white outlines for definition */
+  --shadow-elevation-low: 0 1px 2px oklch(0% 0 0 / 0.2), 0 0 0 1px oklch(100% 0 0 / 0.03);
+  --shadow-elevation-medium: 0 2px 8px oklch(0% 0 0 / 0.3), 0 0 0 1px oklch(100% 0 0 / 0.05);
+  --shadow-elevation-high: 0 8px 24px oklch(0% 0 0 / 0.4), 0 0 0 1px oklch(100% 0 0 / 0.05);
+
+  /* Brighter glows for dark mode */
+  --shadow-primary-glow: 0 4px 14px oklch(0.70 0.17 255 / 0.3);
+  --shadow-primary-glow-hover: 0 6px 20px oklch(0.70 0.17 255 / 0.4);
+  --shadow-destructive-glow: 0 4px 14px oklch(0.55 0.2 25 / 0.3);
 }
 
 @theme inline {
