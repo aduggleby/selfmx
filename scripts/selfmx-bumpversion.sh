@@ -14,6 +14,9 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Clean up Syncthing conflict files first
+"$SCRIPT_DIR/clean.sh"
 REPO_ROOT="$SCRIPT_DIR/.."
 CSPROJ="$REPO_ROOT/src/SelfMX.Api/SelfMX.Api.csproj"
 

@@ -4,6 +4,11 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Clean up Syncthing conflict files first
+"$SCRIPT_DIR/clean.sh"
+
 SERVER_NAME="claude-selfmx"
 SERVER_TYPE="cx22"  # 2 vCPU, 4GB RAM
 IMAGE="ubuntu-24.04"
