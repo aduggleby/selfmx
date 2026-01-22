@@ -16,7 +16,7 @@ export function DomainCard({ domain, onDelete, isDeleting }: DomainCardProps) {
   const hasDnsRecords = domain.dnsRecords && domain.dnsRecords.length > 0;
 
   return (
-    <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
+    <Card className="hover:shadow-lg hover:shadow-blue-500/10 transition-shadow duration-200">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-lg font-medium">{domain.name}</CardTitle>
         <DomainStatusBadge status={domain.status} />

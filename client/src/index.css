@@ -10,19 +10,24 @@
   --card-foreground: oklch(0.13 0.02 260);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.13 0.02 260);
-  --primary: oklch(0.45 0.2 260);
-  --primary-foreground: oklch(0.98 0.005 260);
-  --secondary: oklch(0.96 0.005 240);
-  --secondary-foreground: oklch(0.13 0.02 260);
+  --primary: oklch(0.55 0.24 263);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.97 0.01 255);
+  --secondary-foreground: oklch(0.25 0.05 260);
   --muted: oklch(0.96 0.005 240);
-  --muted-foreground: oklch(0.5 0.02 260);
-  --accent: oklch(0.96 0.01 260);
-  --accent-foreground: oklch(0.13 0.02 260);
+  --muted-foreground: oklch(0.45 0.02 260);
+  --accent: oklch(0.96 0.02 255);
+  --accent-foreground: oklch(0.25 0.05 260);
   --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.98 0.005 0);
+  --destructive-foreground: oklch(0.99 0 0);
   --border: oklch(0.92 0.005 240);
   --input: oklch(0.92 0.005 240);
-  --ring: oklch(0.45 0.2 260);
+  --ring: oklch(0.55 0.24 263);
+
+  /* Blue scale for colored shadows */
+  --blue-400: oklch(0.70 0.17 255);
+  --blue-500: oklch(0.62 0.21 260);
+  --blue-600: oklch(0.55 0.24 263);
 
   /* Status colors */
   --status-pending-bg: oklch(0.95 0.08 85);
@@ -37,24 +42,29 @@
 
 .dark {
   --background: oklch(0.14 0.015 260);
-  --foreground: oklch(0.95 0.01 240);
+  --foreground: oklch(0.96 0.005 240);
   --card: oklch(0.18 0.015 260);
-  --card-foreground: oklch(0.95 0.01 240);
+  --card-foreground: oklch(0.96 0.005 240);
   --popover: oklch(0.18 0.015 260);
-  --popover-foreground: oklch(0.95 0.01 240);
-  --primary: oklch(0.7 0.18 260);
-  --primary-foreground: oklch(0.13 0.02 260);
+  --popover-foreground: oklch(0.96 0.005 240);
+  --primary: oklch(0.70 0.17 255);
+  --primary-foreground: oklch(0.15 0.02 260);
   --secondary: oklch(0.22 0.015 260);
-  --secondary-foreground: oklch(0.95 0.01 240);
+  --secondary-foreground: oklch(0.96 0.005 240);
   --muted: oklch(0.22 0.015 260);
   --muted-foreground: oklch(0.65 0.02 260);
   --accent: oklch(0.25 0.015 260);
-  --accent-foreground: oklch(0.95 0.01 240);
+  --accent-foreground: oklch(0.96 0.005 240);
   --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(0.95 0.01 240);
+  --destructive-foreground: oklch(0.96 0.005 240);
   --border: oklch(0.28 0.015 260);
   --input: oklch(0.22 0.015 260);
-  --ring: oklch(0.6 0.18 260);
+  --ring: oklch(0.70 0.17 255);
+
+  /* Blue scale for dark mode shadows */
+  --blue-400: oklch(0.70 0.17 255);
+  --blue-500: oklch(0.62 0.21 260);
+  --blue-600: oklch(0.55 0.24 263);
 
   /* Dark mode status colors */
   --status-pending-bg: oklch(0.28 0.06 85);
@@ -87,6 +97,9 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-blue-400: var(--blue-400);
+  --color-blue-500: var(--blue-500);
+  --color-blue-600: var(--blue-600);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

@@ -21,7 +21,7 @@ export function DnsRecordsTable({ records }: DnsRecordsTableProps) {
         </thead>
         <tbody>
           {records.map((record, index) => (
-            <tr key={index} className="border-b last:border-0">
+            <tr key={index} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
               <td className="py-2 px-2">
                 <code className="bg-muted px-1 rounded text-xs">{record.type}</code>
               </td>
