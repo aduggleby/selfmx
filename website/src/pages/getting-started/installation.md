@@ -1,86 +1,125 @@
 ---
 layout: ../../layouts/DocsLayout.astro
 title: Installation
-description: Deploy SelfMX using Docker on your server.
+description: Deploy SelfMX on your Ubuntu server with a single command.
 ---
 
-SelfMX is distributed as a Docker image for easy deployment. This guide covers the installation process.
+SelfMX can be installed on any Ubuntu 22.04+ server with a single command. The installer sets up Docker, Caddy (for automatic HTTPS), systemd services, and automated backups.
 
-## Docker Installation
+## Quick Install
 
-### Pull the Image
-
-```bash
-docker pull ghcr.io/aduggleby/selfmx:latest
-```
-
-### Basic Setup
-
-Create a `docker-compose.yml` file:
-
-```yaml
-version: "3.8"
-services:
-  selfmx:
-    image: ghcr.io/aduggleby/selfmx:latest
-    ports:
-      - "8080:8080"
-      - "2525:2525"
-    environment:
-      - DATABASE_URL=postgres://selfmx:password@db/selfmx
-      - API_KEY=your-secure-api-key
-      - SMTP_HOST=smtp.yourdomain.com
-      - SMTP_PORT=587
-      - SMTP_USER=your-smtp-user
-      - SMTP_PASS=your-smtp-password
-    depends_on:
-      - db
-
-  db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=selfmx
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=selfmx
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
-volumes:
-  pgdata:
-```
-
-### Start the Services
+Run this command on your server as root:
 
 ```bash
-docker compose up -d
+curl -fsSL https://selfmx.com/install.sh | bash
 ```
 
-SelfMX will be available at `http://localhost:8080`.
+The interactive installer will prompt you for:
 
-## Verify Installation
+- **Domain name** - Where SelfMX will be hosted (e.g., `mail.example.com`)
+- **Admin password** - For logging into the admin UI
+- **AWS credentials** - Access Key ID, Secret, and Region for SES
+- **Cloudflare credentials** (optional) - For automatic DNS record management
 
-Check that the API is running:
+## Requirements
+
+- **Ubuntu 22.04 LTS** or newer (24.04 recommended)
+- **Root access** - The script must run as root
+- **5GB disk space** minimum
+- **Ports 80 and 443** available for Caddy
+- **AWS account** with SES access configured
+
+## What Gets Installed
+
+The installer sets up:
+
+- **Docker** - Container runtime
+- **Caddy** - Reverse proxy with automatic HTTPS via Let's Encrypt
+- **SelfMX** - The application container from `ghcr.io/aduggleby/selfmx`
+- **Systemd service** - Auto-start on boot, automatic restarts
+- **Backup system** - Daily and monthly backups with retention policies
+
+## Non-Interactive Installation
+
+For automated deployments, set environment variables before running:
 
 ```bash
-curl http://localhost:8080/health
+export SELFMX_DOMAIN="mail.example.com"
+export SELFMX_EMAIL="admin@example.com"
+export SELFMX_PASSWORD="your-secure-password-here"
+export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
+export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+export AWS_REGION="us-east-1"
+export AUTO_CONFIRM=1
+
+curl -fsSL https://selfmx.com/install.sh | bash
 ```
 
-You should receive:
+## After Installation
 
-```json
-{ "status": "ok" }
+Once complete, your SelfMX instance will be available at:
+
+```
+https://your-domain.com
 ```
 
-## Production Considerations
+Log in with your admin password to:
 
-For production deployments:
+1. Create API keys for your applications
+2. Add domains for email sending
+3. View the audit trail
 
-1. **Use a reverse proxy** (nginx, Caddy) with HTTPS
-2. **Set secure environment variables** - Don't hardcode secrets
-3. **Configure database backups** - Regular PostgreSQL backups
-4. **Set up monitoring** - Track API response times and error rates
+## Updating
+
+To update an existing installation, run the installer again:
+
+```bash
+curl -fsSL https://selfmx.com/install.sh | bash
+```
+
+Select **[U] Update** when prompted to preserve your configuration.
+
+## Backup & Restore
+
+Backups run automatically at 3:00 AM daily (configurable).
+
+**Manual backup:**
+```bash
+selfmx-backup
+```
+
+**Restore from backup:**
+```bash
+selfmx-restore /var/backups/selfmx/daily/selfmx-2024-01-15.tar.gz
+```
+
+## File Locations
+
+| Path | Description |
+|------|-------------|
+| `/opt/selfmx/` | Installation directory (docker-compose.yml, .env) |
+| `/var/lib/selfmx/` | Data directory (SQLite databases) |
+| `/var/backups/selfmx/` | Backup directory |
+| `/var/log/selfmx/` | Log files |
+
+## Useful Commands
+
+```bash
+# View logs
+docker compose -f /opt/selfmx/docker-compose.yml logs -f
+
+# Restart services
+systemctl restart selfmx
+
+# Check status
+systemctl status selfmx
+
+# Manual backup
+selfmx-backup
+```
 
 ## Next Steps
 
 - [Quick Start](/getting-started/quick-start) - Send your first email
-- [Environment Variables](/configuration/environment) - Full configuration reference
+- [Configuration](/configuration/environment) - Environment variables reference
+- [Deployment Guide](/guides/deployment) - Production best practices

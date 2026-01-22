@@ -39,5 +39,5 @@ if (push)
     Cloudflare.PagesDeploy(website / "dist", "selfmx");
 
     // Purge the Cloudflare cache to ensure visitors see the latest content.
-    Cloudflare.PurgeCache("selfmx.dev");
+    Cloudflare.PurgeCache("selfmx.com");
 }

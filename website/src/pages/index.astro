@@ -2,22 +2,13 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import CodeBlock from "../components/CodeBlock.astro";
 
-const quickStartCode = `# Pull the Docker image
-docker pull ghcr.io/aduggleby/selfmx:latest
+const installCode = `curl -fsSL https://selfmx.com/install.sh | bash`;
 
-# Run with default configuration
-docker run -d \\
-  -p 2525:2525 \\
-  -p 8080:8080 \\
-  -e DATABASE_URL=postgres://user:pass@host/selfmx \\
-  -e API_KEY=your-secret-key \\
-  ghcr.io/aduggleby/selfmx:latest`;
-
-const sendEmailCode = `curl -X POST https://api.yourdomain.com/v1/send \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
+const sendEmailCode = `curl -X POST https://mail.yourdomain.com/v1/emails \\
+  -H "Authorization: Bearer re_your_api_key" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "from": "sender@yourdomain.com",
+    "from": "hello@yourdomain.com",
     "to": "recipient@example.com",
     "subject": "Hello from SelfMX",
     "html": "<p>Your email content here</p>"
@@ -25,17 +16,17 @@ const sendEmailCode = `curl -X POST https://api.yourdomain.com/v1/send \\
 
 const features = [
   { title: "Self-Hosted", desc: "Full control over your email infrastructure. Your data stays on your servers." },
-  { title: "REST API", desc: "Simple HTTP API for sending emails from any language or platform." },
-  { title: "Multi-Tenant", desc: "Support for multiple domains and API keys with isolated configurations." },
-  { title: "Webhooks", desc: "Real-time notifications for delivery status, bounces, and complaints." },
-  { title: "Templates", desc: "Built-in templating engine for dynamic email content." },
+  { title: "Resend-Compatible API", desc: "Drop-in replacement for Resend. Use existing SDKs and integrations." },
+  { title: "AWS SES Backend", desc: "Reliable delivery through Amazon SES with automatic domain verification." },
+  { title: "Multi-Tenant", desc: "Multiple API keys with domain scoping and rate limiting." },
+  { title: "Cloudflare DNS", desc: "Automatic DNS record management for domain verification." },
   { title: "Audit Trail", desc: "Complete logging of all email activity for compliance and debugging." },
 ];
 ---
 
 <BaseLayout
   title="SelfMX - Self-hosted Email API"
-  description="Send transactional emails from your own infrastructure. Self-hosted alternative to SendGrid and Mailgun with full API control."
+  description="Send transactional emails from your own infrastructure. Self-hosted Resend-compatible API backed by AWS SES."
 >
   <section id="top" class="mb-10 md:mb-16">
     <div class="mb-4 pt-24">
@@ -43,7 +34,7 @@ const features = [
         href="/changelog"
         class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
       >
-        v1.0.0
+        v0.9.2
       </a>
     </div>
     <h1 class="mb-4 max-w-4xl text-3xl font-bold text-zinc-900 sm:mb-6 sm:text-8xl dark:text-white">
@@ -52,11 +43,22 @@ const features = [
     <blockquote
       class="mb-18 border-l-2 border-zinc-200 pl-4 text-sm text-zinc-400 italic dark:border-zinc-700 dark:text-zinc-500"
     >
-      Self-hosted transactional email API - like SendGrid, but yours.
+      Self-hosted Resend-compatible API backed by AWS SES.
     </blockquote>
     <p class="mb-8 font-serif text-zinc-600 sm:text-3xl dark:text-zinc-400">
-      SelfMX is a complete email sending solution that runs on your servers. Deploy once, send emails through a simple
-      REST API, and maintain full control over your email infrastructure.
+      SelfMX is a complete email sending solution that runs on your servers. One command to install,
+      Resend-compatible API, automatic domain verification via Cloudflare, and full audit trail.
+    </p>
+  </section>
+
+  <section id="install" class="mb-10 md:mb-16">
+    <h2 class="mb-2 text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">Install in one command</h2>
+    <p class="mb-4 text-zinc-500 sm:mb-6 dark:text-zinc-400">
+      Run on any Ubuntu 22.04+ server. Sets up Docker, Caddy, HTTPS, and automated backups.
+    </p>
+    <CodeBlock code={installCode} lang="bash" filename="terminal" />
+    <p class="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
+      See the <a href="/getting-started/installation" class="text-green-600 hover:underline dark:text-green-400">installation guide</a> for non-interactive deployment options.
     </p>
   </section>
 
@@ -78,30 +80,20 @@ const features = [
   </section>
 
   <section id="getting-started" class="mb-10 md:mb-16">
-    <h2 class="mb-2 text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">Getting started</h2>
-    <p class="mb-4 text-zinc-500 sm:mb-6 dark:text-zinc-400">Deploy SelfMX with Docker and start sending emails.</p>
-
-    <div class="mb-6">
-      <h3 class="mb-3 text-lg font-semibold text-zinc-800 dark:text-zinc-200">Step 1: Deploy SelfMX</h3>
-      <CodeBlock code={quickStartCode} lang="bash" filename="terminal" />
-    </div>
-
-    <div class="mb-6">
-      <h3 class="mb-3 text-lg font-semibold text-zinc-800 dark:text-zinc-200">Step 2: Send an Email</h3>
-      <CodeBlock code={sendEmailCode} lang="bash" filename="send-email" />
-    </div>
-
-    <p class="text-sm text-zinc-500 dark:text-zinc-400">
-      See the <a href="/getting-started" class="text-green-600 hover:underline dark:text-green-400"
-        >full documentation</a
-      > for detailed configuration options and API reference.
+    <h2 class="mb-2 text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">Send your first email</h2>
+    <p class="mb-4 text-zinc-500 sm:mb-6 dark:text-zinc-400">
+      After installation, create an API key in the admin UI and start sending.
+    </p>
+    <CodeBlock code={sendEmailCode} lang="bash" filename="send-email" />
+    <p class="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
+      See the <a href="/api/endpoints" class="text-green-600 hover:underline dark:text-green-400">API reference</a> for all available endpoints.
     </p>
   </section>
 
   <section id="architecture" class="mb-10 md:mb-16">
     <h2 class="mb-2 text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">How it works</h2>
     <p class="mb-4 text-zinc-500 sm:mb-6 dark:text-zinc-400">
-      SelfMX receives API requests, processes email content, and delivers through SMTP.
+      SelfMX receives API requests, verifies domains via Cloudflare, and delivers through AWS SES.
     </p>
 
     <div
@@ -112,7 +104,7 @@ const features = [
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                              YOUR APPLICATION                                   │
 │                                                                                 │
-│    Send email via REST API: POST /v1/send                                       │
+│    Send email via REST API: POST /v1/emails                                     │
 └─────────────────────────────────────────────────────────────────────────────────┘
                                        │
                                        ▼
@@ -122,24 +114,25 @@ const features = [
 │  │                              SelfMX                                       │  │
 │  │                                                                           │  │
 │  │   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                   │  │
-│  │   │   REST API  │───▶│   Queue     │───▶│   SMTP      │                   │  │
-│  │   │   :8080     │    │  Processor  │    │  Sender     │                   │  │
+│  │   │  Caddy      │───▶│   REST API  │───▶│   AWS SES   │                   │  │
+│  │   │  (HTTPS)    │    │   :5000     │    │   Client    │                   │  │
 │  │   └─────────────┘    └─────────────┘    └─────────────┘                   │  │
-│  │          │                  │                  │                          │  │
-│  │          ▼                  ▼                  ▼                          │  │
-│  │   ┌─────────────────────────────────────────────────────────────────┐    │  │
-│  │   │                     PostgreSQL Database                          │    │  │
-│  │   │              (emails, logs, templates, api keys)                 │    │  │
-│  │   └─────────────────────────────────────────────────────────────────┘    │  │
+│  │                             │                  │                          │  │
+│  │                             ▼                  │                          │  │
+│  │   ┌─────────────────────────────────────┐     │                          │  │
+│  │   │         SQLite Database             │     │                          │  │
+│  │   │   (domains, api keys, audit logs)   │     │                          │  │
+│  │   └─────────────────────────────────────┘     │                          │  │
 │  └──────────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────────┘
                                        │
-                                       │  SMTP
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              RECIPIENT                                          │
-│                      Email delivered to inbox                                   │
-└─────────────────────────────────────────────────────────────────────────────────┘
+                     ┌─────────────────┴─────────────────┐
+                     │                                   │
+                     ▼                                   ▼
+┌─────────────────────────────────┐   ┌─────────────────────────────────────────┐
+│          CLOUDFLARE             │   │              AWS SES                     │
+│   Automatic DNS verification    │   │         Email delivery                   │
+└─────────────────────────────────┘   └─────────────────────────────────────────┘
       `}</pre>
     </div>
   </section>
@@ -163,11 +156,11 @@ const features = [
         </svg>
         <div>
           <div class="font-semibold text-zinc-900 dark:text-white">GitHub Repository</div>
-          <div class="text-sm text-zinc-500 dark:text-zinc-400">Source code & documentation</div>
+          <div class="text-sm text-zinc-500 dark:text-zinc-400">Source code & issues</div>
         </div>
       </a>
       <a
-        href="/getting-started"
+        href="/getting-started/installation"
         class="flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 transition-colors hover:border-green-300 hover:bg-green-50 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-green-700 dark:hover:bg-green-900/20"
       >
         <svg class="h-8 w-8 text-zinc-700 dark:text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,8 +172,8 @@ const features = [
           ></path>
         </svg>
         <div>
-          <div class="font-semibold text-zinc-900 dark:text-white">Documentation</div>
-          <div class="text-sm text-zinc-500 dark:text-zinc-400">Complete guides & API reference</div>
+          <div class="font-semibold text-zinc-900 dark:text-white">Installation Guide</div>
+          <div class="text-sm text-zinc-500 dark:text-zinc-400">Deploy in one command</div>
         </div>
       </a>
       <a
