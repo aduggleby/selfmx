@@ -35,11 +35,18 @@ builder.Services.AddDbContext<AuditDbContext>(options =>
         sqlite => sqlite.CommandTimeout(30)));
 
 // Hangfire with SQLite
+// Hangfire.Storage.SQLite expects a filename, not a connection string
+// Handle both "Data Source=/path/file.db" and plain "/path/file.db" formats
+var hangfireConnString = builder.Configuration.GetConnectionString("HangfireConnection") ?? "selfmx-hangfire.db";
+if (hangfireConnString.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase))
+{
+    hangfireConnString = hangfireConnString["Data Source=".Length..].Trim();
+}
 builder.Services.AddHangfire(config => config
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
-    .UseSQLiteStorage(builder.Configuration.GetConnectionString("HangfireConnection") ?? "selfmx-hangfire.db"));
+    .UseSQLiteStorage(hangfireConnString));
 
 builder.Services.AddHangfireServer(options =>
 {
@@ -182,9 +189,11 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Serve static files from wwwroot (React frontend)
+app.UseStaticFiles();
+
 // Health endpoint (no auth)
 app.MapHealthChecks("/health");
-app.MapGet("/", () => new HealthResponse("ok", DateTime.UtcNow));
 
 // API v1 routes
 var v1 = app.MapGroup("/v1");
@@ -209,10 +218,14 @@ if (app.Environment.IsDevelopment())
 }
 
 // Schedule recurring domain verification job (every 5 minutes)
-RecurringJob.AddOrUpdate<VerifyDomainsJob>(
+var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+recurringJobManager.AddOrUpdate<VerifyDomainsJob>(
     "verify-domains",
     job => job.ExecuteAsync(),
     "*/5 * * * *");
+
+// SPA fallback - serve index.html for client-side routing
+app.MapFallbackToFile("index.html");
 
 // Graceful shutdown
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
