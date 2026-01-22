@@ -39,3 +39,14 @@ Thumbs.db
 
 # Build outputs
 publish/
+
+# Ando build system
+.ando/
+
+# Test artifacts
+playwright-report/
+test-results/
+coverage/
+
+# Syncthing conflicts
+*.sync-conflict-*
