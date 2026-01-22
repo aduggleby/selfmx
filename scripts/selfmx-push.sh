@@ -24,5 +24,16 @@ REPO_ROOT="$SCRIPT_DIR/.."
 
 cd "$REPO_ROOT"
 
+# Export GITHUB_TOKEN from gh CLI if not already set
+if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+    export GITHUB_TOKEN=$(gh auth token 2>/dev/null)
+    if [[ -z "$GITHUB_TOKEN" ]]; then
+        echo "Error: GITHUB_TOKEN not set and 'gh auth token' failed."
+        echo "Please run 'gh auth login' or set GITHUB_TOKEN environment variable."
+        exit 1
+    fi
+    echo "Using GitHub token from gh CLI"
+fi
+
 # Run ando with push profile and Docker-in-Docker enabled
 ando run -p push --dind "$@"
