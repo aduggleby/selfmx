@@ -166,6 +166,7 @@ builder.Services.AddSingleton<IDnsVerificationService, DnsVerificationService>()
 builder.Services.AddScoped<ApiKeyService>();
 builder.Services.AddSingleton<AuditService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditService>());
+builder.Services.AddScoped<DataMigrationService>();
 builder.Services.AddHttpContextAccessor();
 
 // Health checks
@@ -267,6 +268,7 @@ authenticated.MapEmailEndpoints();
 var adminOnly = v1.RequireAuthorization("AdminOnly").RequireRateLimiting("api");
 adminOnly.MapApiKeyEndpoints();
 adminOnly.MapAuditEndpoints();
+adminOnly.MapMigrationEndpoints();
 
 // Hangfire dashboard (development only)
 if (app.Environment.IsDevelopment())

@@ -66,7 +66,9 @@ src/SelfMX.Api/
 ├── Jobs/                   # Hangfire background jobs
 │   ├── SetupDomainJob.cs   # Creates SES identity, DNS records
 │   └── VerifyDomainsJob.cs # Polls verification status (every 5 min)
-├── Data/AppDbContext.cs    # EF Core with SQLite (WAL mode)
+├── Data/
+│   ├── AppDbContext.cs     # EF Core DbContext (Domains, ApiKeys, ApiKeyDomains)
+│   └── AuditDbContext.cs   # Separate audit log context
 └── Authentication/         # API key auth + rate limiting
 ```
 
@@ -74,7 +76,40 @@ src/SelfMX.Api/
 - Routes use `TypedResults` for compile-time response type safety
 - Domain verification state machine: Pending → Verifying → Verified/Failed
 - DNS records stored as JSON in Domain entity
-- Hangfire with single worker (SQLite concurrency constraint)
+- Multi-provider database support: SQLite (default) or SQL Server
+
+### Database Configuration
+
+SelfMX supports two database providers:
+
+| Provider | Config Value | Use Case |
+|----------|--------------|----------|
+| SQLite | `sqlite` (default) | Development, small deployments |
+| SQL Server | `sqlserver` or `docker-sqlserver` | Enterprise, high concurrency |
+
+**Configuration:**
+```json
+{
+  "Database": {
+    "Provider": "sqlite"  // or "sqlserver"
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=selfmx.db",
+    "AuditConnection": "Data Source=audit.db",
+    "HangfireConnection": "selfmx-hangfire.db"
+  }
+}
+```
+
+**SQL Server mode:**
+- Connection resilience with automatic retry (5 retries, 30s max delay)
+- Shared database for main + audit + Hangfire (no lock contention issues)
+- Scaled Hangfire workers (ProcessorCount * 2 vs 1 for SQLite)
+
+**Migration from SQLite to SQL Server:**
+- `GET /v1/migration/status` - Check if migration is needed
+- `POST /v1/migration/start` - Execute migration (admin only)
+- Creates backups before migrating, verifies row counts after
 
 ### Frontend (React 19 + TanStack Query)
 
@@ -107,8 +142,14 @@ client/src/
 | `GET /v1/domains/{id}` | Yes | Get domain |
 | `DELETE /v1/domains/{id}` | Yes | Delete domain |
 | `POST /v1/emails` | Yes | Send email (Resend-compatible) |
+| `GET /v1/api-keys` | Admin | List API keys |
+| `POST /v1/api-keys` | Admin | Create API key |
+| `GET /v1/audit` | Admin | Audit logs (paginated) |
+| `GET /v1/migration/status` | Admin | Migration status |
+| `POST /v1/migration/start` | Admin | Start SQLite→SQL Server migration |
 
-Auth: Bearer token with BCrypt-hashed API key configured in `App:ApiKeyHash`.
+Auth: Bearer token with API key, or Cookie auth for admin UI.
+Admin: Requires `ActorType=admin` claim (cookie auth or admin API key).
 
 ## Configuration
 

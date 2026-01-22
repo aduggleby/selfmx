@@ -33,10 +33,11 @@ The installer will:
 
 ### Prerequisites
 
-- Ubuntu 22.04+ server (2GB RAM minimum)
+- Ubuntu 22.04+ server (2GB RAM for SQLite, 4GB for SQL Server)
 - Domain name pointed to your server
 - AWS account with SES access
 - (Optional) Cloudflare account for automatic DNS management
+- (Optional) SQL Server 2019+ for enterprise deployments
 
 ### Post-Install
 
@@ -81,6 +82,35 @@ sudo selfmx-restore /var/backups/selfmx/daily/selfmx-YYYY-MM-DD.tar.gz
 curl -fsSL https://raw.githubusercontent.com/aduggleby/selfmx/main/deploy/install.sh | sudo bash
 ```
 
+### SQL Server Deployment (Enterprise)
+
+For production environments requiring SQL Server instead of SQLite:
+
+```bash
+# Set environment variables
+export MSSQL_SA_PASSWORD='YourStrong@Password123!'
+
+# Deploy with SQL Server
+cd /opt/selfmx
+docker compose -f docker-compose.yml -f docker-compose.sqlserver.yml up -d
+```
+
+**Configuration:**
+- Set `Database__Provider=sqlserver` environment variable
+- Provide SQL Server connection strings for `DefaultConnection`, `AuditConnection`, `HangfireConnection`
+
+**Migrate from SQLite to SQL Server:**
+```bash
+# Check migration status
+curl -X GET https://your-domain.com/v1/migration/status \
+  -H "Authorization: Bearer re_admin_api_key"
+
+# Start migration (admin only)
+curl -X POST https://your-domain.com/v1/migration/start \
+  -H "Authorization: Bearer re_admin_api_key" \
+  -H "Content-Type: application/json"
+```
+
 ## Repository Structure
 
 ```
@@ -99,7 +129,9 @@ selfmx/
 ├── website/                  # Documentation site (Astro)
 ├── deploy/                   # Deployment files
 │   ├── install.sh            # One-line installer
-│   ├── docker-compose.yml    # Production compose file
+│   ├── docker-compose.yml    # Production compose file (SQLite)
+│   ├── docker-compose.sqlserver.yml  # SQL Server override
+│   ├── docker/sqlserver/     # SQL Server init scripts
 │   └── Caddyfile             # Reverse proxy config
 ├── scripts/                  # Development scripts
 │   ├── selfmx-bumpversion.sh # Version management
@@ -202,7 +234,9 @@ SelfMX implements the [Resend API](https://resend.com/docs/api-reference/emails/
 | `/v1/domains/{id}` | DELETE | Delete domain |
 | `/v1/api-keys` | GET | List API keys |
 | `/v1/api-keys` | POST | Create API key |
-| `/admin/audit` | GET | Audit logs |
+| `/v1/audit` | GET | Audit logs |
+| `/v1/migration/status` | GET | Check migration status |
+| `/v1/migration/start` | POST | Start SQLite to SQL Server migration |
 
 See [full documentation](https://selfmx.com) for details.
 
