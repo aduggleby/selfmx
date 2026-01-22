@@ -2,7 +2,7 @@
 
 ## Overview
 
-Elevate the Selfmx UI from a functional foundation to a polished, premium Stripe/Linear-inspired experience. The current implementation has the right architecture (Tailwind CSS 4 with OKLCH colors, dark mode support, semantic tokens) but lacks the visual depth, refined interactions, and micro-details that make Stripe and Linear's interfaces feel sophisticated.
+Elevate the SelfMX UI from a functional foundation to a polished, premium Stripe/Linear-inspired experience. The current implementation has the right architecture (Tailwind CSS 4 with OKLCH colors, dark mode support, semantic tokens) but lacks the visual depth, refined interactions, and micro-details that make Stripe and Linear's interfaces feel sophisticated.
 
 ## Problem Statement
 

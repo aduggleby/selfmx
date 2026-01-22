@@ -2,7 +2,7 @@
 
 ## Overview
 
-Transform the Selfmx dashboard from basic shadcn/ui defaults to a polished, Stripe/Linear inspired developer experience. Minimal, functional, but with visual refinement that makes it feel premium.
+Transform the SelfMX dashboard from basic shadcn/ui defaults to a polished, Stripe/Linear inspired developer experience. Minimal, functional, but with visual refinement that makes it feel premium.
 
 **Target aesthetic:** Clean monochromatic base with refined typography, subtle depth through shadows, and smooth micro-interactions.
 
@@ -356,7 +356,7 @@ toast.error(error.message)
 ```tsx
 <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
   <div className="container mx-auto flex items-center justify-between py-4 px-4">
-    <h1 className="text-xl font-semibold tracking-tight">Selfmx</h1>
+    <h1 className="text-xl font-semibold tracking-tight">SelfMX</h1>
     <ThemeToggle />
   </div>
 </header>

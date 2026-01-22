@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/Selfmx.Api/Selfmx.Api.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/Selfmx.Api.Tests/Selfmx.Api.Tests.csproj" />
-  </Folder>
-</Solution>

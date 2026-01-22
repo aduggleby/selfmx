@@ -6,7 +6,7 @@ test.describe('Page Layout', () => {
     await page.goto('/');
 
     await expect(page.locator('header')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Selfmx' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'SelfMX' })).toBeVisible();
   });
 
   test('displays main domains heading', async ({ page, apiMock }) => {

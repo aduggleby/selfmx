@@ -20,7 +20,7 @@
 
 ## Overview
 
-Enhance the selfmx client UI from its current functional-but-bland state to a polished, premium feel inspired by Tailwind UI. This includes adopting a blue brand color, richer card styling, improved typography, and enhanced interactive states.
+Enhance the SelfMX client UI from its current functional-but-bland state to a polished, premium feel inspired by Tailwind UI. This includes adopting a blue brand color, richer card styling, improved typography, and enhanced interactive states.
 
 **Current State:** The app has a working OKLCH color system with dark mode, shadcn/ui components, and basic styling. However, it lacks visual punch and the refined details that make Tailwind UI designs feel premium.
 

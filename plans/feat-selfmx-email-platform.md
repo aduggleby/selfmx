@@ -1,4 +1,4 @@
-# feat: Selfmx - Self-Hosted Email Sending Platform
+# feat: SelfMX - Self-Hosted Email Sending Platform
 
 ## Enhancement Summary
 
@@ -22,7 +22,7 @@
 
 ## Overview
 
-Selfmx is a self-hosted email sending platform that provides a Resend-compatible API backed by AWS SES. It automates domain verification with DNS record management, supports automatic Cloudflare DNS integration, and includes a modern React dashboard for managing domains.
+SelfMX is a self-hosted email sending platform that provides a Resend-compatible API backed by AWS SES. It automates domain verification with DNS record management, supports automatic Cloudflare DNS integration, and includes a modern React dashboard for managing domains.
 
 **Project:** selfmx
 **Site:** selfmx.com
@@ -38,7 +38,7 @@ Setting up email sending for side projects requires:
 4. Verifying everything is correct
 5. Writing integration code with proper error handling
 
-Selfmx automates this entire workflow and provides a drop-in Resend-compatible API, so you can use the familiar Resend SDK but send through your own AWS SES account at a fraction of the cost ($0.10/1000 emails vs $3/1000).
+SelfMX automates this entire workflow and provides a drop-in Resend-compatible API, so you can use the familiar Resend SDK but send through your own AWS SES account at a fraction of the cost ($0.10/1000 emails vs $3/1000).
 
 ## Technical Approach
 
@@ -156,7 +156,7 @@ builder.Services.AddRateLimiter(options =>
 **Project Structure (Simplified):**
 ```
 src/
-  Selfmx.Api/                 # Single project - API + Frontend
+  SelfMX.Api/                 # Single project - API + Frontend
     Program.cs                # App configuration and DI
     Endpoints/
       EmailEndpoints.cs       # POST /v1/emails (Resend-compatible)
@@ -175,13 +175,13 @@ src/
     Jobs/
       DnsVerificationJob.cs   # Hangfire job (fixed 5-min interval)
     Data/
-      SelfmxDbContext.cs      # EF Core DbContext (WAL mode)
+      SelfMXDbContext.cs      # EF Core DbContext (WAL mode)
       Entities/
         Domain.cs             # Domain entity (anemic - no business logic)
         DnsRecord.cs          # DNS record entity
         EmailLog.cs           # Email sending log
     Settings/
-      SelfmxSettings.cs       # Typed configuration (renamed from Configuration/)
+      SelfMXSettings.cs       # Typed configuration (renamed from Configuration/)
     Authentication/
       PasswordBearerHandler.cs   # Custom auth handler
     Contracts/
@@ -196,7 +196,7 @@ src/
       ...
 
 tests/
-  Selfmx.Api.Tests/           # Unit + integration tests
+  SelfMX.Api.Tests/           # Unit + integration tests
     Services/
     Endpoints/
     Jobs/
@@ -243,16 +243,16 @@ export AWS_REGION="us-east-1"
 var builder = WebApplication.CreateBuilder(args);
 
 // Bind strongly-typed configuration
-builder.Services.Configure<SelfmxSettings>(
+builder.Services.Configure<SelfMXSettings>(
     builder.Configuration.GetSection("Selfmx"));
 
 // Validate configuration at startup (fail fast)
-builder.Services.AddOptions<SelfmxSettings>()
+builder.Services.AddOptions<SelfMXSettings>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
 // SQLite with WAL mode for better concurrency
-builder.Services.AddDbContext<SelfmxDbContext>(options =>
+builder.Services.AddDbContext<SelfMXDbContext>(options =>
     options.UseSqlite(connectionString, sqlite =>
         sqlite.CommandTimeout(30)));
 
@@ -469,7 +469,7 @@ const { data: domain } = useQuery({
 
 **Structure:**
 ```
-src/Selfmx.Api/ClientApp/
+src/SelfMX.Api/ClientApp/
   src/
     components/
       ui/                     # shadcn/ui components
@@ -734,7 +734,7 @@ public enum DomainStatus
 // Services/DomainService.cs - Business logic lives HERE, not in entity
 public class DomainService : IDomainService
 {
-    private readonly SelfmxSettings _settings;
+    private readonly SelfMXSettings _settings;
 
     // IsTimedOut is BUSINESS LOGIC - belongs in service, not entity
     public bool IsTimedOut(Domain domain) =>
@@ -790,9 +790,9 @@ RecurringJob.AddOrUpdate<DnsVerificationJob>(
 ```
 
 - [ ] **1.1 Initialize .NET 9 solution**
-  - Create solution file `Selfmx.sln`
-  - Create `Selfmx.Api` project (single project, not separate class libraries)
-  - Create `Selfmx.Api.Tests` project
+  - Create solution file `SelfMX.slnx`
+  - Create `SelfMX.Api` project (single project, not separate class libraries)
+  - Create `SelfMX.Api.Tests` project
   - Add `Directory.Build.props` for centralized build settings
   - Add `Directory.Packages.props` for central package management
   - Add `.editorconfig` for code style
@@ -800,7 +800,7 @@ RecurringJob.AddOrUpdate<DnsVerificationJob>(
 
 - [ ] **1.2 Configure SQLite with EF Core**
   - Install packages: `Microsoft.EntityFrameworkCore.Sqlite`
-  - Create `SelfmxDbContext.cs` with entity configurations
+  - Create `SelfMXDbContext.cs` with entity configurations
   - Create `Domain`, `DnsRecord`, `EmailLog` entities (anemic - no business logic)
   - Add initial migration
   - **Configure WAL mode** for better concurrency:
@@ -823,7 +823,7 @@ RecurringJob.AddOrUpdate<DnsVerificationJob>(
     // Program.cs - Auto-migrate on startup
     // Acceptable for single-instance self-hosted deployment
     using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<SelfmxDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<SelfMXDbContext>();
     await db.Database.MigrateAsync();
 
     // For upgrades: add new migrations with `dotnet ef migrations add <Name>`
@@ -831,7 +831,7 @@ RecurringJob.AddOrUpdate<DnsVerificationJob>(
     ```
 
 - [ ] **1.3 Implement password authentication (Security-Hardened)**
-  - Create `SelfmxSettings.cs` for typed configuration with validation
+  - Create `SelfMXSettings.cs` for typed configuration with validation
   - **Store bcrypt hash**, not plaintext password
   - Use `CryptographicOperations.FixedTimeEquals` for timing-attack resistance:
     ```csharp
@@ -1510,7 +1510,7 @@ builder.Services.AddRateLimiter(options =>
   VOLUME /var/data/selfmx
 
   EXPOSE 8080
-  ENTRYPOINT ["dotnet", "Selfmx.Api.dll"]
+  ENTRYPOINT ["dotnet", "SelfMX.Api.dll"]
   ```
 
   ```yaml
@@ -1698,12 +1698,12 @@ For testing, create mock implementations of:
 ## References
 
 ### Internal References (to be created)
-- `src/Selfmx.Api/Services/SesService.cs` - AWS SES v2 integration
-- `src/Selfmx.Api/Services/DnsChecker.cs` - DNS verification with caching
-- `src/Selfmx.Api/Services/DnsResultCache.cs` - 5-min TTL cache
-- `src/Selfmx.Api/Jobs/DnsVerificationJob.cs` - Fixed-interval background polling
-- `src/Selfmx.Api/Auth/PasswordBearerHandler.cs` - Custom auth handler
-- `src/Selfmx.Api/Endpoints/EmailEndpoints.cs` - Resend-compatible API
+- `src/SelfMX.Api/Services/SesService.cs` - AWS SES v2 integration
+- `src/SelfMX.Api/Services/DnsChecker.cs` - DNS verification with caching
+- `src/SelfMX.Api/Services/DnsResultCache.cs` - 5-min TTL cache
+- `src/SelfMX.Api/Jobs/DnsVerificationJob.cs` - Fixed-interval background polling
+- `src/SelfMX.Api/Auth/PasswordBearerHandler.cs` - Custom auth handler
+- `src/SelfMX.Api/Endpoints/EmailEndpoints.cs` - Resend-compatible API
 
 ### External References (from Research)
 - [AWS SES v2 API Reference](https://docs.aws.amazon.com/ses/latest/APIReference-V2/)

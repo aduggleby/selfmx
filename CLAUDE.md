@@ -1,0 +1,129 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+SelfMX is a self-hosted email sending platform providing a Resend-compatible API backed by AWS SES. It automates domain verification with DNS record management via Cloudflare integration.
+
+## Build & Test Commands
+
+### Backend (.NET 10)
+
+```bash
+dotnet build SelfMX.slnx           # Build solution
+dotnet test SelfMX.slnx            # Run all tests (XUnit)
+dotnet test --filter "FullyQualifiedName~DomainService"  # Run specific test class
+dotnet run --project src/SelfMX.Api  # Run API (port 5000)
+```
+
+### Frontend (React/Vite)
+
+```bash
+cd client
+npm install                        # Install dependencies
+npm run dev                        # Dev server (port 5173, proxies /v1 to :5000)
+npm run build                      # TypeScript check + Vite build
+npm run lint                       # ESLint
+npm run test                       # Playwright E2E tests (headless)
+npm run test:headed                # Playwright with browser UI
+```
+
+### Full Stack Development
+
+Run both servers simultaneously:
+- Terminal 1: `dotnet run --project src/SelfMX.Api`
+- Terminal 2: `cd client && npm run dev`
+
+Frontend at `http://localhost:5173` proxies API calls to backend at `http://localhost:5000`.
+
+## Architecture
+
+### Backend (ASP.NET Core Minimal APIs)
+
+```
+src/SelfMX.Api/
+├── Program.cs              # DI setup, middleware, route registration
+├── Endpoints/              # Minimal API route handlers
+│   ├── DomainEndpoints.cs  # /v1/domains CRUD
+│   └── EmailEndpoints.cs   # /v1/emails send
+├── Services/               # Business logic
+│   ├── DomainService.cs    # Domain CRUD, verification state
+│   ├── SesService.cs       # AWS SES integration
+│   ├── CloudflareService.cs # DNS record management
+│   └── DnsVerificationService.cs # Direct DNS checks
+├── Jobs/                   # Hangfire background jobs
+│   ├── SetupDomainJob.cs   # Creates SES identity, DNS records
+│   └── VerifyDomainsJob.cs # Polls verification status (every 5 min)
+├── Data/AppDbContext.cs    # EF Core with SQLite (WAL mode)
+└── Authentication/         # API key auth + rate limiting
+```
+
+**Key patterns:**
+- Routes use `TypedResults` for compile-time response type safety
+- Domain verification state machine: Pending → Verifying → Verified/Failed
+- DNS records stored as JSON in Domain entity
+- Hangfire with single worker (SQLite concurrency constraint)
+
+### Frontend (React 19 + TanStack Query)
+
+```
+client/src/
+├── pages/DomainsPage.tsx   # Main view with domain list
+├── components/
+│   ├── ui/                 # Reusable primitives (Button, Card, Input)
+│   └── Domain*.tsx         # Domain-specific components
+├── hooks/useDomains.ts     # React Query hooks for API
+└── lib/
+    ├── api.ts              # ApiClient with Zod validation
+    └── schemas.ts          # Zod schemas matching API responses
+```
+
+**Key patterns:**
+- API responses validated with Zod schemas at runtime
+- TanStack Query for server state management
+- Tailwind CSS 4 with OKLCH color system
+- Dark mode via React Context
+
+### API Endpoints
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /health` | No | Health check |
+| `GET /` | No | Status |
+| `POST /v1/domains` | Yes | Create domain |
+| `GET /v1/domains` | Yes | List domains (paginated) |
+| `GET /v1/domains/{id}` | Yes | Get domain |
+| `DELETE /v1/domains/{id}` | Yes | Delete domain |
+| `POST /v1/emails` | Yes | Send email (Resend-compatible) |
+
+Auth: Bearer token with BCrypt-hashed API key configured in `App:ApiKeyHash`.
+
+## Configuration
+
+Environment variables or `appsettings.json`:
+
+```json
+{
+  "App": {
+    "ApiKeyHash": "<bcrypt hash of API key>"
+  },
+  "Aws": {
+    "Region": "us-east-1",
+    "AccessKeyId": "<optional, uses IAM if blank>",
+    "SecretAccessKey": "<optional>"
+  },
+  "Cloudflare": {
+    "ApiToken": "<cloudflare api token>",
+    "ZoneId": "<cloudflare zone id>"
+  }
+}
+```
+
+## Naming Convention
+
+The project uses "SelfMX" casing (capital M and X) for:
+- Namespace: `SelfMX.Api`
+- Solution: `SelfMX.slnx`
+- Project directories: `src/SelfMX.Api`, `tests/SelfMX.Api.Tests`
+- User-facing brand text in UI and documentation

@@ -1,4 +1,4 @@
-# Selfmx Frontend Design Specification
+# SelfMX Frontend Design Specification
 
 ## Design Philosophy
 
@@ -152,7 +152,7 @@ Applying the **frontend-design skill** to create a distinctive, production-grade
 │                                                                 │
 │                    ┌─────────────────────┐                      │
 │                    │   ▄▄▄▄▄▄▄▄▄▄▄▄▄     │                      │
-│                    │   selfmx            │  (logo)              │
+│                    │   SelfMX            │  (logo)              │
 │                    │   ─────────────     │                      │
 │                    │   Self-hosted       │                      │
 │                    │   email sending     │                      │
@@ -176,7 +176,7 @@ Applying the **frontend-design skill** to create a distinctive, production-grade
 ```tsx
 /**
  * @file LoginPage.tsx
- * @description Password authentication page with selfmx branding
+ * @description Password authentication page with SelfMX branding
  */
 
 import { useState } from 'react'
@@ -218,7 +218,7 @@ export function LoginPage() {
           {/* Logo */}
           <div className="mx-auto">
             <div className="font-mono text-3xl font-bold tracking-tight text-text-primary">
-              selfmx
+              SelfMX
             </div>
             <div className="h-0.5 w-12 mx-auto mt-2 bg-accent-primary" />
           </div>
@@ -323,7 +323,7 @@ export function LoginPage() {
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  selfmx                                           [+] Add Domain    [☀/☾]  │
+│  SelfMX                                           [+] Add Domain    [☀/☾]  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  Domains (3)                                                                │
@@ -375,7 +375,7 @@ export function DashboardPage() {
       <header className="sticky top-0 z-50 border-b border-border-default bg-bg-primary/80 backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="font-mono text-lg font-bold text-text-primary">
-            selfmx
+            SelfMX
           </div>
 
           <div className="flex items-center gap-2">
@@ -1587,7 +1587,7 @@ npm install @fontsource/geist-sans
 
 ## Summary
 
-This design specification applies the **frontend-design skill** principles to create a distinctive, memorable interface for selfmx:
+This design specification applies the **frontend-design skill** principles to create a distinctive, memorable interface for SelfMX:
 
 1. **Bold aesthetic direction**: Industrial Precision - clean, functional, authoritative
 2. **Unique typography**: JetBrains Mono (technical) + Geist (UI) - no generic fonts
