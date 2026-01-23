@@ -1,12 +1,65 @@
 #!/bin/bash
 # SelfMX Install Script
-# Usage: curl -fsSL https://get.selfmx.com/install.sh | bash
+# Usage: curl -fsSL https://selfmx.com/install.sh | bash
+#
+# Remote installation via SSH:
+#   curl -fsSL https://selfmx.com/install.sh | bash -s -- -i ~/.ssh/id_rsa user@host
+#   curl -fsSL https://selfmx.com/install.sh | bash -s -- user@host
 #
 # Environment variables for non-interactive mode:
 #   SELFMX_DOMAIN, SELFMX_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 #   AWS_REGION, HTTP_PORT, HTTPS_PORT, SELFMX_EMAIL
 
 set -euo pipefail
+
+# ============================================
+# SSH Remote Execution
+# ============================================
+# Check if we're being asked to run on a remote host
+SSH_IDENTITY=""
+SSH_TARGET=""
+
+parse_ssh_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -i)
+                SSH_IDENTITY="$2"
+                shift 2
+                ;;
+            -*)
+                echo "Unknown option: $1" >&2
+                exit 1
+                ;;
+            *)
+                SSH_TARGET="$1"
+                shift
+                ;;
+        esac
+    done
+}
+
+# Parse arguments for SSH mode
+parse_ssh_args "$@"
+
+# If SSH target is specified, run remotely
+if [[ -n "$SSH_TARGET" ]]; then
+    echo "Installing SelfMX on remote host: $SSH_TARGET"
+
+    SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10)
+    if [[ -n "$SSH_IDENTITY" ]]; then
+        SSH_OPTS+=(-i "$SSH_IDENTITY")
+    fi
+
+    # Download script and pipe to remote bash
+    if [[ -t 0 ]]; then
+        # Script was run directly (not piped), fetch from URL
+        curl -fsSL https://selfmx.com/install.sh | ssh "${SSH_OPTS[@]}" "$SSH_TARGET" 'bash -s'
+    else
+        # Script is being piped, forward stdin
+        ssh "${SSH_OPTS[@]}" "$SSH_TARGET" 'bash -s'
+    fi
+    exit $?
+fi
 
 # ============================================
 # Configuration
