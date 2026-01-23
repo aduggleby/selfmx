@@ -6,6 +6,13 @@ description: Release notes and version history for SelfMX.
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.4] - 2026-01-23
+
+### Fixed
+- Bumpversion now checks GitHub authentication before attempting to push to remote
+
+---
+
 ## [0.9.3] - 2026-01-23
 
 ### Added
