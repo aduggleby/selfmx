@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useDomains, useCreateDomain, useDeleteDomain } from '@/hooks/useDomains';
 import { DomainCard } from '@/components/DomainCard';
@@ -24,6 +25,7 @@ function DomainCardSkeleton() {
 }
 
 export function DomainsPage() {
+  const navigate = useNavigate();
   const [newDomain, setNewDomain] = useState('');
   const [page, setPage] = useState(1);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -49,9 +51,10 @@ export function DomainsPage() {
     if (!newDomain.trim()) return;
 
     try {
-      await createMutation.mutateAsync(newDomain.trim());
+      const created = await createMutation.mutateAsync(newDomain.trim());
       toast.success(`Domain ${newDomain.trim()} added`);
       setNewDomain('');
+      navigate(`/domains/${created.id}`);
       return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to add domain');

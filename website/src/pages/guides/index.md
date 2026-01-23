@@ -8,6 +8,15 @@ Step-by-step guides for common SelfMX operations.
 
 ## Available Guides
 
+### [Domain Management](/guides/domain-management)
+
+Add, verify, and manage domains for sending emails.
+
+- Adding and verifying domains
+- DNS record configuration
+- BIND file downloads
+- Cloudflare integration
+
 ### [Deployment](/guides/deployment)
 
 Deploy SelfMX to production with Docker, Kubernetes, or cloud platforms.

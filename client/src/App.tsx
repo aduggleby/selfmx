@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './components/theme-provider';
 import { ThemeToggle } from './components/ui/theme-toggle';
@@ -6,6 +7,7 @@ import { Toaster } from './components/ui/toaster';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { DomainsPage } from './pages/DomainsPage';
+import { DomainDetailPage } from './pages/DomainDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { Button } from './components/ui/button';
 import { LogOut } from 'lucide-react';
@@ -76,7 +78,11 @@ function AuthenticatedApp() {
         </div>
       </header>
       <main className="relative">
-        <DomainsPage />
+        <Routes>
+          <Route path="/" element={<DomainsPage />} />
+          <Route path="/domains/:id" element={<DomainDetailPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
     </div>
   );

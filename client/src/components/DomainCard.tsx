@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DomainStatusBadge } from './DomainStatusBadge';
@@ -28,7 +29,14 @@ export function DomainCard({ domain, onDelete, isDeleting }: DomainCardProps) {
       <div className="absolute inset-x-0 top-0 h-1 bg-primary" />
       <CardHeader className="flex flex-col gap-3 pb-3">
         <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-lg font-semibold">{domain.name}</CardTitle>
+          <CardTitle className="text-lg font-semibold">
+            <Link
+              to={`/domains/${domain.id}`}
+              className="hover:text-primary transition-colors"
+            >
+              {domain.name}
+            </Link>
+          </CardTitle>
           <DomainStatusBadge status={domain.status} />
         </div>
         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
