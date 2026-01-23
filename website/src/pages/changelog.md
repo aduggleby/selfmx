@@ -6,6 +6,17 @@ description: Release notes and version history for SelfMX.
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.3] - 2026-01-23
+
+### Added
+- SSH identity file support for remote installation (`-i` flag)
+- Auto-commit option in bumpversion for uncommitted changes
+
+### Changed
+- Improved SSH installation documentation with Hetzner Ubuntu 24 guidance
+
+---
+
 ## [1.0.0] - 2024-01-15
 
 ### Added
