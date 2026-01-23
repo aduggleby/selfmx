@@ -291,14 +291,25 @@ echo ""
 echo "Pushing to remote..."
 echo ""
 
-# Push to remote
-git push
+# Check GitHub authentication before pushing
+if ! gh auth status &>/dev/null; then
+    echo "Warning: Not authenticated with GitHub CLI."
+    echo "Run 'gh auth login' to authenticate, then push manually with 'git push'."
+    echo ""
+    echo "=========================================="
+    echo "Version bump complete: $CURRENT_VERSION -> $NEW_VERSION"
+    echo "Changes committed locally but NOT pushed."
+    echo "=========================================="
+else
+    # Push to remote
+    git push
 
-echo ""
-echo "=========================================="
-echo "Version bump complete: $CURRENT_VERSION -> $NEW_VERSION"
-echo "Changes committed and pushed to remote."
-echo "=========================================="
+    echo ""
+    echo "=========================================="
+    echo "Version bump complete: $CURRENT_VERSION -> $NEW_VERSION"
+    echo "Changes committed and pushed to remote."
+    echo "=========================================="
+fi
 
 # =============================================================================
 # Ask user if they want to publish
