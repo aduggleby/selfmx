@@ -55,26 +55,83 @@ fi
 
 cd "$REPO_ROOT"
 
-# Check for uncommitted changes (staged or unstaged)
+# Check for uncommitted changes (staged or unstaged) or untracked files
+HAS_CHANGES=false
+UNTRACKED=$(git ls-files --others --exclude-standard)
+
 if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "Error: You have uncommitted changes."
-    echo "Please commit or stash your changes before bumping the version."
+    HAS_CHANGES=true
+fi
+
+if [[ -n "$UNTRACKED" ]]; then
+    HAS_CHANGES=true
+fi
+
+if [[ "$HAS_CHANGES" == "true" ]]; then
+    echo "Warning: You have uncommitted changes or untracked files."
     echo ""
     git status --short
-    exit 1
-fi
-
-# Check for untracked files (excluding common ignored patterns)
-UNTRACKED=$(git ls-files --others --exclude-standard)
-if [[ -n "$UNTRACKED" ]]; then
-    echo "Error: You have untracked files."
-    echo "Please commit, stash, or add to .gitignore before bumping the version."
     echo ""
-    echo "$UNTRACKED"
-    exit 1
+    echo "Options:"
+    echo "  [C] Auto-commit with Claude-generated message, then continue"
+    echo "  [S] Stop and handle manually"
+    echo ""
+    read -p "Select option [C/S]: " DIRTY_RESPONSE
+
+    case "$DIRTY_RESPONSE" in
+        [cC])
+            echo ""
+            echo "Generating commit message with Claude..."
+            echo ""
+
+            # Build the prompt for Claude to generate a commit message
+            COMMIT_PROMPT=$(cat <<'COMMIT_PROMPT_EOF'
+Generate a git commit message for the following changes. Output ONLY the commit message, nothing else.
+
+Use conventional commit format (e.g., "feat:", "fix:", "chore:", "docs:", "refactor:").
+Keep the first line under 72 characters. Add a body if needed for complex changes.
+
+Changes to commit:
+COMMIT_PROMPT_EOF
+)
+            COMMIT_PROMPT="$COMMIT_PROMPT"$'\n\n'"$(git status --short)"$'\n\n'"$(git diff --stat)"
+
+            # Generate commit message using Claude
+            GENERATED_MSG=$(claude -p "$COMMIT_PROMPT" --dangerously-skip-permissions 2>/dev/null)
+
+            if [[ -z "$GENERATED_MSG" ]]; then
+                echo "Error: Failed to generate commit message with Claude."
+                exit 1
+            fi
+
+            echo "Generated commit message:"
+            echo "─────────────────────────────────────────"
+            echo "$GENERATED_MSG"
+            echo "─────────────────────────────────────────"
+            echo ""
+
+            # Stage all changes
+            git add -A
+
+            # Commit with generated message
+            git commit -m "$GENERATED_MSG
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+
+            echo ""
+            echo "Changes committed. Continuing with version bump..."
+            echo ""
+            ;;
+        *)
+            echo ""
+            echo "Stopping. Please commit or stash your changes before bumping the version."
+            exit 1
+            ;;
+    esac
+else
+    echo "Git state: clean (all changes committed)"
 fi
 
-echo "Git state: clean (all changes committed)"
 echo ""
 
 # =============================================================================
