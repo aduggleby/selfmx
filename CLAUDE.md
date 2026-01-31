@@ -46,7 +46,7 @@ ando verify               # Validate build script
 ando clean                # Remove build artifacts
 ```
 
-Find Ando documentation at https://andobuild.com
+Find Ando documentation at https://andobuild.com/llms.txt
 
 ## Architecture
 
