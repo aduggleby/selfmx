@@ -163,7 +163,7 @@ Environment variables or `appsettings.json`:
   },
   "App": {
     "Fqdn": "mail.example.com",
-    "AdminPasswordHash": "<SHA-512 hash>"
+    "AdminPasswordHash": "$6$..." // SHA-512 crypt hash, generate with: openssl passwd -6 "YourPassword"
   },
   "Aws": {
     "Region": "us-east-1",

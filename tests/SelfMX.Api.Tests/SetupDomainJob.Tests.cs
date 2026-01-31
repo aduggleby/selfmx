@@ -33,7 +33,7 @@ public class SetupDomainJobTests : IDisposable
         var appSettings = Options.Create(new AppSettings
         {
             ApiKeyHash = "test",
-            AdminPasswordHash = "$2a$12$test", // BCrypt hash placeholder for tests
+            AdminPasswordHash = "$6$testsalt$K3lHqxM.xK.B.D3ZwQ9RGvJyN8O.mS.pT.uV.wX.yZ.0A.1B.2C.3D.4E.5F.6G.7H.8I.9J", // SHA-512 crypt hash placeholder for tests
             VerificationTimeout = TimeSpan.FromHours(72)
         });
 

@@ -451,12 +451,12 @@ gather_configuration() {
 # Generate Admin Password Hash
 # ============================================
 generate_admin_password_hash() {
-    info "Generating admin password hash (BCrypt)..."
+    info "Generating admin password hash (SHA-512 crypt)..."
 
-    # Generate BCrypt hash of admin password using htpasswd
-    # BCrypt is appropriate for admin passwords because they're user-chosen (low entropy)
-    SELFMX_ADMIN_PASSWORD_HASH=$(docker run --rm \
-        httpd:alpine htpasswd -nbBC 12 admin "$SELFMX_PASSWORD" | cut -d: -f2)
+    # Generate SHA-512 crypt hash of admin password using openssl
+    # Format: $6$salt$hash - compatible with Linux/OpenSSL tooling
+    # Uses 5000 rounds by default (configurable via $6$rounds=N$ format)
+    SELFMX_ADMIN_PASSWORD_HASH=$(openssl passwd -6 "$SELFMX_PASSWORD")
 
     success "Admin password hash generated."
 }
@@ -503,7 +503,8 @@ SELFMX_DOMAIN=${SELFMX_DOMAIN}
 SELFMX_EMAIL=${SELFMX_EMAIL}
 SELFMX_VERSION=${SELFMX_VERSION}
 
-# Admin Authentication (BCrypt hash for browser UI login)
+# Admin Authentication (SHA-512 crypt hash for browser UI login)
+# Generate with: openssl passwd -6 "YourPassword"
 # API keys are created via the admin UI after first login
 SELFMX_ADMIN_PASSWORD_HASH=${SELFMX_ADMIN_PASSWORD_HASH}
 
