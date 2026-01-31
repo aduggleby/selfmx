@@ -44,7 +44,7 @@ For TrueNAS SCALE installations, see the dedicated guide: **[TrueNAS Installatio
 | RAM | 4GB (SQL Server requires 2GB minimum) |
 | Disk | 10GB free space |
 | Ports | 80 and 443 available |
-| AWS | Account with SES access |
+| AWS | Account with SES access ([setup guide](/aws-setup)) |
 
 ## Configuration Prompts
 
@@ -54,7 +54,7 @@ The interactive installer prompts for:
 |---------|-------------|
 | Domain name | Where SelfMX will be hosted (e.g., `mail.example.com`) |
 | Admin password | For logging into the admin UI (min 12 characters) |
-| AWS credentials | Access Key ID, Secret, and Region for SES |
+| AWS credentials | Access Key ID, Secret, and Region for SES ([setup guide](/aws-setup)) |
 | Cloudflare credentials | Optional, for automatic DNS record creation |
 
 ## Non-Interactive Installation
@@ -67,7 +67,7 @@ export SELFMX_DOMAIN="mail.example.com"       # FQDN where SelfMX is hosted
 export SELFMX_EMAIL="admin@example.com"       # Email for Let's Encrypt certificates
 export SELFMX_PASSWORD="your-secure-password" # Admin UI password (min 12 chars)
 
-# === Required: AWS SES Credentials ===
+# === Required: AWS SES Credentials (see /aws-setup for how to create these) ===
 export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
 export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 export AWS_REGION="us-east-1"
@@ -174,9 +174,10 @@ docker logs selfmx-sqlserver
 
 ### AWS SES Errors
 
-1. Verify AWS credentials are correct
+1. Verify AWS credentials are correct (see [AWS Setup Guide](/aws-setup))
 2. Check SES is enabled in your region
 3. Verify sending domain is verified in SES
+4. Ensure your account is out of sandbox mode for production use
 
 ### Domain Verification Stuck
 

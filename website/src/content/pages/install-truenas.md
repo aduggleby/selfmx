@@ -15,7 +15,7 @@ Before starting, ensure you have:
 - **TrueNAS SCALE 24.10 or later** (earlier versions used Kubernetes)
 - **Apps pool configured** - a storage pool designated for application data
 - **SQL Server** - already running as a container on TrueNAS (install from the app catalog if needed)
-- **AWS credentials** - Access Key ID, Secret Access Key, and Region for SES
+- **AWS credentials** - Access Key ID, Secret Access Key, and Region for SES ([setup guide](/aws-setup))
 - **A domain name** pointing to your TrueNAS server (for HTTPS)
 
 ### Gather Required Information
