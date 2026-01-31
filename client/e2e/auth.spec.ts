@@ -260,7 +260,7 @@ test.describe('Authentication', () => {
       // Add a domain
       await page.getByPlaceholder('example.com').fill('mytest.com');
       await page.getByRole('button', { name: 'Add domain' }).click();
-      await expect(page.getByText('mytest.com')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'mytest.com' })).toBeVisible();
 
       // Logout
       await page.getByRole('button', { name: 'Logout' }).click();
