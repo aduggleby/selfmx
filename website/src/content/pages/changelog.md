@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.14] - 2026-01-31
+
+### Added
+- Display version and server information on startup
+
 ## [0.9.13] - 2026-01-31
 
 ### Added
