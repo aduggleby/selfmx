@@ -68,13 +68,9 @@ aws iam put-user-policy \
 
 # Create access keys (save these securely!)
 aws iam create-access-key --user-name selfmx-ses
-
-# Verify a domain in SES (replace with your domain)
-aws ses verify-domain-identity --domain yourdomain.com --region us-east-1
-
-# Get DKIM tokens for DNS setup
-aws ses verify-domain-dkim --domain yourdomain.com --region us-east-1
 ```
+
+**Note:** Domain verification is handled automatically by SelfMX - you don't need to do it manually in AWS.
 
 ## Step-by-Step Guide
 
@@ -158,45 +154,7 @@ SES is available in these regions. Choose one close to your server:
 
 **Note:** You must configure SES in the region you choose. SES settings don't replicate across regions.
 
-### Step 4: Verify Your Domain in SES
-
-SelfMX can manage domain verification automatically if you use Cloudflare DNS. Otherwise, add the DNS records manually.
-
-#### Using the AWS Console
-
-1. Open the [Amazon SES Console](https://console.aws.amazon.com/ses)
-2. Ensure you're in your chosen region (top-right dropdown)
-3. Go to **Configuration** > **Verified identities**
-4. Click **Create identity**
-5. Select **Domain**
-6. Enter your domain (e.g., `yourdomain.com`)
-7. Under **Advanced DKIM settings**, keep **Easy DKIM** selected
-8. Choose **2048-bit** DKIM key length (recommended)
-9. Click **Create identity**
-
-#### Add DNS Records
-
-After creating the identity, you'll see DNS records to add:
-
-**DKIM Records (3 CNAME records):**
-
-| Name | Type | Value |
-|------|------|-------|
-| `abc123._domainkey.yourdomain.com` | CNAME | `abc123.dkim.amazonses.com` |
-| `def456._domainkey.yourdomain.com` | CNAME | `def456.dkim.amazonses.com` |
-| `ghi789._domainkey.yourdomain.com` | CNAME | `ghi789.dkim.amazonses.com` |
-
-**Verification TXT Record:**
-
-| Name | Type | Value |
-|------|------|-------|
-| `_amazonses.yourdomain.com` | TXT | `abc123def456...` |
-
-Add these records in your DNS provider (Cloudflare, Route 53, Namecheap, etc.).
-
-**Verification takes up to 72 hours** but usually completes within a few hours.
-
-### Step 5: Request Production Access
+### Step 4: Request Production Access
 
 New SES accounts start in **sandbox mode** with restrictions:
 - Can only send to verified email addresses
@@ -247,7 +205,7 @@ Before requesting, ensure you have:
 
 AWS typically responds within 24 hours. If denied, you can resubmit with more detail.
 
-### Step 6: Configure SelfMX
+### Step 5: Configure SelfMX
 
 Once you have your credentials and domain verified, configure SelfMX:
 
