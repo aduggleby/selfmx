@@ -6,6 +6,14 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.13] - 2026-01-31
+
+### Added
+- Comprehensive AWS SES setup guide
+
+### Fixed
+- SQL Server compatibility on all system configurations
+
 ## [0.9.10] - 2026-01-31
 
 ### Added
