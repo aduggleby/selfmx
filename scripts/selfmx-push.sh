@@ -35,5 +35,5 @@ if [[ -z "${GITHUB_TOKEN:-}" ]]; then
     echo "Using GitHub token from gh CLI"
 fi
 
-# Run ando with push profile and Docker-in-Docker enabled
-ando run -p push --dind "$@"
+# Run ando with publish profile and Docker-in-Docker enabled
+ando run -p publish --dind "$@"

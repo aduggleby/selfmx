@@ -201,7 +201,7 @@ cd client && npm run lint
 ando
 
 # Full release: build, test, push Docker image to ghcr.io, deploy docs
-ando --dind -p push
+ando --dind -p publish
 
 # Validate build script
 ando verify

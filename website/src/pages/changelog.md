@@ -6,6 +6,13 @@ description: Release notes and version history for SelfMX.
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.7] - 2026-01-31
+
+### Changed
+- Rename "push profile" to "publish" for consistency
+
+---
+
 ## [0.9.4] - 2026-01-23
 
 ### Fixed
