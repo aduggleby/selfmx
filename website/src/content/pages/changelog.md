@@ -6,6 +6,18 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.10] - 2026-01-31
+
+### Added
+- Send test email feature for verifying domain configuration
+
+### Changed
+- Improved security with SHA-512 password hashing for admin accounts
+- Simplified database support to SQL Server only
+
+### Fixed
+- Build system improvements for release publishing
+
 ## [0.9.4] - 2026-01-23
 
 ### Fixed

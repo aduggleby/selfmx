@@ -29,6 +29,7 @@ API keys are created in the admin UI and use the Resend format: `re_` followed b
 | `/v1/domains` | POST | API Key | Create domain |
 | `/v1/domains/{id}` | GET | API Key | Get domain |
 | `/v1/domains/{id}` | DELETE | API Key | Delete domain |
+| `/v1/domains/{id}/test-email` | POST | API Key | Send test email |
 | `/v1/api-keys` | GET | Admin | List API keys |
 | `/v1/api-keys` | POST | Admin | Create API key |
 | `/v1/audit` | GET | Admin | Audit logs |
@@ -200,6 +201,60 @@ Remove a domain from SelfMX and AWS SES.
 ```
 204 No Content
 ```
+
+## Send Test Email
+
+Send a test email from a verified domain. Useful for verifying domain configuration.
+
+**POST** `/v1/domains/{id}/test-email`
+
+### Request
+
+```json
+{
+  "senderPrefix": "test",
+  "to": "recipient@example.com",
+  "subject": "Test Email",
+  "text": "This is a test email from SelfMX."
+}
+```
+
+### Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `senderPrefix` | string | Yes | Local part of sender address (e.g., `test` becomes `test@yourdomain.com`) |
+| `to` | string | Yes | Recipient email address |
+| `subject` | string | Yes | Email subject line |
+| `text` | string | Yes | Plain text body content |
+
+### Response
+
+```json
+{
+  "id": "msg_xxxxxxxxxxxx"
+}
+```
+
+### Example
+
+```bash
+curl -X POST https://mail.yourdomain.com/v1/domains/{id}/test-email \
+  -H "Authorization: Bearer re_xxxxxxxxxxxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "senderPrefix": "test",
+    "to": "recipient@example.com",
+    "subject": "Test Email",
+    "text": "This is a test email from SelfMX."
+  }'
+```
+
+### Notes
+
+- Domain must be in `Verified` status
+- Sender prefix must contain only alphanumeric characters, dots, underscores, and hyphens
+- The full sender address is constructed as `{senderPrefix}@{domainName}`
 
 ## List API Keys (Admin)
 

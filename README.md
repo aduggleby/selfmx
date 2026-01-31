@@ -154,19 +154,6 @@ ando --dind -p publish
 ando verify
 ```
 
-### Version Management
-
-```bash
-# Bump patch version (1.0.0 -> 1.0.1)
-./scripts/selfmx-bumpversion.sh
-
-# Bump minor version (1.0.0 -> 1.1.0)
-./scripts/selfmx-bumpversion.sh minor
-
-# Bump major version (1.0.0 -> 2.0.0)
-./scripts/selfmx-bumpversion.sh major
-```
-
 ## API Reference
 
 SelfMX implements the [Resend API](https://resend.com/docs/api-reference/emails/send-email) for email sending.
