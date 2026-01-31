@@ -1,7 +1,10 @@
+using System.Security.Claims;
+using System.Text.RegularExpressions;
 using Hangfire;
 using Microsoft.AspNetCore.Http.HttpResults;
 using SelfMX.Api.Contracts.Requests;
 using SelfMX.Api.Contracts.Responses;
+using SelfMX.Api.Entities;
 using SelfMX.Api.Jobs;
 using SelfMX.Api.Services;
 
@@ -17,6 +20,7 @@ public static class DomainEndpoints
         domains.MapPost("/", CreateDomain);
         domains.MapGet("/{id}", GetDomain);
         domains.MapDelete("/{id}", DeleteDomain);
+        domains.MapPost("/{id}/test-email", SendTestEmail);
 
         return group;
     }
@@ -118,5 +122,138 @@ public static class DomainEndpoints
         await domainService.DeleteAsync(domain, ct);
 
         return TypedResults.NoContent();
+    }
+
+    private static readonly Regex SenderPrefixRegex = new(@"^[a-zA-Z0-9._-]+$", RegexOptions.Compiled);
+    private static readonly Regex EmailRegex = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
+
+    private static async Task<Results<Ok<SendEmailResponse>, BadRequest<object>, NotFound<object>, UnprocessableEntity<object>, ForbidHttpResult>> SendTestEmail(
+        string id,
+        SendTestEmailRequest request,
+        DomainService domainService,
+        ApiKeyService apiKeyService,
+        AuditService auditService,
+        ISesService sesService,
+        ClaimsPrincipal user,
+        CancellationToken ct = default)
+    {
+        var actorType = user.FindFirst("ActorType")?.Value ?? "unknown";
+        var actorId = user.FindFirst("KeyPrefix")?.Value;
+
+        // Validate required fields
+        if (string.IsNullOrWhiteSpace(request.SenderPrefix) ||
+            string.IsNullOrWhiteSpace(request.To) ||
+            string.IsNullOrWhiteSpace(request.Subject) ||
+            string.IsNullOrWhiteSpace(request.Text))
+        {
+            auditService.Log(new AuditEntry(
+                Action: "domain.test_email",
+                ActorType: actorType,
+                ActorId: actorId,
+                ResourceType: "domain",
+                ResourceId: id,
+                StatusCode: 400,
+                ErrorMessage: "Missing required fields"
+            ));
+            return TypedResults.BadRequest(ApiError.InvalidRequest.ToResponse());
+        }
+
+        // Validate sender prefix format
+        if (!SenderPrefixRegex.IsMatch(request.SenderPrefix))
+        {
+            auditService.Log(new AuditEntry(
+                Action: "domain.test_email",
+                ActorType: actorType,
+                ActorId: actorId,
+                ResourceType: "domain",
+                ResourceId: id,
+                StatusCode: 400,
+                ErrorMessage: $"Invalid sender prefix: {request.SenderPrefix}"
+            ));
+            return TypedResults.BadRequest(ApiError.InvalidSenderPrefix.ToResponse());
+        }
+
+        // Validate recipient email format
+        if (!EmailRegex.IsMatch(request.To))
+        {
+            auditService.Log(new AuditEntry(
+                Action: "domain.test_email",
+                ActorType: actorType,
+                ActorId: actorId,
+                ResourceType: "domain",
+                ResourceId: id,
+                StatusCode: 400,
+                ErrorMessage: $"Invalid recipient email: {request.To}"
+            ));
+            return TypedResults.BadRequest(ApiError.InvalidRecipientEmail.ToResponse());
+        }
+
+        // Get domain
+        var domain = await domainService.GetByIdAsync(id, ct);
+        if (domain is null)
+        {
+            auditService.Log(new AuditEntry(
+                Action: "domain.test_email",
+                ActorType: actorType,
+                ActorId: actorId,
+                ResourceType: "domain",
+                ResourceId: id,
+                StatusCode: 404,
+                ErrorMessage: "Domain not found"
+            ));
+            return TypedResults.NotFound(ApiError.NotFound.ToResponse());
+        }
+
+        // Check domain is verified
+        if (domain.Status != DomainStatus.Verified)
+        {
+            auditService.Log(new AuditEntry(
+                Action: "domain.test_email",
+                ActorType: actorType,
+                ActorId: actorId,
+                ResourceType: "domain",
+                ResourceId: id,
+                StatusCode: 422,
+                ErrorMessage: $"Domain not verified: {domain.Name}"
+            ));
+            return TypedResults.UnprocessableEntity(ApiError.DomainNotVerified.ToResponse());
+        }
+
+        // Check authorization
+        if (!apiKeyService.CanAccessDomain(user, domain.Id))
+        {
+            auditService.Log(new AuditEntry(
+                Action: "domain.test_email",
+                ActorType: actorType,
+                ActorId: actorId,
+                ResourceType: "domain",
+                ResourceId: id,
+                StatusCode: 403,
+                ErrorMessage: $"Not authorized for domain: {domain.Name}"
+            ));
+            return TypedResults.Forbid();
+        }
+
+        // Construct from address and send
+        var fromAddress = $"{request.SenderPrefix}@{domain.Name}";
+        var messageId = await sesService.SendEmailAsync(
+            fromAddress,
+            [request.To],
+            request.Subject,
+            html: null,
+            text: request.Text,
+            ct: ct);
+
+        auditService.Log(new AuditEntry(
+            Action: "domain.test_email",
+            ActorType: actorType,
+            ActorId: actorId,
+            ResourceType: "domain",
+            ResourceId: id,
+            StatusCode: 200,
+            Details: new { From = fromAddress, To = request.To, MessageId = messageId }
+        ));
+
+        return TypedResults.Ok(new SendEmailResponse(messageId));
     }
 }

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { Domain, PaginatedDomains } from '@/lib/schemas';
+import type { Domain, PaginatedDomains, SendEmailResponse } from '@/lib/schemas';
 
 export const domainKeys = {
   all: ['domains'] as const,
@@ -73,5 +73,24 @@ export function useDeleteDomain() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: domainKeys.lists() });
     },
+  });
+}
+
+export function useSendTestEmail() {
+  return useMutation({
+    mutationFn: ({
+      domainId,
+      senderPrefix,
+      to,
+      subject,
+      text,
+    }: {
+      domainId: string;
+      senderPrefix: string;
+      to: string;
+      subject: string;
+      text: string;
+    }): Promise<SendEmailResponse> =>
+      api.sendTestEmail(domainId, { senderPrefix, to, subject, text }),
   });
 }

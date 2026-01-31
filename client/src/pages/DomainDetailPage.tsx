@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Mail } from 'lucide-react';
 import { useDomain, useDeleteDomain } from '@/hooks/useDomains';
 import { DomainStatusBadge } from '@/components/DomainStatusBadge';
 import { DnsRecordsTable } from '@/components/DnsRecordsTable';
 import { DnsActions } from '@/components/DnsActions';
+import { SendTestEmailForm } from '@/components/SendTestEmailForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,6 +36,7 @@ export function DomainDetailPage() {
   const navigate = useNavigate();
   const { data: domain, isLoading, error } = useDomain(id ?? '');
   const deleteMutation = useDeleteDomain();
+  const [showTestEmailForm, setShowTestEmailForm] = useState(false);
 
   const handleDelete = async () => {
     if (!domain) return;
@@ -95,16 +98,29 @@ export function DomainDetailPage() {
               <CardTitle className="text-2xl">{domain.name}</CardTitle>
               <DomainStatusBadge status={domain.status} />
             </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-              className="rounded-full w-fit"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              {deleteMutation.isPending ? 'Deleting...' : 'Delete domain'}
-            </Button>
+            <div className="flex gap-2">
+              {domain.status === 'verified' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowTestEmailForm(!showTestEmailForm)}
+                  className="rounded-full w-fit"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Test Email
+                </Button>
+              )}
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+                className="rounded-full w-fit"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete domain'}
+              </Button>
+            </div>
           </div>
           <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-2">
             <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1">
@@ -116,6 +132,14 @@ export function DomainDetailPage() {
               </span>
             )}
           </div>
+
+          {showTestEmailForm && (
+            <SendTestEmailForm
+              domainId={domain.id}
+              domainName={domain.name}
+              onClose={() => setShowTestEmailForm(false)}
+            />
+          )}
         </CardHeader>
         <CardContent className="space-y-6">
           {domain.failureReason && (

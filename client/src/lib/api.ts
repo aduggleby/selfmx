@@ -156,6 +156,16 @@ class ApiClient {
     });
   }
 
+  async sendTestEmail(
+    domainId: string,
+    request: { senderPrefix: string; to: string; subject: string; text: string }
+  ): Promise<SendEmailResponse> {
+    return this.request(`/domains/${domainId}/test-email`, SendEmailResponseSchema, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
   async login(password: string): Promise<void> {
     const requestUrl = getApiUrl('/admin/login');
     const apiHost = getApiHost('/admin/login');

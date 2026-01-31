@@ -52,6 +52,9 @@ public record ApiError(string Code, string Message)
     public static readonly ApiError DomainNotVerified = new("domain_not_verified", "Domain is not verified for sending");
     public static readonly ApiError DomainAlreadyExists = new("domain_exists", "Domain already exists");
     public static readonly ApiError InternalError = new("internal_error", "An unexpected error occurred");
+    public static readonly ApiError Forbidden = new("forbidden", "Access denied to this resource");
+    public static readonly ApiError InvalidSenderPrefix = new("invalid_sender_prefix", "Sender prefix contains invalid characters");
+    public static readonly ApiError InvalidRecipientEmail = new("invalid_recipient_email", "Invalid recipient email address");
 }
 
 public record HealthResponse(string Status, DateTime Timestamp);

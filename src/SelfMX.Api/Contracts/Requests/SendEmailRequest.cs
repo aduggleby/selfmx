@@ -13,3 +13,10 @@ public record SendEmailRequest(
 );
 
 public record CreateDomainRequest(string Name);
+
+public record SendTestEmailRequest(
+    string SenderPrefix,
+    string To,
+    string Subject,
+    string Text
+);

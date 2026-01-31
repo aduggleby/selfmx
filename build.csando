@@ -10,8 +10,8 @@
 //   ando --dind -p publish  # Build, test, push Docker image, deploy website
 //
 // Output:
-// - selfmx:{version} Docker image (push profile only)
-// - Website deployed to Cloudflare Pages (push profile only)
+// - selfmx:{version} Docker image (publish profile only)
+// - Website deployed to Cloudflare Pages (publish profile only)
 // =============================================================================
 
 // Define profiles
@@ -78,7 +78,6 @@ if (publish)
     Git.PushTags();
 
     // Deploy documentation website to Cloudflare Pages
-    // Note: Nested build inherits the push profile from parent
     Log.Info("Deploying documentation website...");
     Ando.Build(Directory("./website"));
 }
