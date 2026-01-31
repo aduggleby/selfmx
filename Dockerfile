@@ -37,8 +37,7 @@ RUN dotnet publish src/SelfMX.Api/SelfMX.Api.csproj \
     -o /app/publish \
     -r linux-musl-x64 \
     --self-contained false \
-    -p:PublishReadyToRun=true \
-    -p:InvariantGlobalization=true
+    -p:PublishReadyToRun=true
 
 # ============================================
 # Stage 3: Production Runtime
@@ -54,8 +53,8 @@ RUN addgroup -g 1001 -S selfmx && \
 # Create data directory
 RUN mkdir -p /app/data && chown -R selfmx:selfmx /app/data
 
-# Install wget for health checks (already in alpine base, but ensure it's there)
-RUN apk add --no-cache wget
+# Install wget for health checks and ICU libraries for SQL Server globalization
+RUN apk add --no-cache wget icu-libs
 
 # Copy published backend
 COPY --from=backend-build --chown=selfmx:selfmx /app/publish ./
@@ -71,7 +70,6 @@ RUN chmod +x /app/healthcheck.sh
 ENV ASPNETCORE_URLS=http://+:5000 \
     ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_RUNNING_IN_CONTAINER=true \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 \
     DOTNET_EnableDiagnostics=0
 
 # Switch to non-root user
