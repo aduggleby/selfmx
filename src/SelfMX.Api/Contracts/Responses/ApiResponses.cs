@@ -55,3 +55,35 @@ public record ApiError(string Code, string Message)
 }
 
 public record HealthResponse(string Status, DateTime Timestamp);
+
+// Sent Email responses (list excludes body, detail includes it; BCC never returned)
+public record SentEmailListItem(
+    string Id,
+    string MessageId,
+    DateTime SentAt,
+    string FromAddress,
+    string[] To,
+    string Subject,
+    string DomainId
+);
+
+public record SentEmailDetail(
+    string Id,
+    string MessageId,
+    DateTime SentAt,
+    string FromAddress,
+    string[] To,
+    string[]? Cc,
+    // BCC intentionally excluded for privacy
+    string? ReplyTo,
+    string Subject,
+    string? HtmlBody,
+    string? TextBody,
+    string DomainId
+);
+
+public record CursorPagedResponse<T>(
+    T[] Data,
+    string? NextCursor,
+    bool HasMore
+);
