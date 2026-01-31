@@ -6,6 +6,13 @@ description: Release notes and version history for SelfMX.
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.9] - 2026-01-31
+
+### Changed
+- Internal improvements and maintenance
+
+---
+
 ## [0.9.8] - 2026-01-31
 
 ### Changed
