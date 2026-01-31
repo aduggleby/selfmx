@@ -59,57 +59,23 @@ POST /v1/send
 
 ---
 
-## Get Email
+## List Sent Emails
 
-Retrieve email details by ID.
-
-```http
-GET /v1/emails/{id}
-```
-
-### Response
-
-```json
-{
-  "id": "msg_abc123",
-  "status": "delivered",
-  "from": "sender@yourdomain.com",
-  "to": ["recipient@example.com"],
-  "subject": "Hello",
-  "created_at": "2024-01-15T10:30:00Z",
-  "delivered_at": "2024-01-15T10:30:05Z"
-}
-```
-
-### Status Values
-
-| Status      | Description                    |
-| ----------- | ------------------------------ |
-| `queued`    | Email is queued for sending    |
-| `sending`   | Email is being sent            |
-| `delivered` | Email was delivered            |
-| `bounced`   | Email bounced                  |
-| `failed`    | Email failed to send           |
-
----
-
-## List Emails
-
-List sent emails with pagination.
+List sent emails with keyset pagination.
 
 ```http
-GET /v1/emails
+GET /v1/sent-emails
 ```
 
 ### Query Parameters
 
-| Parameter | Type   | Default | Description                    |
-| --------- | ------ | ------- | ------------------------------ |
-| `page`    | int    | 1       | Page number                    |
-| `limit`   | int    | 20      | Items per page (max 100)       |
-| `status`  | string | -       | Filter by status               |
-| `from`    | string | -       | Filter by sender               |
-| `to`      | string | -       | Filter by recipient            |
+| Parameter  | Type     | Default | Description                    |
+| ---------- | -------- | ------- | ------------------------------ |
+| `domainId` | string   | -       | Filter by domain ID            |
+| `from`     | datetime | -       | Filter emails sent after       |
+| `to`       | datetime | -       | Filter emails sent before      |
+| `cursor`   | string   | -       | Pagination cursor              |
+| `pageSize` | int      | 50      | Items per page (max 100)       |
 
 ### Response
 
@@ -117,21 +83,51 @@ GET /v1/emails
 {
   "data": [
     {
-      "id": "msg_abc123",
-      "status": "delivered",
-      "from": "sender@yourdomain.com",
+      "id": "abc123-def456",
+      "messageId": "0100018abc123-def456-789@email.amazonses.com",
+      "sentAt": "2024-01-15T10:30:00Z",
+      "fromAddress": "sender@yourdomain.com",
       "to": ["recipient@example.com"],
       "subject": "Hello",
-      "created_at": "2024-01-15T10:30:00Z"
+      "domainId": "domain-id-123"
     }
   ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 150
-  }
+  "nextCursor": "eyJJZCI6ImFiYzEyMyIsIlNlbnRBdCI6Ii4uLiJ9",
+  "hasMore": true
 }
 ```
+
+The list view excludes email body content for efficiency. Use the detail endpoint to retrieve full email content.
+
+---
+
+## Get Sent Email
+
+Retrieve full sent email details including body content.
+
+```http
+GET /v1/sent-emails/{id}
+```
+
+### Response
+
+```json
+{
+  "id": "abc123-def456",
+  "messageId": "0100018abc123-def456-789@email.amazonses.com",
+  "sentAt": "2024-01-15T10:30:00Z",
+  "fromAddress": "sender@yourdomain.com",
+  "to": ["recipient@example.com"],
+  "cc": ["cc@example.com"],
+  "replyTo": "reply@yourdomain.com",
+  "subject": "Hello",
+  "htmlBody": "<p>Email content</p>",
+  "textBody": "Email content",
+  "domainId": "domain-id-123"
+}
+```
+
+> **Note**: BCC recipients are never returned in API responses for privacy.
 
 ---
 

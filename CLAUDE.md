@@ -65,7 +65,8 @@ src/SelfMX.Api/
 │   └── DnsVerificationService.cs # Direct DNS checks
 ├── Jobs/                   # Hangfire background jobs
 │   ├── SetupDomainJob.cs   # Creates SES identity, DNS records
-│   └── VerifyDomainsJob.cs # Polls verification status (every 5 min)
+│   ├── VerifyDomainsJob.cs # Polls verification status (every 5 min)
+│   └── CleanupSentEmailsJob.cs # Deletes old sent emails (daily at 3 AM)
 ├── Data/
 │   ├── AppDbContext.cs     # EF Core DbContext (Domains, ApiKeys, ApiKeyDomains)
 │   └── AuditDbContext.cs   # Separate audit log context
@@ -142,6 +143,8 @@ client/src/
 | `GET /v1/domains/{id}` | Yes | Get domain |
 | `DELETE /v1/domains/{id}` | Yes | Delete domain |
 | `POST /v1/emails` | Yes | Send email (Resend-compatible) |
+| `GET /v1/sent-emails` | Yes | List sent emails (keyset pagination) |
+| `GET /v1/sent-emails/{id}` | Yes | Get sent email detail |
 | `GET /v1/api-keys` | Admin | List API keys |
 | `POST /v1/api-keys` | Admin | Create API key |
 | `GET /v1/audit` | Admin | Audit logs (paginated) |
@@ -158,7 +161,8 @@ Environment variables or `appsettings.json`:
 ```json
 {
   "App": {
-    "ApiKeyHash": "<bcrypt hash of API key>"
+    "ApiKeyHash": "<bcrypt hash of API key>",
+    "SentEmailRetentionDays": 30  // null or 0 = keep forever
   },
   "Aws": {
     "Region": "us-east-1",

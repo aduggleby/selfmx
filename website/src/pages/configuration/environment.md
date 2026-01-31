@@ -92,6 +92,18 @@ Rate limit window in seconds. Default: `60`
 RATE_LIMIT_WINDOW=60
 ```
 
+## Email Storage
+
+### SENT_EMAIL_RETENTION_DAYS
+
+Days to retain sent email records. Set to `0` or leave unset to keep forever.
+
+```bash
+App__SentEmailRetentionDays=30
+```
+
+A cleanup job runs daily at 3 AM to delete emails older than the retention period.
+
 ## Queue Settings
 
 ### QUEUE_WORKERS
