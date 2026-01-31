@@ -1,7 +1,9 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
 using SelfMX.Api.Contracts.Requests;
 using SelfMX.Api.Contracts.Responses;
+using SelfMX.Api.Data;
 using SelfMX.Api.Entities;
 using SelfMX.Api.Services;
 
@@ -21,6 +23,8 @@ public static class EmailEndpoints
         ApiKeyService apiKeyService,
         AuditService auditService,
         ISesService sesService,
+        AppDbContext db,
+        ILoggerFactory loggerFactory,
         ClaimsPrincipal user,
         CancellationToken ct = default)
     {
@@ -110,6 +114,35 @@ public static class EmailEndpoints
             StatusCode: 200,
             Details: new { Domain = domainName, RecipientCount = request.To.Length }
         ));
+
+        // Store sent email in database
+        var sentEmail = new SentEmail
+        {
+            Id = Guid.NewGuid().ToString(),
+            MessageId = messageId,
+            FromAddress = request.From,
+            ToAddresses = JsonSerializer.Serialize(request.To),
+            CcAddresses = request.Cc is { Length: > 0 } ? JsonSerializer.Serialize(request.Cc) : null,
+            BccAddresses = request.Bcc is { Length: > 0 } ? JsonSerializer.Serialize(request.Bcc) : null,
+            ReplyTo = request.ReplyTo is { Length: > 0 } ? JsonSerializer.Serialize(request.ReplyTo) : null,
+            Subject = request.Subject,
+            HtmlBody = request.Html,
+            TextBody = request.Text,
+            DomainId = domain.Id,
+            ApiKeyId = user.FindFirst("KeyId")?.Value
+        };
+
+        try
+        {
+            db.SentEmails.Add(sentEmail);
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail - email was already sent
+            var logger = loggerFactory.CreateLogger("EmailEndpoints");
+            logger.LogError(ex, "Failed to store sent email {MessageId}", messageId);
+        }
 
         return TypedResults.Ok(new SendEmailResponse(messageId));
     }

@@ -270,6 +270,9 @@ adminOnly.MapApiKeyEndpoints();
 adminOnly.MapAuditEndpoints();
 adminOnly.MapMigrationEndpoints();
 
+// Sent emails - authenticated users can view their domain's emails, admin can view all
+authenticated.MapSentEmailEndpoints();
+
 // Hangfire dashboard (development only)
 if (app.Environment.IsDevelopment())
 {
@@ -282,6 +285,13 @@ recurringJobManager.AddOrUpdate<VerifyDomainsJob>(
     "verify-domains",
     job => job.ExecuteAsync(),
     "*/5 * * * *");
+
+// Schedule sent email cleanup job (daily at 3 AM UTC)
+recurringJobManager.AddOrUpdate<CleanupSentEmailsJob>(
+    "cleanup-sent-emails",
+    job => job.ExecuteAsync(CancellationToken.None),
+    "0 3 * * *",
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
 // SPA fallback - serve index.html for client-side routing
 app.MapFallbackToFile("index.html");

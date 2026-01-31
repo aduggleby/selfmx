@@ -18,6 +18,9 @@ public class AppSettings
     // Domain verification
     public TimeSpan VerificationTimeout { get; set; } = TimeSpan.FromHours(72);
     public TimeSpan VerificationPollInterval { get; set; } = TimeSpan.FromMinutes(5);
+
+    // Sent email retention (null or 0 = keep forever)
+    public int? SentEmailRetentionDays { get; set; }
 }
 
 public class AwsSettings
