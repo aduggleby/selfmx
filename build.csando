@@ -81,7 +81,9 @@ if (publish)
 
     // Create GitHub release with auto-generated notes
     Log.Info("Creating GitHub release...");
-    GitHub.CreateRelease(project.Version, o => o.WithGenerateNotes());
+    GitHub.CreateRelease(o => o
+        .WithTag($"v{project.Version}")
+        .WithGeneratedNotes());
 
     // Deploy documentation website to Cloudflare Pages
     Log.Info("Deploying documentation website...");
