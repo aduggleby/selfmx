@@ -1,0 +1,33 @@
+// =============================================================================
+// ando-pre.csando - Pre-hook for all Ando commands
+//
+// Runs before any ando command to:
+// - Clean up Syncthing conflict files
+// - Ensure GITHUB_TOKEN is available from gh CLI if not set
+// =============================================================================
+
+// Clean up Syncthing conflict files
+var conflictFiles = Glob("**/*.sync-conflict-*");
+if (conflictFiles.Any())
+{
+    Log.Info($"Cleaning up {conflictFiles.Count()} Syncthing conflict files...");
+    foreach (var file in conflictFiles)
+    {
+        File.Delete(file);
+    }
+}
+
+// Ensure GITHUB_TOKEN is set for commands that need it
+var command = Env("ANDO_COMMAND", required: false);
+var needsGitHub = command == "release" || command == "bump";
+
+if (needsGitHub && string.IsNullOrEmpty(Env("GITHUB_TOKEN", required: false)))
+{
+    Log.Info("GITHUB_TOKEN not set, attempting to get from gh CLI...");
+    var token = Shell("gh auth token 2>/dev/null").Trim();
+    if (!string.IsNullOrEmpty(token))
+    {
+        Environment.SetEnvironmentVariable("GITHUB_TOKEN", token);
+        Log.Info("Using GitHub token from gh CLI");
+    }
+}

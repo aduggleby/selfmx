@@ -2,6 +2,10 @@ namespace SelfMX.Api.Settings;
 
 public class AppSettings
 {
+    // FQDN where SelfMX is hosted (e.g., mail.example.com)
+    // Used to derive CORS origins
+    public string? Fqdn { get; set; }
+
     // Legacy single API key - keep for backward compatibility during migration
     public string? ApiKeyHash { get; set; }
 

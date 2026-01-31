@@ -82,7 +82,7 @@ public class ApiKeyAuthHandler : AuthenticationHandler<AuthenticationSchemeOptio
         // Fallback to legacy single-key mode (backward compatibility)
         if (!string.IsNullOrEmpty(_settings.ApiKeyHash))
         {
-            if (BCrypt.Net.BCrypt.Verify(apiKey, _settings.ApiKeyHash))
+            if (Sha512CryptVerifier.Verify(apiKey, _settings.ApiKeyHash))
             {
                 var claims = new List<Claim>
                 {

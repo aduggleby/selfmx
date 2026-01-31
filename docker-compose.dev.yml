@@ -1,0 +1,26 @@
+# Development SQL Server for local SelfMX development
+# Usage: docker compose -f docker-compose.dev.yml up -d
+
+version: '3.8'
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: selfmx-sqlserver-dev
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=Dev@Password123!
+      - MSSQL_PID=Developer
+    ports:
+      - "17402:1433"
+    volumes:
+      - sqlserver-dev-data:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Dev@Password123!" -Q "SELECT 1" -C -N -b
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  sqlserver-dev-data:

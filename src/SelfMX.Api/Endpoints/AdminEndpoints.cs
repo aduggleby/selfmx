@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
+using SelfMX.Api.Authentication;
 using SelfMX.Api.Services;
 using SelfMX.Api.Settings;
 
@@ -27,7 +28,7 @@ public static class AdminEndpoints
         HttpContext context)
     {
         if (string.IsNullOrWhiteSpace(request.Password) ||
-            !BCrypt.Net.BCrypt.Verify(request.Password, settings.Value.AdminPasswordHash))
+            !Sha512CryptVerifier.Verify(request.Password, settings.Value.AdminPasswordHash))
         {
             auditService.Log(new AuditEntry(
                 Action: "admin.login",

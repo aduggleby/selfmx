@@ -3,14 +3,18 @@
 //
 // Profiles:
 // - (default): Build backend, frontend, and run unit tests
-// - publish: Also runs E2E tests, builds Docker image, pushes to ghcr.io, builds and deploys website
+// - publish: Also runs E2E tests, builds Docker image, pushes to ghcr.io,
+//            creates GitHub release, and deploys website
 //
 // Usage:
-//   ando              # Build and test only
-//   ando --dind -p publish  # Build, test, push Docker image, deploy website
+//   ando                       # Build and test only
+//   ando --dind -p publish     # Full release pipeline
+//   ando bump [patch|minor|major]  # Bump version with AI changelog
+//   ando release               # Interactive release workflow
 //
 // Output:
 // - selfmx:{version} Docker image (publish profile only)
+// - GitHub release with auto-generated notes (publish profile only)
 // - Website deployed to Cloudflare Pages (publish profile only)
 // =============================================================================
 
@@ -45,10 +49,8 @@ Npm.Run(frontend, "build");
 if (publish)
 {
     // Run Playwright E2E tests
-    Log.Info("Installing Playwright browsers...");
-    Playwright.Install(frontend);
-
     Log.Info("Running Playwright E2E tests...");
+    Playwright.Install(frontend);
     Playwright.Test(frontend);
 
     Log.Info("Building Docker image...");
@@ -76,6 +78,10 @@ if (publish)
     Git.Tag($"v{project.Version}", o => o.WithSkipIfExists());
     Git.Push();
     Git.PushTags();
+
+    // Create GitHub release with auto-generated notes
+    Log.Info("Creating GitHub release...");
+    GitHub.CreateRelease(project.Version, o => o.WithGenerateNotes());
 
     // Deploy documentation website to Cloudflare Pages
     Log.Info("Deploying documentation website...");

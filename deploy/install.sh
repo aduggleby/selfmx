@@ -66,8 +66,7 @@ fi
 # ============================================
 SELFMX_VERSION="${SELFMX_VERSION:-latest}"
 INSTALL_DIR="/opt/selfmx"
-DATA_DIR="/var/lib/selfmx"
-BACKUP_DIR="/var/backups/selfmx"
+DATA_DIR="/data/selfmx"
 LOG_FILE="/var/log/selfmx-install.log"
 
 # Colors for output
@@ -104,6 +103,7 @@ main() {
     install_dependencies
     gather_configuration
     generate_admin_password_hash
+    generate_sa_password
     create_directories
     generate_config_files
     setup_backup_system
@@ -111,6 +111,17 @@ main() {
     pull_and_start
     verify_installation
     display_completion_message
+}
+
+# ============================================
+# Generate SQL Server SA Password
+# ============================================
+generate_sa_password() {
+    info "Generating SQL Server SA password..."
+    # Simple, secure password generation
+    # Append A1! to guarantee complexity requirements (uppercase, number, special char)
+    MSSQL_SA_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)A1!"
+    success "SA password generated."
 }
 
 # ============================================
@@ -143,10 +154,21 @@ preflight_checks() {
         fi
     fi
 
-    # Check available disk space (require at least 5GB)
+    # Check available disk space (require at least 10GB for SQL Server)
     available_space=$(df / --output=avail -B1G | tail -1 | tr -d ' ')
-    if [ "$available_space" -lt 5 ]; then
-        fatal "Insufficient disk space. Required: 5GB, Available: ${available_space}GB"
+    if [ "$available_space" -lt 10 ]; then
+        fatal "Insufficient disk space. Required: 10GB, Available: ${available_space}GB"
+    fi
+
+    # Check available memory (require at least 4GB for SQL Server)
+    available_mem=$(free -g | awk '/^Mem:/{print $2}')
+    if [ "$available_mem" -lt 4 ]; then
+        warn "SQL Server requires at least 4GB RAM. Available: ${available_mem}GB"
+        warn "The installation may fail or SQL Server may not start properly."
+        read -r -p "Continue anyway? [y/N]: " continue_anyway
+        if [[ ! "$continue_anyway" =~ ^[Yy] ]]; then
+            fatal "Installation cancelled."
+        fi
     fi
 
     # Check if ports are available
@@ -215,7 +237,7 @@ install_dependencies() {
     apt-get update -qq
 
     # Install prerequisites
-    for pkg in apt-transport-https ca-certificates curl gnupg lsb-release sqlite3; do
+    for pkg in apt-transport-https ca-certificates curl gnupg lsb-release openssl; do
         if ! dpkg -s "$pkg" &>/dev/null; then
             info "Installing $pkg..."
             apt-get install -y "$pkg"
@@ -278,9 +300,9 @@ gather_configuration() {
     fi
 
     echo ""
-    echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║              SelfMX Configuration                          ║"
-    echo "╚════════════════════════════════════════════════════════════╝"
+    echo "========================================"
+    echo "         SelfMX Configuration           "
+    echo "========================================"
     echo ""
 
     # Domain
@@ -320,9 +342,9 @@ gather_configuration() {
     fi
 
     echo ""
-    echo "─────────────────────────────────────────────────────────────"
-    echo "                    AWS Configuration"
-    echo "─────────────────────────────────────────────────────────────"
+    echo "----------------------------------------"
+    echo "            AWS Configuration           "
+    echo "----------------------------------------"
 
     # AWS Credentials
     if [ -z "${AWS_ACCESS_KEY_ID:-}" ]; then
@@ -361,9 +383,9 @@ gather_configuration() {
     fi
 
     echo ""
-    echo "─────────────────────────────────────────────────────────────"
-    echo "              Cloudflare Configuration (Optional)"
-    echo "─────────────────────────────────────────────────────────────"
+    echo "----------------------------------------"
+    echo "      Cloudflare Configuration (Optional)"
+    echo "----------------------------------------"
 
     if [ -z "${CLOUDFLARE_API_TOKEN+x}" ]; then
         read -r -p "Cloudflare API Token (press Enter to skip): " CLOUDFLARE_API_TOKEN
@@ -374,9 +396,9 @@ gather_configuration() {
     fi
 
     echo ""
-    echo "─────────────────────────────────────────────────────────────"
-    echo "                  Port Configuration"
-    echo "─────────────────────────────────────────────────────────────"
+    echo "----------------------------------------"
+    echo "          Port Configuration            "
+    echo "----------------------------------------"
 
     if [ -z "${HTTP_PORT:-}" ]; then
         read -r -p "HTTP Port [80]: " HTTP_PORT
@@ -389,9 +411,9 @@ gather_configuration() {
     fi
 
     echo ""
-    echo "─────────────────────────────────────────────────────────────"
-    echo "                  Backup Configuration"
-    echo "─────────────────────────────────────────────────────────────"
+    echo "----------------------------------------"
+    echo "         Backup Configuration           "
+    echo "----------------------------------------"
 
     if [ -z "${BACKUP_TIME:-}" ]; then
         read -r -p "Daily backup time (24h format) [03:00]: " BACKUP_TIME
@@ -400,9 +422,9 @@ gather_configuration() {
 
     # Confirm configuration
     echo ""
-    echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║                  Configuration Summary                     ║"
-    echo "╚════════════════════════════════════════════════════════════╝"
+    echo "========================================"
+    echo "        Configuration Summary           "
+    echo "========================================"
     echo ""
     echo "  Domain:           $SELFMX_DOMAIN"
     echo "  Email:            $SELFMX_EMAIL"
@@ -410,6 +432,7 @@ gather_configuration() {
     echo "  Cloudflare:       ${CLOUDFLARE_API_TOKEN:+Configured}${CLOUDFLARE_API_TOKEN:-Not configured}"
     echo "  Ports:            HTTP=$HTTP_PORT, HTTPS=$HTTPS_PORT"
     echo "  Backup Time:      $BACKUP_TIME"
+    echo "  Database:         SQL Server 2022 (containerized)"
     echo ""
 
     if [ "${AUTO_CONFIRM:-}" = "1" ]; then
@@ -445,15 +468,21 @@ create_directories() {
     info "Creating directories..."
 
     mkdir -p "$INSTALL_DIR"
-    mkdir -p "$DATA_DIR"
-    mkdir -p "$BACKUP_DIR/daily"
-    mkdir -p "$BACKUP_DIR/monthly"
+    mkdir -p "$DATA_DIR/sqlserver"
+    mkdir -p "$DATA_DIR/backups"
+    mkdir -p "$DATA_DIR/logs"
+    mkdir -p "$DATA_DIR/caddy/data"
+    mkdir -p "$DATA_DIR/caddy/config"
     mkdir -p /var/log/selfmx
+
+    # SQL Server runs as UID 10001
+    chown -R 10001:0 "$DATA_DIR/sqlserver"
+    chmod -R 700 "$DATA_DIR/sqlserver"
 
     # Set permissions
     chmod 750 "$INSTALL_DIR"
     chmod 750 "$DATA_DIR"
-    chmod 750 "$BACKUP_DIR"
+    chmod 750 "$DATA_DIR/backups"
 
     success "Directories created."
 }
@@ -478,6 +507,9 @@ SELFMX_VERSION=${SELFMX_VERSION}
 # API keys are created via the admin UI after first login
 SELFMX_ADMIN_PASSWORD_HASH=${SELFMX_ADMIN_PASSWORD_HASH}
 
+# SQL Server
+MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+
 # AWS Configuration
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
 AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
@@ -499,44 +531,59 @@ EOF
 
     # Generate docker-compose.yml
     cat > "${INSTALL_DIR}/docker-compose.yml" <<'COMPOSE_EOF'
-version: "3.9"
+version: "3.8"
+
+networks:
+  selfmx-net:
+    driver: bridge
 
 services:
-  caddy:
-    image: caddy:2-alpine
-    container_name: selfmx-caddy
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: selfmx-sqlserver
+    hostname: sqlserver
     restart: unless-stopped
-    ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
-      - "${HTTPS_PORT:-443}:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
     networks:
       - selfmx-net
-    depends_on:
-      selfmx:
-        condition: service_healthy
     environment:
-      - SELFMX_DOMAIN=${SELFMX_DOMAIN}
-      - SELFMX_EMAIL=${SELFMX_EMAIL}
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+      - MSSQL_PID=Developer
+      - MSSQL_MEMORY_LIMIT_MB=3072
+    volumes:
+      - /data/selfmx/sqlserver:/var/opt/mssql
+      - /data/selfmx/backups:/var/opt/mssql/backup
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$${MSSQL_SA_PASSWORD}" -Q "SELECT 1" -C -N -b
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    shm_size: 1g
 
   selfmx:
     image: ghcr.io/aduggleby/selfmx:${SELFMX_VERSION:-latest}
     container_name: selfmx-app
     restart: unless-stopped
-    expose:
-      - "5000"
-    volumes:
-      - selfmx_data:/app/data
     networks:
       - selfmx-net
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    expose:
+      - "5000"
     environment:
-      - ConnectionStrings__DefaultConnection=Data Source=/app/data/selfmx.db
-      - ConnectionStrings__HangfireConnection=Data Source=/app/data/selfmx-hangfire.db
-      - ConnectionStrings__AuditConnection=Data Source=/app/data/audit.db
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=SelfMX;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;MultipleActiveResultSets=true;Max Pool Size=200;Min Pool Size=20
       - App__AdminPasswordHash=${SELFMX_ADMIN_PASSWORD_HASH}
       - App__SessionExpirationDays=30
       - App__MaxLoginAttemptsPerMinute=5
@@ -549,21 +596,35 @@ services:
       - Cloudflare__ApiToken=${CLOUDFLARE_API_TOKEN:-}
       - Cloudflare__ZoneId=${CLOUDFLARE_ZONE_ID:-}
       - Cors__Origins__0=https://${SELFMX_DOMAIN}
+    volumes:
+      - /data/selfmx/logs:/app/logs
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5000/health"]
       interval: 30s
       timeout: 10s
-      start_period: 15s
+      start_period: 30s
       retries: 3
 
-networks:
-  selfmx-net:
-    driver: bridge
-
-volumes:
-  caddy_data:
-  caddy_config:
-  selfmx_data:
+  caddy:
+    image: caddy:2-alpine
+    container_name: selfmx-caddy
+    restart: unless-stopped
+    networks:
+      - selfmx-net
+    depends_on:
+      selfmx:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /data/selfmx/caddy/data:/data
+      - /data/selfmx/caddy/config:/config
+    environment:
+      - SELFMX_DOMAIN=${SELFMX_DOMAIN}
+      - SELFMX_EMAIL=${SELFMX_EMAIL}
 COMPOSE_EOF
 
     # Generate Caddyfile
@@ -617,101 +678,31 @@ setup_backup_system() {
 #!/bin/bash
 set -euo pipefail
 
-BACKUP_DIR="/var/backups/selfmx"
-INSTALL_DIR="/opt/selfmx"
-DATA_VOLUME="selfmx_selfmx_data"
-RETENTION_DAILY=7
-RETENTION_MONTHLY=12
+# SelfMX SQL Server Backup Script
+source /opt/selfmx/.env
 
-# Logging
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-info() { log "[INFO] $*"; }
-error() { log "[ERROR] $*" >&2; }
-warn() { log "[WARN] $*"; }
+BACKUP_FILE="selfmx_$(date +%Y%m%d_%H%M%S).bak"
+BACKUP_PATH="/var/opt/mssql/backup/${BACKUP_FILE}"
 
-# Determine backup type
-TODAY=$(date +%Y-%m-%d)
-DAY_OF_MONTH=$(date +%-d)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting backup..."
 
-if [ "$DAY_OF_MONTH" -eq 1 ]; then
-    BACKUP_TYPE="monthly"
-else
-    BACKUP_TYPE="daily"
-fi
+# Backup directly to mounted volume
+docker exec selfmx-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+    -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -N \
+    -Q "BACKUP DATABASE [SelfMX] TO DISK = N'$BACKUP_PATH' WITH FORMAT, COMPRESSION, CHECKSUM"
 
-BACKUP_FILE="${BACKUP_DIR}/${BACKUP_TYPE}/selfmx-${TODAY}.tar.gz"
+# Verify backup integrity
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Verifying backup integrity..."
+docker exec selfmx-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+    -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -N \
+    -Q "RESTORE VERIFYONLY FROM DISK = N'$BACKUP_PATH'"
 
-info "Starting ${BACKUP_TYPE} backup..."
+# Cleanup old backups (7 day retention for daily, 90 days for monthly)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cleaning up old backups..."
+find /data/selfmx/backups -name "selfmx_*.bak" -mtime +7 -delete
 
-# Create temp directory
-TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
-
-# Use SQLite .backup for atomic point-in-time snapshot
-info "Creating atomic database backup..."
-docker exec selfmx-app sh -c "
-    sqlite3 /app/data/selfmx.db '.backup /tmp/selfmx.db.backup' && \
-    sqlite3 /app/data/selfmx-hangfire.db '.backup /tmp/selfmx-hangfire.db.backup' && \
-    sqlite3 /app/data/audit.db '.backup /tmp/audit.db.backup' 2>/dev/null || true && \
-    mv /tmp/selfmx.db.backup /app/data/selfmx.db.backup && \
-    mv /tmp/selfmx-hangfire.db.backup /app/data/selfmx-hangfire.db.backup && \
-    mv /tmp/audit.db.backup /app/data/audit.db.backup 2>/dev/null || true
-"
-
-# Copy backup files from volume
-info "Copying backup files from Docker volume..."
-docker run --rm \
-    -v "${DATA_VOLUME}:/data:ro" \
-    -v "${TMP_DIR}:/backup" \
-    alpine:latest \
-    sh -c "cp /data/*.backup /backup/ 2>/dev/null; \
-           for f in /backup/*.backup; do mv \"\$f\" \"\${f%.backup}\"; done"
-
-# Clean up backup files in container
-docker exec selfmx-app rm -f /app/data/*.backup 2>/dev/null || true
-
-# Copy configuration files
-cp "${INSTALL_DIR}/docker-compose.yml" "${TMP_DIR}/docker-compose.yml"
-cp "${INSTALL_DIR}/Caddyfile" "${TMP_DIR}/Caddyfile"
-
-# Encrypt .env if age is available
-if command -v age &>/dev/null && [ -f "${INSTALL_DIR}/.backup-key" ]; then
-    info "Encrypting configuration with age..."
-    age -e -i "${INSTALL_DIR}/.backup-key" -o "${TMP_DIR}/.env.age" "${INSTALL_DIR}/.env"
-else
-    warn "age not installed or backup key missing - storing .env unencrypted"
-    cp "${INSTALL_DIR}/.env" "${TMP_DIR}/.env"
-fi
-
-# Create metadata
-cat > "${TMP_DIR}/metadata.json" <<EOF
-{
-    "backup_date": "$(date -Iseconds)",
-    "backup_type": "${BACKUP_TYPE}",
-    "selfmx_version": "$(docker inspect selfmx-app --format '{{.Config.Image}}' 2>/dev/null || echo 'unknown')",
-    "hostname": "$(hostname)"
-}
-EOF
-
-# Create tarball
-info "Creating backup archive: ${BACKUP_FILE}"
-tar -czf "${BACKUP_FILE}" -C "${TMP_DIR}" .
-
-# Verify backup
-if ! tar -tzf "${BACKUP_FILE}" > /dev/null 2>&1; then
-    error "Backup verification failed!"
-    exit 1
-fi
-
-BACKUP_SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
-info "Backup complete: ${BACKUP_FILE} (${BACKUP_SIZE})"
-
-# Rotation: Remove old backups
-info "Rotating old backups..."
-find "${BACKUP_DIR}/daily" -name "*.tar.gz" -mtime +${RETENTION_DAILY} -delete
-find "${BACKUP_DIR}/monthly" -name "*.tar.gz" -mtime +$((RETENTION_MONTHLY * 30)) -delete
-
-info "Backup rotation complete."
+BACKUP_SIZE=$(du -h "/data/selfmx/backups/${BACKUP_FILE}" | cut -f1)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backup complete: ${BACKUP_FILE} (${BACKUP_SIZE})"
 BACKUP_EOF
 
     chmod +x /usr/local/bin/selfmx-backup
@@ -721,98 +712,64 @@ BACKUP_EOF
 #!/bin/bash
 set -euo pipefail
 
-BACKUP_DIR="/var/backups/selfmx"
-INSTALL_DIR="/opt/selfmx"
-DATA_VOLUME="selfmx_selfmx_data"
+# SelfMX SQL Server Restore Script
+source /opt/selfmx/.env
 
-# Logging
-info() { echo "[INFO] $*"; }
-error() { echo "[ERROR] $*" >&2; }
-fatal() { error "$*"; exit 1; }
-
-# Usage
 if [ $# -lt 1 ]; then
-    echo "Usage: selfmx-restore <backup-file>"
+    echo "Usage: selfmx-restore <backup-file.bak>"
     echo ""
     echo "Available backups:"
-    echo "  Daily:"
-    ls -1 "${BACKUP_DIR}/daily/"*.tar.gz 2>/dev/null || echo "    (none)"
-    echo "  Monthly:"
-    ls -1 "${BACKUP_DIR}/monthly/"*.tar.gz 2>/dev/null || echo "    (none)"
+    ls -lh /data/selfmx/backups/*.bak 2>/dev/null || echo "  (none)"
     exit 1
 fi
 
 BACKUP_FILE="$1"
 
+# If only filename provided, prepend backup directory
+if [[ ! "$BACKUP_FILE" == /* ]]; then
+    BACKUP_FILE="/data/selfmx/backups/${BACKUP_FILE}"
+fi
+
 if [ ! -f "$BACKUP_FILE" ]; then
-    fatal "Backup file not found: $BACKUP_FILE"
+    echo "ERROR: Backup file not found: $BACKUP_FILE"
+    exit 1
 fi
 
-info "Restoring from: $BACKUP_FILE"
-
-# Create temp directory
-TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
-
-# Extract backup
-info "Extracting backup..."
-tar -xzf "$BACKUP_FILE" -C "$TMP_DIR"
-
-# Verify BEFORE stopping services
-info "Verifying database integrity BEFORE stopping services..."
-for db in selfmx.db selfmx-hangfire.db audit.db; do
-    if [ -f "${TMP_DIR}/${db}" ]; then
-        info "Checking ${db}..."
-        if ! sqlite3 "${TMP_DIR}/${db}" "PRAGMA integrity_check;" | grep -q "ok"; then
-            fatal "Database integrity check failed for ${db} - aborting restore, services NOT stopped"
-        fi
-    fi
-done
-info "Database integrity verified - proceeding with restore"
-
-# Decrypt .env if encrypted
-if [ -f "${TMP_DIR}/.env.age" ] && [ -f "${INSTALL_DIR}/.backup-key" ]; then
-    info "Decrypting configuration..."
-    age -d -i "${INSTALL_DIR}/.backup-key" -o "${TMP_DIR}/.env" "${TMP_DIR}/.env.age"
+echo "WARNING: This will replace ALL data in the SelfMX database."
+echo "Backup file: $BACKUP_FILE"
+echo ""
+read -r -p "Type 'yes' to continue: " confirm
+if [ "$confirm" != "yes" ]; then
+    echo "Restore cancelled."
+    exit 0
 fi
 
-# Stop services ONLY after verification passes
-info "Stopping SelfMX services..."
-cd "$INSTALL_DIR"
-docker compose down || true
+# Get the filename for SQL Server path
+BACKUP_FILENAME=$(basename "$BACKUP_FILE")
+SQL_BACKUP_PATH="/var/opt/mssql/backup/${BACKUP_FILENAME}"
 
-# Restore data to volume
-info "Restoring data to Docker volume..."
-docker run --rm \
-    -v "${DATA_VOLUME}:/data" \
-    -v "${TMP_DIR}:/backup:ro" \
-    alpine:latest \
-    sh -c "rm -rf /data/* && cp -a /backup/*.db /data/ 2>/dev/null || true"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Stopping SelfMX application..."
+docker stop selfmx-app || true
 
-# Optionally restore configuration
-read -r -p "Restore configuration files? (This will overwrite current config) [y/N]: " restore_config
-if [[ "$restore_config" =~ ^[Yy] ]]; then
-    cp "${TMP_DIR}/.env" "${INSTALL_DIR}/.env"
-    cp "${TMP_DIR}/docker-compose.yml" "${INSTALL_DIR}/docker-compose.yml"
-    cp "${TMP_DIR}/Caddyfile" "${INSTALL_DIR}/Caddyfile"
-    info "Configuration restored."
-fi
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restoring database..."
+docker exec selfmx-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+    -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -N \
+    -Q "RESTORE DATABASE [SelfMX] FROM DISK = N'$SQL_BACKUP_PATH' WITH REPLACE"
 
-# Start services
-info "Starting SelfMX services..."
-docker compose up -d
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting SelfMX application..."
+docker start selfmx-app
 
-# Wait for health check
-info "Waiting for services to be healthy..."
+# Wait for health
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for application to be healthy..."
 for i in {1..30}; do
     if docker exec selfmx-app wget -qO- http://127.0.0.1:5000/health &>/dev/null; then
-        info "SelfMX is healthy!"
-        break
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restore complete! Application is healthy."
+        exit 0
     fi
     sleep 2
 done
 
-info "Restore complete!"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Health check timed out. Check logs with: docker logs selfmx-app"
 RESTORE_EOF
 
     chmod +x /usr/local/bin/selfmx-restore
@@ -909,9 +866,30 @@ pull_and_start() {
 verify_installation() {
     info "Verifying installation..."
 
-    # Wait for services to be healthy
-    local retries=30
+    # Wait for SQL Server to be healthy first
+    info "Waiting for SQL Server to be healthy..."
+    local sql_retries=60
     local i=0
+
+    while [ $i -lt $sql_retries ]; do
+        if docker exec selfmx-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -N \
+            -Q "SELECT 1" &>/dev/null; then
+            success "SQL Server is healthy!"
+            break
+        fi
+        i=$((i + 1))
+        sleep 2
+    done
+
+    if [ $i -eq $sql_retries ]; then
+        warn "SQL Server health check timed out. Check logs with: docker logs selfmx-sqlserver"
+    fi
+
+    # Wait for SelfMX to be healthy
+    info "Waiting for SelfMX application to be healthy..."
+    local retries=30
+    i=0
 
     while [ $i -lt $retries ]; do
         if docker exec selfmx-app wget -qO- http://127.0.0.1:5000/health &>/dev/null; then
@@ -939,14 +917,14 @@ create_manual_backup() {
 # ============================================
 display_completion_message() {
     echo ""
-    echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║          SelfMX Installation Complete!                     ║"
-    echo "╚════════════════════════════════════════════════════════════╝"
+    echo "========================================"
+    echo "   SelfMX Installation Complete!        "
+    echo "========================================"
     echo ""
     echo "  Access your SelfMX instance at:"
     echo "    https://${SELFMX_DOMAIN}"
     echo ""
-    echo "  ─────────────────────────────────────────────────────────"
+    echo "  ----------------------------------------"
     echo "  AUTHENTICATION:"
     echo ""
     echo "  1. Log in with your admin password at:"
@@ -959,37 +937,46 @@ display_completion_message() {
     echo ""
     echo "  3. Use API keys in your application:"
     echo "       Authorization: Bearer re_your_api_key_here"
-    echo "  ─────────────────────────────────────────────────────────"
+    echo "  ----------------------------------------"
     echo ""
     echo "  IMPORTANT: Before accessing SelfMX, ensure DNS is configured:"
     echo ""
     echo "    Add an A record pointing ${SELFMX_DOMAIN} to this server's IP"
     echo ""
     echo "    Verify with: dig ${SELFMX_DOMAIN} @8.8.8.8"
-    echo "  ─────────────────────────────────────────────────────────"
+    echo "  ----------------------------------------"
     echo ""
     echo "  Useful commands:"
     echo "    View logs:        docker compose -f ${INSTALL_DIR}/docker-compose.yml logs -f"
     echo "    Restart:          systemctl restart selfmx"
     echo "    Manual backup:    selfmx-backup"
-    echo "    Restore backup:   selfmx-restore /var/backups/selfmx/daily/selfmx-YYYY-MM-DD.tar.gz"
+    echo "    Restore backup:   selfmx-restore <backup-file.bak>"
     echo ""
-    echo "  Backup location: ${BACKUP_DIR}"
-    echo "    - Daily backups:   ${BACKUP_DIR}/daily/   (7 retained)"
-    echo "    - Monthly backups: ${BACKUP_DIR}/monthly/ (12 retained)"
-    echo "    - Includes: selfmx.db, selfmx-hangfire.db, audit.db, .env"
+    echo "  Backup location: ${DATA_DIR}/backups"
+    echo "    - Daily backups retained for 7 days"
+    echo "    - Backups include full SQL Server database"
     echo ""
-    echo "  ─────────────────────────────────────────────────────────"
+    echo "  ----------------------------------------"
+    echo "  DATABASE:"
+    echo ""
+    echo "  SQL Server is running in a container with:"
+    echo "    - 4GB memory limit"
+    echo "    - Persistent storage at ${DATA_DIR}/sqlserver"
+    echo "    - Port 1433 (internal only, not exposed)"
+    echo ""
+    echo "  Connect via sqlcmd (for debugging):"
+    echo "    docker exec -it selfmx-sqlserver /opt/mssql-tools18/bin/sqlcmd \\"
+    echo "      -S localhost -U sa -P '\$MSSQL_SA_PASSWORD' -C -N"
+    echo ""
+    echo "  ----------------------------------------"
     echo "  To backup to another location (S3, rsync, etc.):"
     echo ""
     echo "    # Using rclone to sync to S3:"
-    echo "    rclone sync ${BACKUP_DIR} s3:mybucket/selfmx-backups"
+    echo "    rclone sync ${DATA_DIR}/backups s3:mybucket/selfmx-backups"
     echo ""
     echo "    # Using rsync to another server:"
-    echo "    rsync -avz ${BACKUP_DIR}/ user@backup-server:/backups/selfmx/"
-    echo ""
-    echo "    # Install rclone: curl https://rclone.org/install.sh | bash"
-    echo "  ─────────────────────────────────────────────────────────"
+    echo "    rsync -avz ${DATA_DIR}/backups/ user@backup-server:/backups/selfmx/"
+    echo "  ----------------------------------------"
     echo ""
     echo "  Installation log: ${LOG_FILE}"
     echo ""

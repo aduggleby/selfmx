@@ -4,7 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SelfMX is a self-hosted email sending platform providing a Resend-compatible API backed by AWS SES. It automates domain verification with DNS record management via Cloudflare integration.
+SelfMX is a self-hosted email sending platform providing a Resend-compatible API (sending only) powered by AWS SES. It simplifies domain verification with optional Cloudflare DNS integration.
+
+## Port Range
+
+This project uses ports in the range **17400-17499**:
+
+| Service | Port | Description |
+|---------|------|-------------|
+| Backend API | 17400 | .NET API server |
+| Frontend Dev | 17401 | Vite dev server |
+| SQL Server Dev | 17402 | Development database |
 
 ## Build & Test Commands
 
@@ -14,7 +24,7 @@ SelfMX is a self-hosted email sending platform providing a Resend-compatible API
 dotnet build SelfMX.slnx           # Build solution
 dotnet test SelfMX.slnx            # Run all tests (XUnit)
 dotnet test --filter "FullyQualifiedName~DomainService"  # Run specific test class
-dotnet run --project src/SelfMX.Api  # Run API (port 5000)
+dotnet run --project src/SelfMX.Api  # Run API (port 17400)
 ```
 
 ### Frontend (React/Vite)
@@ -22,7 +32,7 @@ dotnet run --project src/SelfMX.Api  # Run API (port 5000)
 ```bash
 cd client
 npm install                        # Install dependencies
-npm run dev                        # Dev server (port 5173, proxies /v1 to :5000)
+npm run dev                        # Dev server (port 17401, proxies /v1 to :17400)
 npm run build                      # TypeScript check + Vite build
 npm run lint                       # ESLint
 npm run test                       # Playwright E2E tests (headless)
@@ -32,17 +42,17 @@ npm run test:headed                # Playwright with browser UI
 ### Full Stack Development
 
 Run both servers simultaneously:
-- Terminal 1: `dotnet run --project src/SelfMX.Api`
-- Terminal 2: `cd client && npm run dev`
+- Terminal 1: `docker compose -f docker-compose.dev.yml up -d` (start SQL Server)
+- Terminal 2: `dotnet run --project src/SelfMX.Api`
+- Terminal 3: `cd client && npm run dev`
 
-Frontend at `http://localhost:5173` proxies API calls to backend at `http://localhost:5000`.
+Frontend at `http://localhost:17401` proxies API calls to backend at `http://localhost:17400`.
 
 ### Ando Build System
 
 ```bash
 ando                      # Build backend, frontend, run tests
 ando -p publish --dind    # Build + push Docker image to ghcr.io
-ando verify               # Validate build script
 ando clean                # Remove build artifacts
 ```
 
@@ -65,8 +75,7 @@ src/SelfMX.Api/
 │   └── DnsVerificationService.cs # Direct DNS checks
 ├── Jobs/                   # Hangfire background jobs
 │   ├── SetupDomainJob.cs   # Creates SES identity, DNS records
-│   ├── VerifyDomainsJob.cs # Polls verification status (every 5 min)
-│   └── CleanupSentEmailsJob.cs # Deletes old sent emails (daily at 3 AM)
+│   └── VerifyDomainsJob.cs # Polls verification status (every 5 min)
 ├── Data/
 │   ├── AppDbContext.cs     # EF Core DbContext (Domains, ApiKeys, ApiKeyDomains)
 │   └── AuditDbContext.cs   # Separate audit log context
@@ -77,40 +86,33 @@ src/SelfMX.Api/
 - Routes use `TypedResults` for compile-time response type safety
 - Domain verification state machine: Pending → Verifying → Verified/Failed
 - DNS records stored as JSON in Domain entity
-- Multi-provider database support: SQLite (default) or SQL Server
+- SQL Server only - single connection string for all components
 
 ### Database Configuration
 
-SelfMX supports two database providers:
-
-| Provider | Config Value | Use Case |
-|----------|--------------|----------|
-| SQLite | `sqlite` (default) | Development, small deployments |
-| SQL Server | `sqlserver` or `docker-sqlserver` | Enterprise, high concurrency |
+SelfMX uses SQL Server as the only supported database.
 
 **Configuration:**
 ```json
 {
-  "Database": {
-    "Provider": "sqlite"  // or "sqlserver"
-  },
   "ConnectionStrings": {
-    "DefaultConnection": "Data Source=selfmx.db",
-    "AuditConnection": "Data Source=audit.db",
-    "HangfireConnection": "selfmx-hangfire.db"
+    "DefaultConnection": "Server=localhost,17402;Database=SelfMX;User Id=sa;Password=...;TrustServerCertificate=True"
   }
 }
 ```
 
-**SQL Server mode:**
+**Features:**
 - Connection resilience with automatic retry (5 retries, 30s max delay)
-- Shared database for main + audit + Hangfire (no lock contention issues)
-- Scaled Hangfire workers (ProcessorCount * 2 vs 1 for SQLite)
+- Shared database for main + audit + Hangfire
+- Scaled Hangfire workers (ProcessorCount * 2, capped at 20)
+- Connection pooling (Max=200, Min=20)
 
-**Migration from SQLite to SQL Server:**
-- `GET /v1/migration/status` - Check if migration is needed
-- `POST /v1/migration/start` - Execute migration (admin only)
-- Creates backups before migrating, verifies row counts after
+**Development SQL Server:**
+```bash
+docker compose -f docker-compose.dev.yml up -d
+# Credentials: sa / Dev@Password123!
+# Port: 17402
+```
 
 ### Frontend (React 19 + TanStack Query)
 
@@ -143,13 +145,9 @@ client/src/
 | `GET /v1/domains/{id}` | Yes | Get domain |
 | `DELETE /v1/domains/{id}` | Yes | Delete domain |
 | `POST /v1/emails` | Yes | Send email (Resend-compatible) |
-| `GET /v1/sent-emails` | Yes | List sent emails (keyset pagination) |
-| `GET /v1/sent-emails/{id}` | Yes | Get sent email detail |
 | `GET /v1/api-keys` | Admin | List API keys |
 | `POST /v1/api-keys` | Admin | Create API key |
 | `GET /v1/audit` | Admin | Audit logs (paginated) |
-| `GET /v1/migration/status` | Admin | Migration status |
-| `POST /v1/migration/start` | Admin | Start SQLite→SQL Server migration |
 
 Auth: Bearer token with API key, or Cookie auth for admin UI.
 Admin: Requires `ActorType=admin` claim (cookie auth or admin API key).
@@ -160,9 +158,12 @@ Environment variables or `appsettings.json`:
 
 ```json
 {
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=...;Database=SelfMX;..."
+  },
   "App": {
-    "ApiKeyHash": "<bcrypt hash of API key>",
-    "SentEmailRetentionDays": 30  // null or 0 = keep forever
+    "Fqdn": "mail.example.com",
+    "AdminPasswordHash": "<SHA-512 hash>"
   },
   "Aws": {
     "Region": "us-east-1",
@@ -170,11 +171,13 @@ Environment variables or `appsettings.json`:
     "SecretAccessKey": "<optional>"
   },
   "Cloudflare": {
-    "ApiToken": "<cloudflare api token>",
-    "ZoneId": "<cloudflare zone id>"
+    "ApiToken": "<optional, for auto DNS>",
+    "ZoneId": "<optional>"
   }
 }
 ```
+
+CORS origins are derived from `App:Fqdn` (becomes `https://{Fqdn}`). Falls back to `http://localhost:17401` for development.
 
 ## Naming Convention
 

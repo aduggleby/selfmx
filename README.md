@@ -15,6 +15,7 @@ SelfMX provides a drop-in replacement for Resend's email API that you can self-h
 - Admin dashboard for key management and audit logs
 - Automatic SSL via Caddy
 - Daily backups with retention policies
+- SQL Server database for production reliability
 
 ## Getting Started
 
@@ -26,18 +27,18 @@ curl -fsSL https://raw.githubusercontent.com/aduggleby/selfmx/main/deploy/instal
 
 The installer will:
 1. Install Docker and dependencies
-2. Prompt for configuration (domain, AWS credentials, admin password)
-3. Set up automatic SSL certificates
-4. Configure daily backups
-5. Start SelfMX as a systemd service
+2. Deploy SQL Server 2022 container
+3. Prompt for configuration (domain, AWS credentials, admin password)
+4. Set up automatic SSL certificates
+5. Configure daily backups
+6. Start SelfMX as a systemd service
 
 ### Prerequisites
 
-- Ubuntu 22.04+ server (2GB RAM for SQLite, 4GB for SQL Server)
+- Ubuntu 22.04+ server (4GB RAM minimum for SQL Server)
 - Domain name pointed to your server
 - AWS account with SES access
 - (Optional) Cloudflare account for automatic DNS management
-- (Optional) SQL Server 2019+ for enterprise deployments
 
 ### Post-Install
 
@@ -76,39 +77,10 @@ sudo systemctl restart selfmx
 sudo selfmx-backup
 
 # Restore from backup
-sudo selfmx-restore /var/backups/selfmx/daily/selfmx-YYYY-MM-DD.tar.gz
+sudo selfmx-restore selfmx_20260126_030000.bak
 
 # Update to latest version
 curl -fsSL https://raw.githubusercontent.com/aduggleby/selfmx/main/deploy/install.sh | sudo bash
-```
-
-### SQL Server Deployment (Enterprise)
-
-For production environments requiring SQL Server instead of SQLite:
-
-```bash
-# Set environment variables
-export MSSQL_SA_PASSWORD='YourStrong@Password123!'
-
-# Deploy with SQL Server
-cd /opt/selfmx
-docker compose -f docker-compose.yml -f docker-compose.sqlserver.yml up -d
-```
-
-**Configuration:**
-- Set `Database__Provider=sqlserver` environment variable
-- Provide SQL Server connection strings for `DefaultConnection`, `AuditConnection`, `HangfireConnection`
-
-**Migrate from SQLite to SQL Server:**
-```bash
-# Check migration status
-curl -X GET https://your-domain.com/v1/migration/status \
-  -H "Authorization: Bearer re_admin_api_key"
-
-# Start migration (admin only)
-curl -X POST https://your-domain.com/v1/migration/start \
-  -H "Authorization: Bearer re_admin_api_key" \
-  -H "Content-Type: application/json"
 ```
 
 ## Repository Structure
@@ -129,68 +101,43 @@ selfmx/
 ├── website/                  # Documentation site (Astro)
 ├── deploy/                   # Deployment files
 │   ├── install.sh            # One-line installer
-│   ├── docker-compose.yml    # Production compose file (SQLite)
-│   ├── docker-compose.sqlserver.yml  # SQL Server override
-│   ├── docker/sqlserver/     # SQL Server init scripts
-│   └── Caddyfile             # Reverse proxy config
-├── scripts/                  # Development scripts
-│   ├── selfmx-bumpversion.sh # Version management
-│   └── selfmx-push.sh        # Build and release
+│   └── docker-compose.yml    # Production compose file
+├── docker-compose.dev.yml    # Development SQL Server
 ├── build.csando              # Ando build script
+├── ando-pre.csando           # Pre-hook (cleanup, auth)
 ├── Dockerfile                # Multi-stage Docker build
 └── mise.toml                 # .NET 9 version pinning
 ```
 
 ## Development
 
-### Prerequisites
-
-- [mise](https://mise.jdx.dev/) (manages .NET version)
-- Node.js 22+
-- Docker (for full builds)
-
-### Setup
+### Quick Start
 
 ```bash
-# Clone repository
+# Clone and setup
 git clone https://github.com/aduggleby/selfmx.git
 cd selfmx
+mise install              # Installs .NET 9
 
-# Install .NET 9 via mise
-mise install
+# Start development SQL Server
+docker compose -f docker-compose.dev.yml up -d
 
-# Verify .NET version
-dotnet --version  # Should show 9.x
-```
-
-### Running Locally
-
-```bash
-# Terminal 1: Backend
+# Run backend (terminal 1)
 dotnet run --project src/SelfMX.Api
 
-# Terminal 2: Frontend
+# Run frontend (terminal 2)
 cd client && npm install && npm run dev
 ```
 
-- Backend: http://localhost:5000
-- Frontend: http://localhost:5173 (proxies API to backend)
+- Backend: http://localhost:17400
+- Frontend: http://localhost:17401 (proxies API to backend)
+- SQL Server: localhost:17402 (sa / Dev@Password123!)
 
-### Build Commands
+### Prerequisites
 
-```bash
-# Build solution
-dotnet build SelfMX.slnx
-
-# Run tests
-dotnet test SelfMX.slnx
-
-# Build frontend
-cd client && npm run build
-
-# Lint frontend
-cd client && npm run lint
-```
+- [mise](https://mise.jdx.dev/) - manages .NET version
+- Node.js 22+
+- Docker - for SQL Server and full builds
 
 ### Ando Build System
 
@@ -235,11 +182,9 @@ SelfMX implements the [Resend API](https://resend.com/docs/api-reference/emails/
 | `/v1/api-keys` | GET | List API keys |
 | `/v1/api-keys` | POST | Create API key |
 | `/v1/audit` | GET | Audit logs |
-| `/v1/migration/status` | GET | Check migration status |
-| `/v1/migration/start` | POST | Start SQLite to SQL Server migration |
 
 See [full documentation](https://selfmx.com) for details.
 
 ## License
 
-MIT
+No'Sassy - Free to use, modify, and distribute. Cannot be offered as a competing SaaS.

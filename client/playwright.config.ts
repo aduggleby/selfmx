@@ -11,7 +11,7 @@ export default defineConfig({
   outputDir: process.env.CI ? '/tmp/test-results' : 'test-results',
   preserveOutput: process.env.CI ? 'never' : 'always',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:17401',
     trace: process.env.CI ? 'off' : 'on-first-retry',
     screenshot: process.env.CI ? 'off' : 'only-on-failure',
     video: process.env.CI ? 'off' : 'retain-on-failure',
@@ -24,7 +24,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:5173',
+    url: 'http://localhost:17401',
     reuseExistingServer: !process.env.CI,
   },
 });

@@ -2,10 +2,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import CodeBlock from "../components/CodeBlock.astro";
 
-const installCode = `curl -fsSL https://selfmx.com/install.sh | bash -s -- user@your-server-ip
-
-# With a specific SSH key:
-curl -fsSL https://selfmx.com/install.sh | bash -s -- -i ~/.ssh/id_rsa user@your-server-ip`;
+const installCode = `curl -fsSL https://selfmx.com/install.sh | bash -s user@your-server-ip`;
 
 const sendEmailCode = `curl -X POST https://mail.yourdomain.com/v1/emails \\
   -H "Authorization: Bearer re_your_api_key" \\
@@ -19,17 +16,17 @@ const sendEmailCode = `curl -X POST https://mail.yourdomain.com/v1/emails \\
 
 const features = [
   { title: "Self-Hosted", desc: "Full control over your email infrastructure. Your data stays on your servers." },
-  { title: "Resend-Compatible API", desc: "Drop-in replacement for Resend. Use existing SDKs and integrations." },
-  { title: "AWS SES Backend", desc: "Reliable delivery through Amazon SES with automatic domain verification." },
+  { title: "Resend-Compatible API", desc: "Drop-in replacement for Resend (sending emails only). Use existing SDKs and integrations." },
+  { title: "Powered by AWS SES", desc: "Reliable email delivery through Amazon Simple Email Service." },
   { title: "Multi-Tenant", desc: "Multiple API keys with domain scoping and rate limiting." },
-  { title: "Cloudflare DNS", desc: "Automatic DNS record management for domain verification." },
+  { title: "Cloudflare DNS", desc: "Optional automatic DNS record creation for domain verification." },
   { title: "Audit Trail", desc: "Complete logging of all email activity for compliance and debugging." },
 ];
 ---
 
 <BaseLayout
   title="SelfMX - Self-hosted Email API"
-  description="Send transactional emails from your own infrastructure. Self-hosted Resend-compatible API backed by AWS SES."
+  description="Send transactional emails from your own infrastructure. Self-hosted Resend-compatible API powered by AWS SES."
 >
   <section id="top" class="mb-10 md:mb-16">
     <div class="mb-4 pt-24">
@@ -37,7 +34,7 @@ const features = [
         href="/changelog"
         class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
       >
-        v0.9.9
+v0.9.9
       </a>
     </div>
     <h1 class="mb-4 max-w-4xl text-3xl font-bold text-zinc-900 sm:mb-6 sm:text-8xl dark:text-white">
@@ -46,22 +43,22 @@ const features = [
     <blockquote
       class="mb-18 border-l-2 border-zinc-200 pl-4 text-sm text-zinc-400 italic dark:border-zinc-700 dark:text-zinc-500"
     >
-      Self-hosted Resend-compatible API backed by AWS SES.
+      Self-hosted Resend-compatible API (sending only) powered by AWS SES.
     </blockquote>
     <p class="mb-8 font-serif text-zinc-600 sm:text-3xl dark:text-zinc-400">
       SelfMX is a complete email sending solution that runs on your servers. One command to install,
-      Resend-compatible API, automatic domain verification via Cloudflare, and full audit trail.
+      Resend-compatible API (sending only), domain verification with Cloudflare integration, and full audit trail.
     </p>
   </section>
 
   <section id="install" class="mb-10 md:mb-16">
     <h2 class="mb-2 text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">Install in one command</h2>
     <p class="mb-4 text-zinc-500 sm:mb-6 dark:text-zinc-400">
-      Run on any Ubuntu 22.04+ server. Sets up Docker, Caddy, HTTPS, and automated backups. Tested on Hetzner with Ubuntu 24.04.
+      Run on any Ubuntu 22.04+ server. Sets up Docker, Caddy, HTTPS, SQL Server, and automated backups.
     </p>
     <CodeBlock code={installCode} lang="bash" filename="terminal" />
     <p class="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
-      See the <a href="/getting-started/installation" class="text-green-600 hover:underline dark:text-green-400">installation guide</a> for non-interactive deployment options.
+      See the <a href="/install" class="text-green-600 hover:underline dark:text-green-400">installation guide</a> for configuration options and TrueNAS support.
     </p>
   </section>
 
@@ -89,14 +86,14 @@ const features = [
     </p>
     <CodeBlock code={sendEmailCode} lang="bash" filename="send-email" />
     <p class="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
-      See the <a href="/api/endpoints" class="text-green-600 hover:underline dark:text-green-400">API reference</a> for all available endpoints.
+      See the <a href="/api" class="text-green-600 hover:underline dark:text-green-400">API reference</a> for all available endpoints.
     </p>
   </section>
 
   <section id="architecture" class="mb-10 md:mb-16">
     <h2 class="mb-2 text-xl font-bold text-zinc-900 sm:text-2xl dark:text-white">How it works</h2>
     <p class="mb-4 text-zinc-500 sm:mb-6 dark:text-zinc-400">
-      SelfMX receives API requests, verifies domains via Cloudflare, and delivers through AWS SES.
+      SelfMX receives API requests, manages domain verification with Cloudflare, and delivers through AWS SES.
     </p>
 
     <div
@@ -123,7 +120,7 @@ const features = [
 │  │                             │                  │                          │  │
 │  │                             ▼                  │                          │  │
 │  │   ┌─────────────────────────────────────┐     │                          │  │
-│  │   │         SQLite Database             │     │                          │  │
+│  │   │       SQL Server 2022               │     │                          │  │
 │  │   │   (domains, api keys, audit logs)   │     │                          │  │
 │  │   └─────────────────────────────────────┘     │                          │  │
 │  └──────────────────────────────────────────────────────────────────────────┘   │
@@ -133,8 +130,8 @@ const features = [
                      │                                   │
                      ▼                                   ▼
 ┌─────────────────────────────────┐   ┌─────────────────────────────────────────┐
-│          CLOUDFLARE             │   │              AWS SES                     │
-│   Automatic DNS verification    │   │         Email delivery                   │
+│     CLOUDFLARE (Optional)       │   │              AWS SES                     │
+│    Automatic DNS management     │   │         Email delivery                   │
 └─────────────────────────────────┘   └─────────────────────────────────────────┘
       `}</pre>
     </div>
@@ -163,7 +160,7 @@ const features = [
         </div>
       </a>
       <a
-        href="/getting-started/installation"
+        href="/install"
         class="flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 transition-colors hover:border-green-300 hover:bg-green-50 dark:border-zinc-700 dark:bg-zinc-800/50 dark:hover:border-green-700 dark:hover:bg-green-900/20"
       >
         <svg class="h-8 w-8 text-zinc-700 dark:text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

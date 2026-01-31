@@ -3,7 +3,6 @@ using Amazon;
 using Amazon.SimpleEmailV2;
 using Hangfire;
 using Hangfire.SqlServer;
-using Hangfire.Storage.SQLite;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -23,88 +22,43 @@ builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("App"))
 builder.Services.Configure<AwsSettings>(builder.Configuration.GetSection("Aws"));
 builder.Services.Configure<CloudflareSettings>(builder.Configuration.GetSection("Cloudflare"));
 
-// Database provider selection: sqlite (default), sqlserver, or docker-sqlserver
-var dbProvider = builder.Configuration.GetValue<string>("Database:Provider") ?? "sqlite";
-var isSqlServer = dbProvider.Equals("sqlserver", StringComparison.OrdinalIgnoreCase)
-    || dbProvider.Equals("docker-sqlserver", StringComparison.OrdinalIgnoreCase);
+// SQL Server database configuration
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required");
 
-if (isSqlServer)
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(connectionString, sql =>
+    {
+        sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
+        sql.CommandTimeout(30);
+    }));
+
+builder.Services.AddDbContext<AuditDbContext>(options =>
+    options.UseSqlServer(connectionString, sql =>
+    {
+        sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
+        sql.CommandTimeout(30);
+    }));
+
+// Hangfire with SQL Server
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UseSqlServerStorage(connectionString, new SqlServerStorageOptions
+    {
+        CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
+        SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
+        QueuePollInterval = TimeSpan.Zero,
+        UseRecommendedIsolationLevel = true,
+        DisableGlobalLocks = true
+    }));
+
+builder.Services.AddHangfireServer(options =>
 {
-    // SQL Server configuration
-    var defaultConnString = builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required for SQL Server");
-
-    builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlServer(defaultConnString, sql =>
-        {
-            sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
-            sql.CommandTimeout(30);
-        }));
-
-    // For SQL Server, audit logs can share the same database (no lock contention issues)
-    var auditConnString = builder.Configuration.GetConnectionString("AuditConnection") ?? defaultConnString;
-    builder.Services.AddDbContext<AuditDbContext>(options =>
-        options.UseSqlServer(auditConnString, sql =>
-        {
-            sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
-            sql.CommandTimeout(30);
-        }));
-
-    // Hangfire with SQL Server
-    var hangfireConnString = builder.Configuration.GetConnectionString("HangfireConnection") ?? defaultConnString;
-    builder.Services.AddHangfire(config => config
-        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-        .UseSimpleAssemblyNameTypeSerializer()
-        .UseRecommendedSerializerSettings()
-        .UseSqlServerStorage(hangfireConnString, new SqlServerStorageOptions
-        {
-            CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
-            SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
-            QueuePollInterval = TimeSpan.Zero,
-            UseRecommendedIsolationLevel = true,
-            DisableGlobalLocks = true
-        }));
-
-    builder.Services.AddHangfireServer(options =>
-    {
-        options.WorkerCount = Environment.ProcessorCount * 2; // Scale workers for SQL Server
-        options.Queues = ["default"];
-    });
-}
-else
-{
-    // SQLite configuration (default)
-    builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlite(
-            builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=selfmx.db",
-            sqlite => sqlite.CommandTimeout(30)));
-
-    // Separate audit database to prevent SQLite lock contention
-    builder.Services.AddDbContext<AuditDbContext>(options =>
-        options.UseSqlite(
-            builder.Configuration.GetConnectionString("AuditConnection") ?? "Data Source=audit.db",
-            sqlite => sqlite.CommandTimeout(30)));
-
-    // Hangfire with SQLite
-    // Hangfire.Storage.SQLite expects a filename, not a connection string
-    // Handle both "Data Source=/path/file.db" and plain "/path/file.db" formats
-    var hangfireConnString = builder.Configuration.GetConnectionString("HangfireConnection") ?? "selfmx-hangfire.db";
-    if (hangfireConnString.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase))
-    {
-        hangfireConnString = hangfireConnString["Data Source=".Length..].Trim();
-    }
-    builder.Services.AddHangfire(config => config
-        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-        .UseSimpleAssemblyNameTypeSerializer()
-        .UseRecommendedSerializerSettings()
-        .UseSQLiteStorage(hangfireConnString));
-
-    builder.Services.AddHangfireServer(options =>
-    {
-        options.WorkerCount = 1; // Single worker for SQLite
-        options.Queues = ["default"];
-    });
-}
+    options.WorkerCount = Math.Min(Environment.ProcessorCount * 2, 20); // Cap at 20 workers
+    options.Queues = ["default"];
+});
 
 // Dual Authentication: Cookie (admin UI) + API Key (programmatic)
 builder.Services.AddAuthentication(options =>
@@ -166,7 +120,6 @@ builder.Services.AddSingleton<IDnsVerificationService, DnsVerificationService>()
 builder.Services.AddScoped<ApiKeyService>();
 builder.Services.AddSingleton<AuditService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditService>());
-builder.Services.AddScoped<DataMigrationService>();
 builder.Services.AddHttpContextAccessor();
 
 // Health checks
@@ -200,12 +153,17 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 
-// CORS for frontend
+// CORS for frontend - derive from Fqdn or use development default
+var fqdn = builder.Configuration.GetValue<string>("App:Fqdn");
+var corsOrigins = !string.IsNullOrEmpty(fqdn)
+    ? new[] { $"https://{fqdn}" }
+    : new[] { "http://localhost:17401" };
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins(builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? ["http://localhost:5173"])
+        policy.WithOrigins(corsOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials(); // Required for cookie auth
@@ -233,13 +191,6 @@ using (var scope = app.Services.CreateScope())
 
     var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
     await auditDb.Database.EnsureCreatedAsync();
-
-    // SQLite-specific: Enable WAL mode for better concurrency
-    if (!isSqlServer)
-    {
-        await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
-        await auditDb.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
-    }
 }
 
 app.UseCors();
@@ -268,7 +219,6 @@ authenticated.MapEmailEndpoints();
 var adminOnly = v1.RequireAuthorization("AdminOnly").RequireRateLimiting("api");
 adminOnly.MapApiKeyEndpoints();
 adminOnly.MapAuditEndpoints();
-adminOnly.MapMigrationEndpoints();
 
 // Sent emails - authenticated users can view their domain's emails, admin can view all
 authenticated.MapSentEmailEndpoints();
