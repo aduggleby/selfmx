@@ -547,8 +547,8 @@ test.describe('Domain Card Grid Layout', () => {
     ]);
     await page.goto('/');
 
-    // Check grid container exists with responsive classes
-    const grid = page.locator('.grid.gap-6');
+    // Check grid container exists with responsive classes (the domain cards grid)
+    const grid = page.locator('.grid.gap-6.md\\:grid-cols-2');
     await expect(grid).toBeVisible();
   });
 });
