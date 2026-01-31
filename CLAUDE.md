@@ -41,7 +41,7 @@ Frontend at `http://localhost:5173` proxies API calls to backend at `http://loca
 
 ```bash
 ando                      # Build backend, frontend, run tests
-ando -p push --dind       # Build + push Docker image to ghcr.io
+ando -p publish --dind    # Build + push Docker image to ghcr.io
 ando verify               # Validate build script
 ando clean                # Remove build artifacts
 ```

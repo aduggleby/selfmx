@@ -3,11 +3,11 @@
 //
 // Profiles:
 // - (default): Build backend, frontend, and run unit tests
-// - push: Also runs E2E tests, builds Docker image, pushes to ghcr.io, builds and deploys website
+// - publish: Also runs E2E tests, builds Docker image, pushes to ghcr.io, builds and deploys website
 //
 // Usage:
 //   ando              # Build and test only
-//   ando --dind -p push  # Build, test, push Docker image, deploy website
+//   ando --dind -p publish  # Build, test, push Docker image, deploy website
 //
 // Output:
 // - selfmx:{version} Docker image (push profile only)
@@ -15,7 +15,7 @@
 // =============================================================================
 
 // Define profiles
-var push = DefineProfile("push");
+var publish = DefineProfile("publish");
 
 var project = Dotnet.Project("./src/SelfMX.Api/SelfMX.Api.csproj");
 var testProject = Dotnet.Project("./tests/SelfMX.Api.Tests/SelfMX.Api.Tests.csproj");
@@ -41,8 +41,8 @@ Node.Install();
 Npm.Ci(frontend);
 Npm.Run(frontend, "build");
 
-// Push profile: Build and push Docker image, deploy website
-if (push)
+// Publish profile: Build and push Docker image, deploy website
+if (publish)
 {
     // Run Playwright E2E tests
     Log.Info("Installing Playwright browsers...");
