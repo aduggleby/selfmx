@@ -246,6 +246,11 @@ recurringJobManager.AddOrUpdate<CleanupSentEmailsJob>(
 // SPA fallback - serve index.html for client-side routing
 app.MapFallbackToFile("index.html");
 
+// Log version on startup
+var version = typeof(Program).Assembly.GetName().Version;
+var appSettings = app.Services.GetRequiredService<IOptions<AppSettings>>().Value;
+app.Logger.LogInformation("SelfMX v{Version} starting on {Fqdn}", version?.ToString(3) ?? "unknown", appSettings.Fqdn);
+
 // Graceful shutdown
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
 lifetime.ApplicationStopping.Register(() =>
