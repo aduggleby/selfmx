@@ -6,6 +6,14 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.15] - 2026-02-01
+
+### Added
+- Multi-architecture Docker images (AMD64 and ARM64) - now runs on AWS Graviton, Apple Silicon, and ARM servers
+
+### Fixed
+- Improve reliability of Docker image publishing with atomic build+push
+
 ## [0.9.14] - 2026-01-31
 
 ### Added
