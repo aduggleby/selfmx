@@ -27,17 +27,15 @@ WORKDIR /src
 COPY SelfMX.slnx ./
 COPY src/SelfMX.Api/SelfMX.Api.csproj src/SelfMX.Api/
 
-# Restore dependencies (include linux-musl-x64 for Alpine)
-RUN dotnet restore src/SelfMX.Api/SelfMX.Api.csproj -r linux-musl-x64
+# Restore dependencies
+RUN dotnet restore src/SelfMX.Api/SelfMX.Api.csproj
 
 # Copy source and build
 COPY src/ src/
 RUN dotnet publish src/SelfMX.Api/SelfMX.Api.csproj \
     -c Release \
     -o /app/publish \
-    -r linux-musl-x64 \
-    --self-contained false \
-    -p:PublishReadyToRun=true
+    --self-contained false
 
 # ============================================
 # Stage 3: Production Runtime
