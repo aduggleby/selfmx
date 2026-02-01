@@ -6,6 +6,15 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.17] - 2026-02-01
+
+### Changed
+- Updated browser tab title and favicon
+
+### Fixed
+- Improve Docker image reliability on ARM64 systems
+- Fix compatibility issues on certain Linux configurations
+
 ## [0.9.15] - 2026-02-01
 
 ### Added
