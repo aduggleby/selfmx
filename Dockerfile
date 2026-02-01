@@ -65,9 +65,12 @@ COPY --chown=selfmx:selfmx scripts/healthcheck.sh /app/healthcheck.sh
 RUN chmod +x /app/healthcheck.sh
 
 # Environment configuration
+# DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false overrides the Alpine base image default
+# This is required for SQL Server client which needs ICU for culture support
 ENV ASPNETCORE_URLS=http://+:5000 \
     ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_RUNNING_IN_CONTAINER=true \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
     DOTNET_EnableDiagnostics=0
 
 # Switch to non-root user
