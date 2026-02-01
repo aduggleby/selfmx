@@ -53,26 +53,19 @@ if (publish)
     Playwright.Install(frontend);
     Playwright.Test(frontend);
 
-    Log.Info("Building Docker image...");
+    Log.Info("Building and pushing Docker image...");
 
     // Install Docker CLI (needed for --dind mode)
     Docker.Install();
 
-    // Build Docker image using existing Dockerfile
+    // Build multi-arch image and push directly to GHCR in one atomic operation
+    // This ensures both version and latest tags point to the same manifest
     Docker.Build("./Dockerfile", o => o
-        .WithTag($"selfmx:{project.Version}")
-        .WithTag("selfmx:latest")
-        .WithContext("."));
-
-    // Push to GitHub Container Registry
-    Log.Info("Pushing to GitHub Container Registry...");
-    GitHub.PushImage("selfmx", o => o
-        .WithTag(project.Version)
-        .WithOwner("aduggleby"));
-
-    GitHub.PushImage("selfmx", o => o
-        .WithTag("latest")
-        .WithOwner("aduggleby"));
+        .WithPlatforms("linux/amd64", "linux/arm64")
+        .WithTag($"ghcr.io/aduggleby/selfmx:{project.Version}")
+        .WithTag("ghcr.io/aduggleby/selfmx:latest")
+        .WithContext(".")
+        .WithPush());
 
     // Tag and push git
     Git.Tag($"v{project.Version}", o => o.WithSkipIfExists());
