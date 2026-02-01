@@ -58,10 +58,9 @@ if (publish)
     // Install Docker CLI (needed for --dind mode)
     Docker.Install();
 
-    // Build multi-arch image and push directly to GHCR in one atomic operation
-    // This ensures both version and latest tags point to the same manifest
+    // Build amd64 image and push directly to GHCR
+    // Using single-arch for now due to crossgen2 issues with ARM64 emulation
     Docker.Build("./Dockerfile", o => o
-        .WithPlatforms("linux/amd64", "linux/arm64")
         .WithTag($"ghcr.io/aduggleby/selfmx:{project.Version}")
         .WithTag("ghcr.io/aduggleby/selfmx:latest")
         .WithContext(".")
