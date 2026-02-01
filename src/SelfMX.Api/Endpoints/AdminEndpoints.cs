@@ -25,10 +25,25 @@ public static class AdminEndpoints
         LoginRequest request,
         IOptions<AppSettings> settings,
         AuditService auditService,
-        HttpContext context)
+        HttpContext context,
+        ILoggerFactory loggerFactory)
     {
-        if (string.IsNullOrWhiteSpace(request.Password) ||
-            !Sha512CryptVerifier.Verify(request.Password, settings.Value.AdminPasswordHash))
+        var logger = loggerFactory.CreateLogger("AdminEndpoints");
+        var storedHash = settings.Value.AdminPasswordHash;
+        var passwordProvided = !string.IsNullOrWhiteSpace(request.Password);
+        var passwordLength = request.Password?.Length ?? 0;
+
+        logger.LogInformation(
+            "Login attempt - Password provided: {Provided}, Length: {Length}, Hash starts with: {HashPrefix}, Hash length: {HashLength}",
+            passwordProvided,
+            passwordLength,
+            storedHash?.Length > 20 ? storedHash[..20] + "..." : storedHash,
+            storedHash?.Length ?? 0);
+
+        var verifyResult = passwordProvided && Sha512CryptVerifier.Verify(request.Password!, storedHash);
+        logger.LogInformation("Verification result: {Result}", verifyResult);
+
+        if (!verifyResult)
         {
             auditService.Log(new AuditEntry(
                 Action: "admin.login",
