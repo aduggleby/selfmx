@@ -75,6 +75,10 @@ openssl passwd -6 "YourSecurePassword"
 
 Save the hash (starts with `$6$...`) for the Docker Compose configuration.
 
+**Important:** The hash contains `$` characters which Docker Compose interprets as variables. You must either:
+- Wrap the value in single quotes: `'$6$salt$hash...'`
+- Or escape each `$` as `$$`: `$$6$$salt$$hash...`
+
 ## Step 3: Open the YAML Installation Wizard
 
 1. Navigate to **Apps** > **Discover Apps**
@@ -100,7 +104,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - App__Fqdn=YOUR_DOMAIN
-      - App__AdminPasswordHash=YOUR_SHA512_HASH
+      - 'App__AdminPasswordHash=$6$YOUR_SALT$YOUR_HASH'  # Single quotes prevent $ interpolation
       - ConnectionStrings__DefaultConnection=Server=YOUR_TRUENAS_IP,1433;Database=SelfMX;User Id=selfmx;Password=YOUR_SELFMX_PASSWORD;TrustServerCertificate=true;Encrypt=True
       - Aws__Region=YOUR_AWS_REGION
       - Aws__AccessKeyId=YOUR_AWS_ACCESS_KEY_ID
@@ -115,7 +119,7 @@ services:
 | Placeholder | Replace With |
 |-------------|--------------|
 | `YOUR_DOMAIN` | Your SelfMX domain (e.g., `mail.example.com`) |
-| `YOUR_SHA512_HASH` | The SHA-512 hash from Step 2 (starts with `$6$...`) |
+| `$6$YOUR_SALT$YOUR_HASH` | The SHA-512 hash from Step 2 (keep the single quotes!) |
 | `YOUR_TRUENAS_IP` | Your TrueNAS host IP address (e.g., `192.168.1.100`) |
 | `YOUR_SELFMX_PASSWORD` | The password you set for the `selfmx` login in Step 1 |
 | `YOUR_POOL` | Your TrueNAS pool name (e.g., `tank`, `data`) |

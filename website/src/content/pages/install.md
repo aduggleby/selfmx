@@ -117,6 +117,12 @@ openssl passwd -6 "YourSecurePassword"
 
 This produces a hash like `$6$salt$hash...` which you set as `App__AdminPasswordHash`.
 
+**Docker Compose note:** The hash contains `$` characters. Wrap the value in single quotes to prevent variable interpolation:
+
+```yaml
+- 'App__AdminPasswordHash=$6$salt$hash...'
+```
+
 ## Using External SQL Server
 
 To use an existing SQL Server instead of the containerized one, see **[External SQL Server Setup](/external-sql-server)**.
