@@ -6,6 +6,13 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.28] - 2026-02-02
+
+### Added
+- Manual verification check button to re-check domain status on demand
+- New API endpoint `POST /v1/domains/{id}/verify` for triggering verification checks
+- Verification status tracking with `lastCheckedAt` and `nextCheckAt` timestamps in domain responses
+
 ## [0.9.27] - 2026-02-02
 
 ### Added

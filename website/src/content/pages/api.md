@@ -30,6 +30,7 @@ API keys are created in the admin UI and use the Resend format: `re_` followed b
 | `/v1/domains` | POST | API Key | Create domain |
 | `/v1/domains/{id}` | GET | API Key | Get domain |
 | `/v1/domains/{id}` | DELETE | API Key | Delete domain |
+| `/v1/domains/{id}/verify` | POST | API Key | Trigger verification check |
 | `/v1/domains/{id}/test-email` | POST | API Key | Send test email |
 | `/v1/api-keys` | GET | Admin | List API keys |
 | `/v1/api-keys` | POST | Admin | Create API key |
@@ -108,8 +109,10 @@ Get all domains for the authenticated API key.
     {
       "id": "d5f2a3b1-...",
       "name": "yourdomain.com",
-      "status": "Verified",
-      "createdAt": "2024-01-15T10:30:00Z"
+      "status": "verified",
+      "createdAt": "2024-01-15T10:30:00Z",
+      "lastCheckedAt": "2024-01-15T10:35:00Z",
+      "nextCheckAt": null
     }
   ]
 }
@@ -119,10 +122,10 @@ Get all domains for the authenticated API key.
 
 | Status | Description |
 |--------|-------------|
-| `Pending` | Domain added, waiting for setup job |
-| `Verifying` | DNS records created, waiting for verification |
-| `Verified` | Domain verified and ready for sending |
-| `Failed` | Verification failed |
+| `pending` | Domain added, waiting for setup job |
+| `verifying` | DNS records created, waiting for verification |
+| `verified` | Domain verified and ready for sending |
+| `failed` | Verification failed |
 
 ## Create Domain
 
@@ -144,8 +147,10 @@ Add a domain for email sending.
 {
   "id": "d5f2a3b1-...",
   "name": "example.com",
-  "status": "Pending",
-  "createdAt": "2024-01-15T10:30:00Z"
+  "status": "pending",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "lastCheckedAt": null,
+  "nextCheckAt": null
 }
 ```
 
@@ -170,7 +175,7 @@ Get details for a specific domain including DNS records.
 {
   "id": "d5f2a3b1-...",
   "name": "example.com",
-  "status": "Verifying",
+  "status": "verifying",
   "dnsRecords": [
     {
       "type": "CNAME",
@@ -188,7 +193,9 @@ Get details for a specific domain including DNS records.
       "value": "token3.dkim.amazonses.com"
     }
   ],
-  "createdAt": "2024-01-15T10:30:00Z"
+  "createdAt": "2024-01-15T10:30:00Z",
+  "lastCheckedAt": "2024-01-15T10:32:00Z",
+  "nextCheckAt": "2024-01-15T10:35:00Z"
 }
 ```
 
@@ -203,6 +210,41 @@ Remove a domain from SelfMX and AWS SES.
 ```
 204 No Content
 ```
+
+## Verify Domain
+
+Manually trigger a verification check for a domain. Only works for domains in `Verifying` status.
+
+**POST** `/v1/domains/{id}/verify`
+
+### Response
+
+Returns the updated domain with current verification status:
+
+```json
+{
+  "id": "d5f2a3b1-...",
+  "name": "example.com",
+  "status": "verified",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "verifiedAt": "2024-01-15T10:35:00Z",
+  "lastCheckedAt": "2024-01-15T10:35:00Z",
+  "nextCheckAt": null
+}
+```
+
+### Example
+
+```bash
+curl -X POST https://mail.yourdomain.com/v1/domains/{id}/verify \
+  -H "Authorization: Bearer re_xxxxxxxxxxxx"
+```
+
+### Notes
+
+- Returns `400 Bad Request` if the domain is not in `Verifying` status
+- Use this to immediately check verification instead of waiting for the next scheduled check (every 5 minutes)
+- After verification succeeds, `status` becomes `verified` and `nextCheckAt` becomes `null`
 
 ## Send Test Email
 

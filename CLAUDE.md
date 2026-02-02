@@ -149,6 +149,7 @@ client/src/
 | `GET /v1/domains` | Yes | List domains (paginated) |
 | `GET /v1/domains/{id}` | Yes | Get domain |
 | `DELETE /v1/domains/{id}` | Yes | Delete domain |
+| `POST /v1/domains/{id}/verify` | Yes | Trigger manual verification check |
 | `POST /v1/domains/{id}/test-email` | Yes | Send test email (verified domains) |
 | `POST /v1/emails` | Yes | Send email (Resend-compatible) |
 | `GET /v1/api-keys` | Admin | List API keys |
