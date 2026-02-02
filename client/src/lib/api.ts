@@ -80,7 +80,14 @@ class ApiClient {
         `API returned invalid JSON from ${apiHost}. Check that the server and port are running.`
       );
     }
-    return schema.parse(data);
+
+    try {
+      return schema.parse(data);
+    } catch (zodError) {
+      console.error('API response validation failed:', zodError);
+      console.error('Response data:', data);
+      throw zodError;
+    }
   }
 
   async listDomains(page = 1, limit = 20): Promise<PaginatedDomains> {

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Amazon;
 using Amazon.SimpleEmailV2;
@@ -16,6 +18,14 @@ using SelfMX.Api.Services;
 using SelfMX.Api.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure JSON serialization for consistent datetime format (ISO 8601 with Z)
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new UtcDateTimeConverter());
+    options.SerializerOptions.Converters.Add(new NullableUtcDateTimeConverter());
+    options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+});
 
 // Settings
 builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("App"));
@@ -296,3 +306,51 @@ lifetime.ApplicationStopping.Register(() =>
 });
 
 await app.RunAsync();
+
+/// <summary>
+/// JSON converter that ensures all DateTime values are serialized as UTC with Z suffix
+/// to match Zod's datetime() schema expectation.
+/// </summary>
+public class UtcDateTimeConverter : JsonConverter<DateTime>
+{
+    public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var dateTime = reader.GetDateTime();
+        return dateTime.Kind == DateTimeKind.Utc ? dateTime : DateTime.SpecifyKind(dateTime, DateTimeKind.Utc);
+    }
+
+    public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
+    {
+        // Ensure the datetime is treated as UTC and formatted with Z suffix
+        var utcValue = value.Kind == DateTimeKind.Utc
+            ? value
+            : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        writer.WriteStringValue(utcValue.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
+    }
+}
+
+/// <summary>
+/// JSON converter for nullable DateTime values.
+/// </summary>
+public class NullableUtcDateTimeConverter : JsonConverter<DateTime?>
+{
+    public override DateTime? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Null) return null;
+        var dateTime = reader.GetDateTime();
+        return dateTime.Kind == DateTimeKind.Utc ? dateTime : DateTime.SpecifyKind(dateTime, DateTimeKind.Utc);
+    }
+
+    public override void Write(Utf8JsonWriter writer, DateTime? value, JsonSerializerOptions options)
+    {
+        if (value is null)
+        {
+            writer.WriteNullValue();
+            return;
+        }
+        var utcValue = value.Value.Kind == DateTimeKind.Utc
+            ? value.Value
+            : DateTime.SpecifyKind(value.Value, DateTimeKind.Utc);
+        writer.WriteStringValue(utcValue.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
+    }
+}

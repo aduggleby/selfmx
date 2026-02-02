@@ -24,25 +24,31 @@ public class SetupDomainJob
 
     public async Task ExecuteAsync(string domainId)
     {
-        _logger.LogInformation("Setting up domain {DomainId}", domainId);
+        _logger.LogInformation("SetupDomainJob started for domain {DomainId}", domainId);
 
         var domain = await _domainService.GetByIdAsync(domainId);
         if (domain is null)
         {
-            _logger.LogWarning("Domain {DomainId} not found", domainId);
+            _logger.LogWarning("SetupDomainJob: Domain {DomainId} not found in database", domainId);
             return;
         }
 
+        _logger.LogInformation("SetupDomainJob: Found domain {DomainName} with status {Status}", domain.Name, domain.Status);
+
         if (domain.Status != DomainStatus.Pending)
         {
-            _logger.LogInformation("Domain {DomainId} is not in Pending status, skipping setup", domainId);
+            _logger.LogInformation("SetupDomainJob: Domain {DomainId} is not in Pending status ({Status}), skipping setup", domainId, domain.Status);
             return;
         }
 
         try
         {
+            _logger.LogInformation("SetupDomainJob: Creating SES domain identity for {DomainName}", domain.Name);
+
             // Create SES domain identity
             var (identityArn, dnsRecords) = await _sesService.CreateDomainIdentityAsync(domain.Name);
+
+            _logger.LogInformation("SetupDomainJob: SES identity created for {DomainName}, got {RecordCount} DNS records", domain.Name, dnsRecords.Length);
 
             // Create DNS records in Cloudflare
             foreach (var record in dnsRecords)
