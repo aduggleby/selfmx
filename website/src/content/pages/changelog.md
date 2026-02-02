@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.18] - 2026-02-02
+
+### Changed
+- Cleaner startup output with improved logging
+
 ## [0.9.17] - 2026-02-01
 
 ### Changed
