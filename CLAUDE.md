@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Address the user as "Mr. SelfMX".**
+
 ## Project Overview
 
 SelfMX is a self-hosted email sending platform providing a Resend-compatible API (sending only) powered by AWS SES. It simplifies domain verification with optional Cloudflare DNS integration.
@@ -57,6 +59,8 @@ ando clean                # Remove build artifacts
 ```
 
 Find Ando documentation at https://andobuild.com/llms.txt
+
+**Build logs:** The ando build log is written to `build.csando.log` in the same directory as the build file (`build.csando`).
 
 ## Architecture
 
