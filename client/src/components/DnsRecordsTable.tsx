@@ -10,30 +10,25 @@ export function DnsRecordsTable({ records }: DnsRecordsTableProps) {
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/70">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/60">
-          <tr className="border-b border-border/60 text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            <th className="py-3 px-3 text-left font-medium">Type</th>
-            <th className="py-3 px-3 text-left font-medium">Name</th>
-            <th className="py-3 px-3 text-left font-medium">Value</th>
+    <div className="overflow-x-auto rounded border">
+      <table className="w-full text-xs">
+        <thead className="bg-muted/50">
+          <tr className="border-b text-left">
+            <th className="py-2 px-3 font-medium text-muted-foreground">Type</th>
+            <th className="py-2 px-3 font-medium text-muted-foreground">Name</th>
+            <th className="py-2 px-3 font-medium text-muted-foreground">Value</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="font-mono">
           {records.map((record, index) => (
-            <tr
-              key={index}
-              className="border-b border-border/60 last:border-0 hover:bg-muted/40 transition-colors"
-            >
-              <td className="py-3 px-3">
-                <code className="rounded-full bg-muted px-2 py-1 text-xs">{record.type}</code>
+            <tr key={index} className="border-b last:border-0 hover:bg-muted/30">
+              <td className="py-2 px-3">
+                <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                  {record.type}
+                </span>
               </td>
-              <td className="py-3 px-3">
-                <code className="text-xs break-all">{record.name}</code>
-              </td>
-              <td className="py-3 px-3">
-                <code className="text-xs break-all">{record.value}</code>
-              </td>
+              <td className="py-2 px-3 break-all">{record.name}</td>
+              <td className="py-2 px-3 break-all text-muted-foreground">{record.value}</td>
             </tr>
           ))}
         </tbody>

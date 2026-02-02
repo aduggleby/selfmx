@@ -6,10 +6,8 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
     <div
       ref={ref}
       className={cn(
-        'rounded-3xl border bg-card text-card-foreground',
-        'shadow-[var(--shadow-elevation-medium)]',
-        'outline outline-1 -outline-offset-1 outline-black/5 dark:outline-white/5',
-        'transition-all duration-200 ease-out',
+        'rounded-lg border bg-card text-card-foreground',
+        'transition-colors duration-150',
         className
       )}
       {...props}
@@ -20,7 +18,7 @@ Card.displayName = 'Card';
 
 const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex flex-col space-y-1.5 p-6', className)} {...props} />
+    <div ref={ref} className={cn('flex flex-col gap-1 p-5 pb-4', className)} {...props} />
   )
 );
 CardHeader.displayName = 'CardHeader';
@@ -29,7 +27,7 @@ const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HT
   ({ className, ...props }, ref) => (
     <h3
       ref={ref}
-      className={cn('text-2xl font-semibold leading-none tracking-tight', className)}
+      className={cn('text-lg font-semibold leading-none tracking-tight', className)}
       {...props}
     />
   )
@@ -46,14 +44,14 @@ CardDescription.displayName = 'CardDescription';
 
 const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('p-6 pt-0', className)} {...props} />
+    <div ref={ref} className={cn('p-5 pt-0', className)} {...props} />
   )
 );
 CardContent.displayName = 'CardContent';
 
 const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn('flex items-center p-6 pt-0', className)} {...props} />
+    <div ref={ref} className={cn('flex items-center p-5 pt-0', className)} {...props} />
   )
 );
 CardFooter.displayName = 'CardFooter';

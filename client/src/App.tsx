@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './components/theme-provider';
 import { ThemeToggle } from './components/ui/theme-toggle';
@@ -31,7 +31,7 @@ const queryClient = new QueryClient({
 function LoadingScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="animate-pulse text-muted-foreground">Loading...</div>
+      <div className="text-sm text-muted-foreground">Loading...</div>
     </div>
   );
 }
@@ -50,20 +50,19 @@ function AuthenticatedApp() {
     <div className="relative min-h-screen">
       <header
         className={cn(
-          'sticky top-0 z-50 border-b border-border/70',
-          'bg-background',
-          'transition-shadow duration-200',
+          'sticky top-0 z-50 border-b bg-background',
+          'transition-shadow duration-150',
           scrolled && 'shadow-[var(--shadow-elevation-low)]'
         )}
       >
-        <div className="container mx-auto flex flex-col gap-3 py-5 px-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
-            <div>
-              <h1 className="font-display text-2xl leading-none">SelfMX</h1>
-              <p className="text-xs text-muted-foreground">Self Hosted ESP Layer</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="container mx-auto max-w-4xl flex items-center justify-between py-3 px-4">
+          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <h1 className="font-display text-lg font-semibold">SelfMX</h1>
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              Email API
+            </span>
+          </Link>
+          <div className="flex items-center gap-1">
             <ThemeToggle />
             <Button
               variant="ghost"
@@ -71,13 +70,14 @@ function AuthenticatedApp() {
               onClick={logout}
               title="Logout"
               aria-label="Logout"
+              className="h-8 w-8"
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </header>
-      <main className="relative">
+      <main>
         <Routes>
           <Route path="/" element={<DomainsPage />} />
           <Route path="/domains/:id" element={<DomainDetailPage />} />

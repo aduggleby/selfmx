@@ -28,19 +28,17 @@ export function DnsActions({ domain }: DnsActionsProps) {
         size="sm"
         onClick={handleDownload}
         disabled={!hasRecords}
-        className="rounded-full"
       >
-        <Download className="h-4 w-4 mr-2" />
-        Download DNS Records
+        <Download className="h-3.5 w-3.5 mr-1.5" />
+        Download
       </Button>
       <Button
         variant="outline"
         size="sm"
         onClick={handleOpenCloudflare}
-        className="rounded-full"
       >
-        <ExternalLink className="h-4 w-4 mr-2" />
-        Add to Cloudflare
+        <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+        Cloudflare
       </Button>
     </div>
   );

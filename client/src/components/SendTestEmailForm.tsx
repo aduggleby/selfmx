@@ -5,7 +5,6 @@ import { useSendTestEmail } from '@/hooks/useDomains';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface SendTestEmailFormProps {
   domainId: string;
@@ -41,76 +40,75 @@ export function SendTestEmailForm({ domainId, domainName, onClose }: SendTestEma
   };
 
   return (
-    <Card className="border-border/70 mt-6">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">Send Test Email</CardTitle>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">From</label>
-            <div className="flex items-center gap-0">
-              <Input
-                value={senderPrefix}
-                onChange={(e) => setSenderPrefix(e.target.value)}
-                placeholder="test"
-                className="rounded-r-none border-r-0 flex-1"
-                required
-              />
-              <div className="h-11 px-4 flex items-center bg-muted/50 border border-input rounded-r-2xl text-muted-foreground text-sm">
-                @{domainName}
-              </div>
+    <div className="rounded border bg-muted/30 p-4">
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="text-sm font-medium">Send Test Email</h4>
+        <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="text-xs text-muted-foreground">From</label>
+          <div className="flex items-center gap-0 mt-1">
+            <Input
+              value={senderPrefix}
+              onChange={(e) => setSenderPrefix(e.target.value)}
+              placeholder="test"
+              className="rounded-r-none border-r-0 flex-1 h-8 text-sm"
+              required
+            />
+            <div className="h-8 px-3 flex items-center bg-muted/50 border border-input rounded-r-md text-muted-foreground text-xs font-mono">
+              @{domainName}
             </div>
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">To</label>
-            <Input
-              type="email"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="recipient@example.com"
-              required
-            />
-          </div>
+        <div>
+          <label className="text-xs text-muted-foreground">To</label>
+          <Input
+            type="email"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            placeholder="recipient@example.com"
+            className="mt-1 h-8 text-sm"
+            required
+          />
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Subject</label>
-            <Input
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Subject"
-              required
-            />
-          </div>
+        <div>
+          <label className="text-xs text-muted-foreground">Subject</label>
+          <Input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="Subject"
+            className="mt-1 h-8 text-sm"
+            required
+          />
+        </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Message</label>
-            <Textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Your message..."
-              rows={4}
-              required
-            />
-          </div>
+        <div>
+          <label className="text-xs text-muted-foreground">Message</label>
+          <Textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Your message..."
+            rows={3}
+            className="mt-1 text-sm"
+            required
+          />
+        </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={sendTestEmailMutation.isPending}>
-              <Send className="h-4 w-4 mr-2" />
-              {sendTestEmailMutation.isPending ? 'Sending...' : 'Send Test Email'}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" disabled={sendTestEmailMutation.isPending}>
+            <Send className="h-3.5 w-3.5 mr-1.5" />
+            {sendTestEmailMutation.isPending ? 'Sending...' : 'Send'}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }

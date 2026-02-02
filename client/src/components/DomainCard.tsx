@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DomainStatusBadge } from './DomainStatusBadge';
 import { DnsRecordsTable } from './DnsRecordsTable';
@@ -20,79 +20,67 @@ export function DomainCard({ domain, onDelete, isDeleting }: DomainCardProps) {
   return (
     <Card
       className={cn(
-        'group relative overflow-hidden border-border/70',
-        'motion-safe:animate-[fade-slide_0.35s_ease-out]',
-        'hover:shadow-[var(--shadow-elevation-high)]',
-        'hover:-translate-y-1'
+        'group hover:border-primary/30',
+        'motion-safe:animate-[fade-slide_0.2s_ease-out]'
       )}
     >
-      <div className="absolute inset-x-0 top-0 h-1 bg-primary" />
-      <CardHeader className="flex flex-col gap-3 pb-3">
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-lg font-semibold">
-            <Link
-              to={`/domains/${domain.id}`}
-              className="hover:text-primary transition-colors"
-            >
-              {domain.name}
-            </Link>
-          </CardTitle>
+          <Link
+            to={`/domains/${domain.id}`}
+            className="font-mono text-sm font-medium hover:text-primary transition-colors"
+          >
+            {domain.name}
+          </Link>
           <DomainStatusBadge status={domain.status} />
         </div>
-        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-          <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1">
-            Added {new Date(domain.createdAt).toLocaleDateString()}
-          </span>
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span>Added {new Date(domain.createdAt).toLocaleDateString()}</span>
           {domain.verifiedAt && (
-            <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1">
-              Verified {new Date(domain.verifiedAt).toLocaleDateString()}
-            </span>
+            <>
+              <span>·</span>
+              <span>Verified {new Date(domain.verifiedAt).toLocaleDateString()}</span>
+            </>
           )}
         </div>
       </CardHeader>
       <CardContent>
-
         {domain.failureReason && (
-          <p className="mb-4 rounded-2xl border border-[var(--status-failed-text)]/30 bg-[var(--status-failed-bg)]/70 px-4 py-3 text-sm text-[var(--status-failed-text)]">
+          <p className="mb-3 rounded border border-[var(--status-failed-text)]/20 bg-[var(--status-failed-bg)] px-3 py-2 text-xs text-[var(--status-failed-text)]">
             {domain.failureReason}
           </p>
         )}
 
         {domain.status === 'verifying' && (
-          <p className="mb-4 rounded-2xl border border-[var(--status-verifying-text)]/30 bg-[var(--status-verifying-bg)]/70 px-4 py-3 text-sm text-[var(--status-verifying-text)]">
-            DNS records are being verified. This may take a few minutes.
+          <p className="mb-3 rounded border border-[var(--status-verifying-text)]/20 bg-[var(--status-verifying-bg)] px-3 py-2 text-xs text-[var(--status-verifying-text)]">
+            Verifying DNS records...
           </p>
         )}
 
         {hasDnsRecords && (
-          <div className="mb-5">
+          <div className="mb-3">
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={() => setShowDns(!showDns)}
-              className="mb-3 rounded-full px-4"
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
             >
-              {showDns ? 'Hide DNS Records' : 'Show DNS Records'}
+              {showDns ? '− Hide DNS' : '+ Show DNS'}
             </Button>
-            <div
-              className={cn(
-                'grid transition-all duration-200 ease-out',
-                showDns ? 'grid-rows-[1fr] opacity-100 visible' : 'grid-rows-[0fr] opacity-0 invisible'
-              )}
-            >
-              <div className="overflow-hidden">
+            {showDns && (
+              <div className="mt-2">
                 <DnsRecordsTable records={domain.dnsRecords!} />
               </div>
-            </div>
+            )}
           </div>
         )}
 
         <Button
-          variant="destructive"
+          variant="ghost"
           size="sm"
           onClick={() => onDelete(domain.id)}
           disabled={isDeleting}
-          className="rounded-full px-4"
+          className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
         >
           {isDeleting ? 'Deleting...' : 'Delete'}
         </Button>
