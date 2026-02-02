@@ -30,9 +30,25 @@ public class ApiKeyAuthHandler : AuthenticationHandler<AuthenticationSchemeOptio
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        // First, check if there's a valid Cookie authentication
+        var cookieResult = await Context.AuthenticateAsync("Cookie");
+        if (cookieResult.Succeeded)
+        {
+            _logger.LogInformation("Auth: Cookie auth succeeded for user {User}, Path={Path}",
+                cookieResult.Principal?.Identity?.Name, Request.Path);
+            return AuthenticateResult.Success(cookieResult.Ticket!);
+        }
+
+        if (cookieResult.Failure != null)
+        {
+            _logger.LogDebug("Auth: Cookie auth failed: {Error}, Path={Path}",
+                cookieResult.Failure.Message, Request.Path);
+        }
+
+        // No cookie, try API key
         if (!Request.Headers.TryGetValue(ApiKeyHeader, out var authHeader))
         {
-            _logger.LogDebug("Auth: no Authorization header, IP={Ip}, Path={Path}",
+            _logger.LogDebug("Auth: no Authorization header and no valid cookie, IP={Ip}, Path={Path}",
                 Context.Connection.RemoteIpAddress, Request.Path);
             return AuthenticateResult.NoResult();
         }
