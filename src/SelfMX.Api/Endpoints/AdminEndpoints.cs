@@ -43,6 +43,14 @@ public static class AdminEndpoints
         var verifyResult = passwordProvided && Sha512CryptVerifier.Verify(request.Password!, storedHash);
         logger.LogInformation("Verification result: {Result}", verifyResult);
 
+        // Extra debug: compute what the hash would be
+        if (passwordProvided && !string.IsNullOrEmpty(storedHash))
+        {
+            var computed = Sha512CryptVerifier.ComputeForDebug(request.Password!, storedHash);
+            logger.LogInformation("Computed hash: {Computed}", computed);
+            logger.LogInformation("Stored hash:   {Stored}", storedHash);
+        }
+
         if (!verifyResult)
         {
             auditService.Log(new AuditEntry(

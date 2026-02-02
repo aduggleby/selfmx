@@ -44,6 +44,21 @@ public static class Sha512CryptVerifier
     }
 
     /// <summary>
+    /// Debug method to compute and return the hash for comparison.
+    /// </summary>
+    public static string ComputeForDebug(string password, string existingHash)
+    {
+        try
+        {
+            return Crypt(password, existingHash);
+        }
+        catch (Exception ex)
+        {
+            return $"ERROR: {ex.Message}";
+        }
+    }
+
+    /// <summary>
     /// Computes a SHA-512 crypt hash for the given password using the salt from an existing hash.
     /// </summary>
     private static string Crypt(string password, string existingHash)
