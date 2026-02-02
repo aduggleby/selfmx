@@ -14,7 +14,7 @@ test.describe('Domain Detail Page', () => {
       await page.getByRole('link', { name: 'example.com' }).click();
 
       await expect(page).toHaveURL('/domains/test-domain-1');
-      await expect(page.getByRole('heading', { name: 'example.com' })).toBeVisible();
+      await expect(page.getByText('example.com')).toBeVisible();
     });
 
     test('redirects to domain detail page after creating a domain', async ({ page, apiMock }) => {
@@ -22,11 +22,11 @@ test.describe('Domain Detail Page', () => {
       await page.goto('/');
 
       await page.getByPlaceholder('example.com').fill('newdomain.com');
-      await page.getByRole('button', { name: 'Add domain' }).click();
+      await page.getByRole('button', { name: 'Add' }).click();
 
       // Should redirect to detail page
       await expect(page).toHaveURL(/\/domains\/.+/);
-      await expect(page.getByRole('heading', { name: 'newdomain.com' })).toBeVisible();
+      await expect(page.getByText('newdomain.com')).toBeVisible();
     });
 
     test('shows back link to domains list', async ({ page, apiMock }) => {
@@ -34,7 +34,7 @@ test.describe('Domain Detail Page', () => {
       apiMock.setDomains([domain]);
       await page.goto('/domains/test-1');
 
-      const backLink = page.getByRole('link', { name: 'Back to domains' });
+      const backLink = page.getByRole('link', { name: 'Back' });
       await expect(backLink).toBeVisible();
 
       await backLink.click();
@@ -60,7 +60,7 @@ test.describe('Domain Detail Page', () => {
       apiMock.setDomains([domain]);
       await page.goto('/domains/test-1');
 
-      await expect(page.getByRole('heading', { name: 'example.com' })).toBeVisible();
+      await expect(page.getByText('example.com')).toBeVisible();
       await expect(page.getByText('verified', { exact: true })).toBeVisible();
     });
 
@@ -165,7 +165,7 @@ test.describe('Domain Detail Page', () => {
   });
 
   test.describe('DNS Actions', () => {
-    test('shows Download DNS Records button', async ({ page, apiMock }) => {
+    test('shows Download button', async ({ page, apiMock }) => {
       const domain = createMockDomain({
         id: 'test-1',
         name: 'example.com',
@@ -174,10 +174,10 @@ test.describe('Domain Detail Page', () => {
       apiMock.setDomains([domain]);
       await page.goto('/domains/test-1');
 
-      await expect(page.getByRole('button', { name: 'Download DNS Records' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Download' })).toBeVisible();
     });
 
-    test('shows Add to Cloudflare button', async ({ page, apiMock }) => {
+    test('shows Cloudflare button', async ({ page, apiMock }) => {
       const domain = createMockDomain({
         id: 'test-1',
         name: 'example.com',
@@ -186,7 +186,7 @@ test.describe('Domain Detail Page', () => {
       apiMock.setDomains([domain]);
       await page.goto('/domains/test-1');
 
-      await expect(page.getByRole('button', { name: 'Add to Cloudflare' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Cloudflare' })).toBeVisible();
     });
 
     test('does not show DNS action buttons when no records', async ({ page, apiMock }) => {
@@ -200,11 +200,11 @@ test.describe('Domain Detail Page', () => {
       await page.goto('/domains/test-1');
 
       // DNS action buttons should not be visible when there are no records
-      await expect(page.getByRole('button', { name: 'Download DNS Records' })).not.toBeVisible();
-      await expect(page.getByRole('button', { name: 'Add to Cloudflare' })).not.toBeVisible();
+      await expect(page.getByRole('button', { name: 'Download' })).not.toBeVisible();
+      await expect(page.getByRole('button', { name: 'Cloudflare' })).not.toBeVisible();
     });
 
-    test('downloads BIND file when clicking Download DNS Records', async ({ page, apiMock }) => {
+    test('downloads BIND file when clicking Download', async ({ page, apiMock }) => {
       const domain = createMockDomain({
         id: 'test-1',
         name: 'example.com',
@@ -215,13 +215,13 @@ test.describe('Domain Detail Page', () => {
 
       // Listen for download
       const downloadPromise = page.waitForEvent('download');
-      await page.getByRole('button', { name: 'Download DNS Records' }).click();
+      await page.getByRole('button', { name: 'Download' }).click();
       const download = await downloadPromise;
 
       expect(download.suggestedFilename()).toBe('example.com-dns-records.txt');
     });
 
-    test('opens Cloudflare in new tab when clicking Add to Cloudflare', async ({ page, apiMock, context }) => {
+    test('opens Cloudflare in new tab when clicking Cloudflare button', async ({ page, apiMock, context }) => {
       const domain = createMockDomain({
         id: 'test-1',
         name: 'example.com',
@@ -232,7 +232,7 @@ test.describe('Domain Detail Page', () => {
 
       // Listen for new page/tab
       const pagePromise = context.waitForEvent('page');
-      await page.getByRole('button', { name: 'Add to Cloudflare' }).click();
+      await page.getByRole('button', { name: 'Cloudflare' }).click();
       const newPage = await pagePromise;
 
       expect(newPage.url()).toContain('dash.cloudflare.com');
@@ -247,7 +247,7 @@ test.describe('Domain Detail Page', () => {
       apiMock.setDomains([domain]);
       await page.goto('/domains/test-1');
 
-      await expect(page.getByRole('button', { name: 'Delete domain' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
     });
 
     test('deletes domain and redirects to home', async ({ page, apiMock }) => {
@@ -255,7 +255,7 @@ test.describe('Domain Detail Page', () => {
       apiMock.setDomains([domain]);
       await page.goto('/domains/test-1');
 
-      await page.getByRole('button', { name: 'Delete domain' }).click();
+      await page.getByRole('button', { name: 'Delete' }).click();
 
       // Should redirect to home after deletion
       await expect(page).toHaveURL('/');
@@ -268,7 +268,7 @@ test.describe('Domain Detail Page', () => {
       await page.goto('/domains/test-1');
 
       // Just verify the delete button exists and is clickable
-      const deleteButton = page.getByRole('button', { name: 'Delete domain' });
+      const deleteButton = page.getByRole('button', { name: 'Delete' });
       await expect(deleteButton).toBeVisible();
       await expect(deleteButton).toBeEnabled();
     });
@@ -290,9 +290,8 @@ test.describe('Domain Detail Page', () => {
 
       await page.goto('/domains/non-existent');
 
-      // Use heading role to be specific
       await expect(page.getByRole('heading', { name: 'Domain not found' })).toBeVisible();
-      await expect(page.getByRole('link', { name: 'Back to domains' })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Back' })).toBeVisible();
     });
 
     test('back link works on error page', async ({ page, apiMock }) => {
@@ -308,9 +307,8 @@ test.describe('Domain Detail Page', () => {
 
       await page.goto('/domains/non-existent');
 
-      // Use heading role to be specific
       await expect(page.getByRole('heading', { name: 'Domain not found' })).toBeVisible();
-      await page.getByRole('link', { name: 'Back to domains' }).click();
+      await page.getByRole('link', { name: 'Back' }).click();
       await expect(page).toHaveURL('/');
     });
   });

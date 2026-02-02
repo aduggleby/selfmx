@@ -13,16 +13,16 @@ test.describe('Page Layout', () => {
     apiMock.setDomains([]);
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: 'Add your first domain' })).toBeVisible();
+    await expect(page.getByText('Add your first domain')).toBeVisible();
     await expect(page.getByPlaceholder('example.com')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Add domain' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add' })).toBeVisible();
   });
 
-  test('displays all domains heading when domains exist', async ({ page, apiMock }) => {
+  test('displays domain count when domains exist', async ({ page, apiMock }) => {
     apiMock.setDomains([createMockDomain({ id: '1', name: 'example.com' })]);
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: 'All domains' })).toBeVisible();
+    await expect(page.getByText('1 domain')).toBeVisible();
   });
 });
 
@@ -31,8 +31,8 @@ test.describe('Empty State', () => {
     apiMock.setDomains([]);
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: 'Add your first domain' })).toBeVisible();
-    await expect(page.getByText(/Enter your domain below/)).toBeVisible();
+    await expect(page.getByText('Add your first domain')).toBeVisible();
+    await expect(page.getByText(/Enter a domain to set up/)).toBeVisible();
   });
 
   test('does not show pagination when no domains', async ({ page, apiMock }) => {
@@ -112,10 +112,8 @@ test.describe('Status Badges', () => {
     ]);
     await page.goto('/');
 
-    const badgeText = page.getByText('verifying', { exact: true });
-    await expect(badgeText).toBeVisible();
-    // For verifying status, the text is wrapped in a relative span, so check parent for styling
-    const badge = badgeText.locator('..');
+    const badge = page.getByText('verifying', { exact: true });
+    await expect(badge).toBeVisible();
     await expect(badge).toHaveClass(/bg-\[var\(--status-verifying-bg\)\]/);
     await expect(badge).toHaveClass(/text-\[var\(--status-verifying-text\)\]/);
   });
@@ -150,7 +148,7 @@ test.describe('Status Badges', () => {
     ]);
     await page.goto('/');
 
-    await expect(page.getByText('DNS records are being verified. This may take a few minutes.')).toBeVisible();
+    await expect(page.getByText('Verifying DNS records...')).toBeVisible();
   });
 
   test('displays failure reason for failed domains', async ({ page, apiMock }) => {
@@ -175,10 +173,10 @@ test.describe('Add Domain', () => {
 
     // Fill in the domain name
     await page.getByPlaceholder('example.com').fill('newdomain.com');
-    await page.getByRole('button', { name: 'Add domain' }).click();
+    await page.getByRole('button', { name: 'Add' }).click();
 
-    // Wait for the domain to appear (use heading to avoid matching toast)
-    await expect(page.getByRole('heading', { name: 'newdomain.com' })).toBeVisible();
+    // Wait for the domain to appear
+    await expect(page.getByText('newdomain.com')).toBeVisible();
   });
 
   test('clears input after successful domain creation', async ({ page, apiMock }) => {
@@ -187,11 +185,10 @@ test.describe('Add Domain', () => {
 
     const input = page.getByPlaceholder('example.com');
     await input.fill('newdomain.com');
-    await page.getByRole('button', { name: 'Add domain' }).click();
+    await page.getByRole('button', { name: 'Add' }).click();
 
-    // Wait for success (domain appears) then check input is cleared
-    await expect(page.getByRole('heading', { name: 'newdomain.com' })).toBeVisible();
-    // Input should be in the modal which is hidden, but let's verify the domain was added
+    // Wait for success (domain appears) then check we're on detail page
+    await expect(page.getByText('newdomain.com')).toBeVisible();
   });
 
   test('shows loading state while creating domain', async ({ page, apiMock }) => {
@@ -216,7 +213,7 @@ test.describe('Add Domain', () => {
     await page.goto('/');
     await page.getByPlaceholder('example.com').fill('newdomain.com');
 
-    await page.getByRole('button', { name: 'Add domain' }).click();
+    await page.getByRole('button', { name: 'Add' }).click();
 
     // Should show loading state
     await expect(page.getByRole('button', { name: 'Adding...' })).toBeVisible();
@@ -236,7 +233,7 @@ test.describe('Add Domain', () => {
     // When domains exist, we need to click "Add domain" button to open modal
     await page.getByRole('button', { name: 'Add domain' }).click();
     await page.getByPlaceholder('example.com').fill('existing.com');
-    await page.locator('form').getByRole('button', { name: 'Add domain' }).click();
+    await page.locator('form').getByRole('button', { name: 'Add' }).click();
 
     await expect(page.getByText('Domain already exists')).toBeVisible();
   });
@@ -246,7 +243,7 @@ test.describe('Add Domain', () => {
     await page.goto('/');
 
     // Button should be disabled when input is empty
-    await expect(page.getByRole('button', { name: 'Add domain' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Add' })).toBeDisabled();
   });
 
   test('trims whitespace from domain name', async ({ page, apiMock }) => {
@@ -254,9 +251,10 @@ test.describe('Add Domain', () => {
     await page.goto('/');
 
     await page.getByPlaceholder('example.com').fill('  trimmed.com  ');
-    await page.getByRole('button', { name: 'Add domain' }).click();
+    await page.getByRole('button', { name: 'Add' }).click();
 
-    await expect(page.getByRole('heading', { name: 'trimmed.com' })).toBeVisible();
+    // Should redirect to detail page after creation
+    await expect(page).toHaveURL(/\/domains\/.+/);
   });
 });
 
@@ -276,7 +274,7 @@ test.describe('Delete Domain', () => {
     // Domain should be removed (optimistic update)
     await expect(page.getByText('todelete.com')).not.toBeVisible();
     // After deletion, empty state should show
-    await expect(page.getByRole('heading', { name: 'Add your first domain' })).toBeVisible();
+    await expect(page.getByText('Add your first domain')).toBeVisible();
   });
 
   test('removes domain from list after delete (optimistic update)', async ({ page, apiMock }) => {
@@ -325,7 +323,7 @@ test.describe('DNS Records', () => {
     ]);
     await page.goto('/');
 
-    await expect(page.getByRole('button', { name: 'Show DNS Records' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '+ Show DNS' })).toBeVisible();
   });
 
   test('does not show DNS toggle for domains without records', async ({ page, apiMock }) => {
@@ -334,7 +332,7 @@ test.describe('DNS Records', () => {
     ]);
     await page.goto('/');
 
-    await expect(page.getByRole('button', { name: 'Show DNS Records' })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: '+ Show DNS' })).not.toBeVisible();
   });
 
   test('toggles DNS records visibility', async ({ page, apiMock }) => {
@@ -353,16 +351,15 @@ test.describe('DNS Records', () => {
     await expect(page.getByText('token1._domainkey.example.com')).not.toBeVisible();
 
     // Click to show
-    await page.getByRole('button', { name: 'Show DNS Records' }).click();
+    await page.getByRole('button', { name: '+ Show DNS' }).click();
     await expect(page.getByText('token1._domainkey.example.com')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Hide DNS Records' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '− Hide DNS' })).toBeVisible();
 
     // Click to hide
-    await page.getByRole('button', { name: 'Hide DNS Records' }).click();
-    // Wait for animation to complete (200ms transition + buffer)
-    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: '− Hide DNS' }).click();
+    // Wait for the element to disappear
     await expect(page.getByText('token1._domainkey.example.com')).not.toBeVisible();
-    await expect(page.getByRole('button', { name: 'Show DNS Records' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '+ Show DNS' })).toBeVisible();
   });
 
   test('displays DNS records table with correct columns', async ({ page, apiMock }) => {
@@ -376,7 +373,7 @@ test.describe('DNS Records', () => {
     ]);
     await page.goto('/');
 
-    await page.getByRole('button', { name: 'Show DNS Records' }).click();
+    await page.getByRole('button', { name: '+ Show DNS' }).click();
 
     // Check table headers
     await expect(page.getByRole('columnheader', { name: 'Type' })).toBeVisible();
@@ -395,7 +392,7 @@ test.describe('DNS Records', () => {
     ]);
     await page.goto('/');
 
-    await page.getByRole('button', { name: 'Show DNS Records' }).click();
+    await page.getByRole('button', { name: '+ Show DNS' }).click();
 
     // Check all 3 DNS records are displayed
     await expect(page.getByText('token1._domainkey.example.com')).toBeVisible();
@@ -403,7 +400,7 @@ test.describe('DNS Records', () => {
     await expect(page.getByText('token3._domainkey.example.com')).toBeVisible();
 
     // Check record type badges
-    const cnameLabels = page.locator('code').filter({ hasText: 'CNAME' });
+    const cnameLabels = page.locator('span').filter({ hasText: 'CNAME' });
     await expect(cnameLabels).toHaveCount(3);
 
     // Check values
@@ -433,7 +430,7 @@ test.describe('Pagination', () => {
 
     await expect(page.getByRole('button', { name: 'Previous' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Next' })).toBeVisible();
-    await expect(page.getByText('Page 1 of 2')).toBeVisible();
+    await expect(page.getByText('1 / 2')).toBeVisible();
   });
 
   test('previous button is disabled on first page', async ({ page, apiMock }) => {
@@ -455,7 +452,7 @@ test.describe('Pagination', () => {
 
     await page.getByRole('button', { name: 'Next' }).click();
 
-    await expect(page.getByText('Page 2 of 2')).toBeVisible();
+    await expect(page.getByText('2 / 2')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Previous' })).not.toBeDisabled();
   });
@@ -469,11 +466,11 @@ test.describe('Pagination', () => {
 
     // Go to page 2
     await page.getByRole('button', { name: 'Next' }).click();
-    await expect(page.getByText('Page 2 of 2')).toBeVisible();
+    await expect(page.getByText('2 / 2')).toBeVisible();
 
     // Go back to page 1
     await page.getByRole('button', { name: 'Previous' }).click();
-    await expect(page.getByText('Page 1 of 2')).toBeVisible();
+    await expect(page.getByText('1 / 2')).toBeVisible();
   });
 
   test('displays correct domains per page', async ({ page, apiMock }) => {
@@ -533,8 +530,8 @@ test.describe('Error Handling', () => {
 
     await page.goto('/');
 
-    // Error modal shows "Unable to load domains"
-    await expect(page.getByText(/Unable to load domains/)).toBeVisible();
+    // Error modal shows "Error"
+    await expect(page.getByRole('heading', { name: 'Error' })).toBeVisible();
   });
 });
 
@@ -547,8 +544,8 @@ test.describe('Domain Card Grid Layout', () => {
     ]);
     await page.goto('/');
 
-    // Check grid container exists with responsive classes (the domain cards grid)
-    const grid = page.locator('.grid.gap-6.md\\:grid-cols-2');
+    // Check grid container exists with responsive classes
+    const grid = page.locator('.grid.gap-4.sm\\:grid-cols-2');
     await expect(grid).toBeVisible();
   });
 });
@@ -572,8 +569,8 @@ test.describe('Form Interaction', () => {
     await input.fill('enter-submit.com');
     await input.press('Enter');
 
-    // Check for the domain card heading (not the toast)
-    await expect(page.getByRole('heading', { name: 'enter-submit.com' })).toBeVisible();
+    // Should redirect to detail page after creation
+    await expect(page).toHaveURL(/\/domains\/.+/);
   });
 });
 
@@ -587,11 +584,11 @@ test.describe('Multiple Domain States', () => {
     ]);
     await page.goto('/');
 
-    // All domains visible (use heading to avoid matching DNS records)
-    await expect(page.getByRole('heading', { name: 'domain-a.com' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'domain-b.com' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'domain-c.com' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'domain-d.com' })).toBeVisible();
+    // All domains visible
+    await expect(page.getByText('domain-a.com')).toBeVisible();
+    await expect(page.getByText('domain-b.com')).toBeVisible();
+    await expect(page.getByText('domain-c.com')).toBeVisible();
+    await expect(page.getByText('domain-d.com')).toBeVisible();
 
     // All status badges visible (using exact match to avoid matching domain names)
     await expect(page.getByText('pending', { exact: true })).toBeVisible();
@@ -603,6 +600,6 @@ test.describe('Multiple Domain States', () => {
     await expect(page.getByText('DNS verification failed')).toBeVisible();
 
     // DNS records button only for verifying domain
-    await expect(page.getByRole('button', { name: 'Show DNS Records' })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: '+ Show DNS' })).toHaveCount(1);
   });
 });

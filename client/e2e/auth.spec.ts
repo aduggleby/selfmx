@@ -7,8 +7,8 @@ test.describe('Authentication', () => {
       await page.goto('/');
 
       await expect(page.getByRole('heading', { name: 'SelfMX' })).toBeVisible();
-      await expect(page.getByPlaceholder('Password')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
+      await expect(page.getByPlaceholder('Admin password')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
     });
 
     test('successful login shows main app', async ({ page, apiMock }) => {
@@ -16,11 +16,11 @@ test.describe('Authentication', () => {
       apiMock.setDomains([]);
       await page.goto('/');
 
-      await page.getByPlaceholder('Password').fill('test-password');
-      await page.getByRole('button', { name: 'Sign In' }).click();
+      await page.getByPlaceholder('Admin password').fill('test-password');
+      await page.getByRole('button', { name: 'Sign in' }).click();
 
       // Should now see the main app with header
-      await expect(page.getByRole('heading', { name: 'Add your first domain' })).toBeVisible();
+      await expect(page.getByText('Add your first domain')).toBeVisible();
     });
 
     test('invalid password shows error', async ({ page, apiMock }) => {
@@ -28,18 +28,18 @@ test.describe('Authentication', () => {
       apiMock.onLogin((password) => password === 'correct-password');
       await page.goto('/');
 
-      await page.getByPlaceholder('Password').fill('wrong-password');
-      await page.getByRole('button', { name: 'Sign In' }).click();
+      await page.getByPlaceholder('Admin password').fill('wrong-password');
+      await page.getByRole('button', { name: 'Sign in' }).click();
 
       await expect(page.getByText(/invalid/i)).toBeVisible();
-      await expect(page.getByPlaceholder('Password')).toBeVisible();
+      await expect(page.getByPlaceholder('Admin password')).toBeVisible();
     });
 
     test('empty password disables submit button', async ({ page, apiMock }) => {
       apiMock.setAuthenticated(false);
       await page.goto('/');
 
-      await expect(page.getByRole('button', { name: 'Sign In' })).toBeDisabled();
+      await expect(page.getByRole('button', { name: 'Sign in' })).toBeDisabled();
     });
 
     test('shows loading state during login', async ({ page, apiMock }) => {
@@ -56,8 +56,8 @@ test.describe('Authentication', () => {
       });
 
       await page.goto('/');
-      await page.getByPlaceholder('Password').fill('test-password');
-      await page.getByRole('button', { name: 'Sign In' }).click();
+      await page.getByPlaceholder('Admin password').fill('test-password');
+      await page.getByRole('button', { name: 'Sign in' }).click();
 
       await expect(page.getByRole('button', { name: 'Signing in...' })).toBeVisible();
     });
@@ -67,12 +67,12 @@ test.describe('Authentication', () => {
       apiMock.setDomains([]);
       await page.goto('/');
 
-      const passwordInput = page.getByPlaceholder('Password');
+      const passwordInput = page.getByPlaceholder('Admin password');
       await passwordInput.fill('test-password');
       await passwordInput.press('Enter');
 
       // Should now see the main app
-      await expect(page.getByRole('heading', { name: 'Add your first domain' })).toBeVisible();
+      await expect(page.getByText('Add your first domain')).toBeVisible();
     });
   });
 
@@ -83,8 +83,8 @@ test.describe('Authentication', () => {
       await page.goto('/');
 
       // Should skip login and show main app
-      await expect(page.getByPlaceholder('Password')).not.toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Add your first domain' })).toBeVisible();
+      await expect(page.getByPlaceholder('Admin password')).not.toBeVisible();
+      await expect(page.getByText('Add your first domain')).toBeVisible();
     });
 
     test('authenticated user sees main app on refresh', async ({ page, apiMock }) => {
@@ -93,13 +93,13 @@ test.describe('Authentication', () => {
       await page.goto('/');
 
       // Login
-      await page.getByPlaceholder('Password').fill('test-password');
-      await page.getByRole('button', { name: 'Sign In' }).click();
-      await expect(page.getByRole('heading', { name: 'Add your first domain' })).toBeVisible();
+      await page.getByPlaceholder('Admin password').fill('test-password');
+      await page.getByRole('button', { name: 'Sign in' }).click();
+      await expect(page.getByText('Add your first domain')).toBeVisible();
 
       // Refresh should stay authenticated (mock maintains state)
       await page.reload();
-      await expect(page.getByRole('heading', { name: 'Add your first domain' })).toBeVisible();
+      await expect(page.getByText('Add your first domain')).toBeVisible();
     });
   });
 
@@ -121,7 +121,7 @@ test.describe('Authentication', () => {
       await page.getByRole('button', { name: 'Logout' }).click();
 
       // Should see login page
-      await expect(page.getByPlaceholder('Password')).toBeVisible();
+      await expect(page.getByPlaceholder('Admin password')).toBeVisible();
     });
   });
 
@@ -161,7 +161,7 @@ test.describe('Authentication', () => {
       await page.reload();
 
       // Should redirect to login after 401
-      await expect(page.getByPlaceholder('Password')).toBeVisible();
+      await expect(page.getByPlaceholder('Admin password')).toBeVisible();
     });
 
     test('rate limiting shows appropriate error', async ({ page, apiMock }) => {
@@ -176,8 +176,8 @@ test.describe('Authentication', () => {
       });
 
       await page.goto('/');
-      await page.getByPlaceholder('Password').fill('test');
-      await page.getByRole('button', { name: 'Sign In' }).click();
+      await page.getByPlaceholder('Admin password').fill('test');
+      await page.getByRole('button', { name: 'Sign in' }).click();
 
       await expect(page.getByText(/too many/i)).toBeVisible();
     });
@@ -194,8 +194,8 @@ test.describe('Authentication', () => {
       });
 
       await page.goto('/');
-      await page.getByPlaceholder('Password').fill('test');
-      await page.getByRole('button', { name: 'Sign In' }).click();
+      await page.getByPlaceholder('Admin password').fill('test');
+      await page.getByRole('button', { name: 'Sign in' }).click();
 
       await expect(page.getByText(/error/i)).toBeVisible();
     });
@@ -208,8 +208,8 @@ test.describe('Authentication', () => {
       });
 
       await page.goto('/');
-      await page.getByPlaceholder('Password').fill('test');
-      await page.getByRole('button', { name: 'Sign In' }).click();
+      await page.getByPlaceholder('Admin password').fill('test');
+      await page.getByRole('button', { name: 'Sign in' }).click();
 
       await expect(page.getByText(/unreachable|failed|error/i)).toBeVisible();
     });
@@ -226,7 +226,7 @@ test.describe('Authentication', () => {
       await expect(page.getByText('Loading...')).toBeVisible();
 
       // Eventually shows login
-      await expect(page.getByPlaceholder('Password')).toBeVisible();
+      await expect(page.getByPlaceholder('Admin password')).toBeVisible();
     });
   });
 
@@ -248,25 +248,26 @@ test.describe('Authentication', () => {
       await page.goto('/');
 
       // Start on login page
-      await expect(page.getByPlaceholder('Password')).toBeVisible();
+      await expect(page.getByPlaceholder('Admin password')).toBeVisible();
 
       // Login
-      await page.getByPlaceholder('Password').fill('test-password');
-      await page.getByRole('button', { name: 'Sign In' }).click();
+      await page.getByPlaceholder('Admin password').fill('test-password');
+      await page.getByRole('button', { name: 'Sign in' }).click();
 
       // See main app
-      await expect(page.getByRole('heading', { name: 'Add your first domain' })).toBeVisible();
+      await expect(page.getByText('Add your first domain')).toBeVisible();
 
       // Add a domain
       await page.getByPlaceholder('example.com').fill('mytest.com');
-      await page.getByRole('button', { name: 'Add domain' }).click();
-      await expect(page.getByRole('heading', { name: 'mytest.com' })).toBeVisible();
+      await page.getByRole('button', { name: 'Add' }).click();
+      // Wait for navigation to detail page
+      await expect(page).toHaveURL(/\/domains\/.+/);
 
       // Logout
       await page.getByRole('button', { name: 'Logout' }).click();
 
       // Back on login page
-      await expect(page.getByPlaceholder('Password')).toBeVisible();
+      await expect(page.getByPlaceholder('Admin password')).toBeVisible();
     });
   });
 });
