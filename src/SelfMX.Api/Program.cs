@@ -251,6 +251,29 @@ var version = typeof(Program).Assembly.GetName().Version;
 var appSettings = app.Services.GetRequiredService<IOptions<AppSettings>>().Value;
 app.Logger.LogInformation("SelfMX v{Version} starting on {Fqdn}", version?.ToString(3) ?? "unknown", appSettings.Fqdn);
 
+// Debug: log App__ environment variables to diagnose configuration issues
+var appEnvVars = Environment.GetEnvironmentVariables()
+    .Cast<System.Collections.DictionaryEntry>()
+    .Where(e => e.Key.ToString()!.StartsWith("App", StringComparison.OrdinalIgnoreCase))
+    .Select(e => $"{e.Key}={MaskValue(e.Key.ToString()!, e.Value?.ToString())}")
+    .ToList();
+app.Logger.LogInformation("App environment variables: {Vars}", string.Join(", ", appEnvVars));
+app.Logger.LogInformation("AdminPasswordHash configured: {HasHash}, Length: {Length}",
+    !string.IsNullOrEmpty(appSettings.AdminPasswordHash),
+    appSettings.AdminPasswordHash?.Length ?? 0);
+
+static string MaskValue(string key, string? value)
+{
+    if (string.IsNullOrEmpty(value)) return "(empty)";
+    if (key.Contains("Password", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Secret", StringComparison.OrdinalIgnoreCase) ||
+        key.Contains("Key", StringComparison.OrdinalIgnoreCase))
+    {
+        return value.Length > 10 ? $"{value[..10]}...({value.Length} chars)" : $"***({value.Length} chars)";
+    }
+    return value;
+}
+
 // Graceful shutdown
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
 lifetime.ApplicationStopping.Register(() =>
