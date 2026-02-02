@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.29] - 2026-02-02
+
+### Fixed
+- Improved session handling when API key is invalidated or session expires
+
 ## [0.9.28] - 2026-02-02
 
 ### Added
