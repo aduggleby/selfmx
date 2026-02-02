@@ -6,6 +6,12 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.27] - 2026-02-02
+
+### Added
+- Delete confirmation dialog to prevent accidental domain deletion
+- Moved delete action to domain detail page for safer access
+
 ## [0.9.26] - 2026-02-02
 
 ### Added
