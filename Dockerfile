@@ -51,8 +51,8 @@ RUN addgroup -g 1001 -S selfmx && \
 # Create data directory
 RUN mkdir -p /app/data && chown -R selfmx:selfmx /app/data
 
-# Install wget for health checks and ICU libraries for SQL Server globalization
-RUN apk add --no-cache wget icu-libs
+# Install wget for health checks, ICU libraries for SQL Server, and libxcrypt for password hashing
+RUN apk add --no-cache wget icu-libs libxcrypt
 
 # Copy published backend
 COPY --from=backend-build --chown=selfmx:selfmx /app/publish ./

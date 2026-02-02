@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.19] - 2026-02-02
+
+### Changed
+- Internal improvements to password verification
+
 ## [0.9.18] - 2026-02-02
 
 ### Changed
