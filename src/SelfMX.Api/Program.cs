@@ -3,7 +3,9 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Amazon;
 using Amazon.SimpleEmailV2;
+using Amazon.SimpleEmailV2.Model;
 using Hangfire;
+using Hangfire.Dashboard;
 using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
@@ -214,6 +216,67 @@ app.UseStaticFiles();
 // Health endpoint (no auth)
 app.MapHealthChecks("/health");
 
+// System status endpoint - checks AWS, database connectivity (no auth, needed before login)
+app.MapGet("/v1/system/status", async (
+    IAmazonSimpleEmailServiceV2 ses,
+    AppDbContext db,
+    IOptions<AwsSettings> awsSettings,
+    ILogger<Program> logger) =>
+{
+    var issues = new List<string>();
+
+    // Check AWS credentials and permissions
+    try
+    {
+        // Try to get account details - this verifies credentials work
+        var response = await ses.GetAccountAsync(new GetAccountRequest());
+        logger.LogInformation("AWS SES account check passed");
+    }
+    catch (AmazonSimpleEmailServiceV2Exception ex)
+    {
+        logger.LogWarning(ex, "AWS SES check failed: {Message}", ex.Message);
+        issues.Add($"AWS SES: {ex.Message}");
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "AWS connectivity check failed");
+        issues.Add($"AWS: Unable to connect - {ex.Message}");
+    }
+
+    // Check database connectivity
+    try
+    {
+        await db.Database.CanConnectAsync();
+    }
+    catch (Exception ex)
+    {
+        logger.LogWarning(ex, "Database connectivity check failed");
+        issues.Add($"Database: {ex.Message}");
+    }
+
+    // Check if AWS settings are configured
+    var aws = awsSettings.Value;
+    if (string.IsNullOrEmpty(aws.Region))
+    {
+        issues.Add("AWS: Region not configured (Aws__Region)");
+    }
+    if (string.IsNullOrEmpty(aws.AccessKeyId))
+    {
+        issues.Add("AWS: Access Key ID not configured (Aws__AccessKeyId)");
+    }
+    if (string.IsNullOrEmpty(aws.SecretAccessKey))
+    {
+        issues.Add("AWS: Secret Access Key not configured (Aws__SecretAccessKey)");
+    }
+
+    return Results.Ok(new
+    {
+        healthy = issues.Count == 0,
+        issues = issues.ToArray(),
+        timestamp = DateTime.UtcNow
+    });
+});
+
 // API v1 routes
 var v1 = app.MapGroup("/v1");
 
@@ -233,11 +296,11 @@ adminOnly.MapAuditEndpoints();
 // Sent emails - authenticated users can view their domain's emails, admin can view all
 authenticated.MapSentEmailEndpoints();
 
-// Hangfire dashboard (development only)
-if (app.Environment.IsDevelopment())
+// Hangfire dashboard - admin only, available in all environments
+app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
 {
-    app.UseHangfireDashboard("/hangfire");
-}
+    Authorization = [new HangfireAdminAuthorizationFilter()]
+});
 
 // Schedule recurring domain verification job (every 5 minutes)
 var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
@@ -352,5 +415,21 @@ public class NullableUtcDateTimeConverter : JsonConverter<DateTime?>
             ? value.Value
             : DateTime.SpecifyKind(value.Value, DateTimeKind.Utc);
         writer.WriteStringValue(utcValue.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
+    }
+}
+
+/// <summary>
+/// Hangfire dashboard authorization filter - requires admin cookie authentication.
+/// </summary>
+public class HangfireAdminAuthorizationFilter : IDashboardAuthorizationFilter
+{
+    public bool Authorize(DashboardContext context)
+    {
+        var httpContext = context.GetHttpContext();
+        var user = httpContext.User;
+
+        // Check if user is authenticated via cookie with admin ActorType
+        return user.Identity?.IsAuthenticated == true
+               && user.FindFirst("ActorType")?.Value == "admin";
     }
 }

@@ -106,6 +106,19 @@ export class ApiMock {
 
   // Setup all route handlers
   async setup() {
+    // System status (always healthy in tests)
+    await this.page.route('**/v1/system/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          healthy: true,
+          issues: [],
+          timestamp: new Date().toISOString(),
+        }),
+      });
+    });
+
     // Auth check
     await this.page.route('**/v1/admin/me', async (route) => {
       if (this.isAuthenticated) {
