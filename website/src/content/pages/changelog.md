@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.21] - 2026-02-02
+
+### Fixed
+- Fix API authentication for admin dashboard sessions
+
 ## [0.9.19] - 2026-02-02
 
 ### Changed
