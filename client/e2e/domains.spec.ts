@@ -175,8 +175,9 @@ test.describe('Add Domain', () => {
     await page.getByPlaceholder('example.com').fill('newdomain.com');
     await page.getByRole('button', { name: 'Add' }).click();
 
-    // Wait for the domain to appear
-    await expect(page.getByText('newdomain.com')).toBeVisible();
+    // Wait for redirect to detail page and check heading
+    await expect(page).toHaveURL(/\/domains\/.+/);
+    await expect(page.getByRole('heading', { name: 'newdomain.com' })).toBeVisible();
   });
 
   test('clears input after successful domain creation', async ({ page, apiMock }) => {
@@ -187,8 +188,8 @@ test.describe('Add Domain', () => {
     await input.fill('newdomain.com');
     await page.getByRole('button', { name: 'Add' }).click();
 
-    // Wait for success (domain appears) then check we're on detail page
-    await expect(page.getByText('newdomain.com')).toBeVisible();
+    // Wait for redirect to detail page
+    await expect(page).toHaveURL(/\/domains\/.+/);
   });
 
   test('shows loading state while creating domain', async ({ page, apiMock }) => {

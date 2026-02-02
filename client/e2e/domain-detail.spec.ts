@@ -26,7 +26,7 @@ test.describe('Domain Detail Page', () => {
 
       // Should redirect to detail page
       await expect(page).toHaveURL(/\/domains\/.+/);
-      await expect(page.getByText('newdomain.com')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'newdomain.com' })).toBeVisible();
     });
 
     test('shows back link to domains list', async ({ page, apiMock }) => {
