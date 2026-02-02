@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache, useQuery } from '@tanstack/react-query';
 import { ThemeProvider } from './components/theme-provider';
 import { ThemeToggle } from './components/ui/theme-toggle';
 import { Toaster } from './components/ui/toaster';
@@ -20,7 +20,20 @@ interface SystemStatus {
   timestamp: string;
 }
 
+// Handle 401 errors globally at the React Query level
+const handleQueryError = (error: unknown) => {
+  if ((error as Error & { status?: number }).status === 401) {
+    window.dispatchEvent(new Event('selfmx:unauthorized'));
+  }
+};
+
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: handleQueryError,
+  }),
+  mutationCache: new MutationCache({
+    onError: handleQueryError,
+  }),
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000,
@@ -31,6 +44,9 @@ const queryClient = new QueryClient({
         return failureCount < 2;
       },
       refetchOnWindowFocus: false,
+    },
+    mutations: {
+      retry: false,
     },
   },
 });
