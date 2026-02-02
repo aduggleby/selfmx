@@ -26,5 +26,8 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:17401',
     reuseExistingServer: !process.env.CI,
+    env: {
+      PLAYWRIGHT_TEST: 'true',
+    },
   },
 });

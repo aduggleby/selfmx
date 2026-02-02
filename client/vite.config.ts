@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
+const isTest = process.env.PLAYWRIGHT_TEST === 'true'
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -12,7 +14,8 @@ export default defineConfig({
   },
   server: {
     port: 17401,
-    proxy: {
+    // Disable proxy during Playwright tests - requests are mocked via page.route()
+    proxy: isTest ? undefined : {
       '/v1': {
         target: 'http://localhost:17400',
         changeOrigin: true,
