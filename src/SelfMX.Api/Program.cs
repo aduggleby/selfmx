@@ -246,9 +246,22 @@ recurringJobManager.AddOrUpdate<CleanupSentEmailsJob>(
 // SPA fallback - serve index.html for client-side routing
 app.MapFallbackToFile("index.html");
 
-// Log version on startup
+// Startup banner and diagnostics
 var version = typeof(Program).Assembly.GetName().Version;
 var appSettings = app.Services.GetRequiredService<IOptions<AppSettings>>().Value;
+
+const string banner = """
+
+ ███████╗███████╗██╗     ███████╗███╗   ███╗██╗  ██╗
+ ██╔════╝██╔════╝██║     ██╔════╝████╗ ████║╚██╗██╔╝
+ ███████╗█████╗  ██║     █████╗  ██╔████╔██║ ╚███╔╝
+ ╚════██║██╔══╝  ██║     ██╔══╝  ██║╚██╔╝██║ ██╔██╗
+ ███████║███████╗███████╗██║     ██║ ╚═╝ ██║██╔╝ ██╗
+ ╚══════╝╚══════╝╚══════╝╚═╝     ╚═╝     ╚═╝╚═╝  ╚═╝
+
+""";
+
+Console.WriteLine(banner);
 app.Logger.LogInformation("SelfMX v{Version} starting on {Fqdn}", version?.ToString(3) ?? "unknown", appSettings.Fqdn);
 
 // Debug: log App__ environment variables to diagnose configuration issues
@@ -257,10 +270,11 @@ var appEnvVars = Environment.GetEnvironmentVariables()
     .Where(e => e.Key.ToString()!.StartsWith("App", StringComparison.OrdinalIgnoreCase))
     .Select(e => $"{e.Key}={MaskValue(e.Key.ToString()!, e.Value?.ToString())}")
     .ToList();
-app.Logger.LogInformation("App environment variables: {Vars}", string.Join(", ", appEnvVars));
-app.Logger.LogInformation("AdminPasswordHash configured: {HasHash}, Length: {Length}",
-    !string.IsNullOrEmpty(appSettings.AdminPasswordHash),
-    appSettings.AdminPasswordHash?.Length ?? 0);
+app.Logger.LogInformation("Environment: {Vars}", string.Join(", ", appEnvVars));
+app.Logger.LogInformation("AdminPasswordHash: {Status}",
+    !string.IsNullOrEmpty(appSettings.AdminPasswordHash)
+        ? $"configured ({appSettings.AdminPasswordHash.Length} chars)"
+        : "NOT CONFIGURED");
 
 static string MaskValue(string key, string? value)
 {
