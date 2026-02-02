@@ -24,6 +24,7 @@ API keys are created in the admin UI and use the Resend format: `re_` followed b
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
 | `/health` | GET | No | Health check |
+| `/v1/system/status` | GET | No | System status check |
 | `/v1/emails` | POST | API Key | Send email |
 | `/v1/domains` | GET | API Key | List domains |
 | `/v1/domains` | POST | API Key | Create domain |
@@ -33,6 +34,7 @@ API keys are created in the admin UI and use the Resend format: `re_` followed b
 | `/v1/api-keys` | GET | Admin | List API keys |
 | `/v1/api-keys` | POST | Admin | Create API key |
 | `/v1/audit` | GET | Admin | Audit logs |
+| `/hangfire` | GET | Admin | Background jobs dashboard |
 
 ## Send Email
 
@@ -387,3 +389,55 @@ Check if the API is running.
   "status": "Healthy"
 }
 ```
+
+## System Status
+
+Check system configuration and connectivity. Returns AWS and database health status. Use this to verify your deployment is properly configured.
+
+**GET** `/v1/system/status`
+
+### Response
+
+```json
+{
+  "healthy": true,
+  "issues": [],
+  "timestamp": "2026-02-02T10:30:00Z"
+}
+```
+
+When configuration issues are detected:
+
+```json
+{
+  "healthy": false,
+  "issues": [
+    "AWS SES: Access Denied",
+    "AWS: Region not configured (Aws__Region)"
+  ],
+  "timestamp": "2026-02-02T10:30:00Z"
+}
+```
+
+### Checks Performed
+
+| Check | Description |
+|-------|-------------|
+| AWS SES | Verifies credentials can access SES account |
+| Database | Tests database connectivity |
+| AWS Config | Validates Region, AccessKeyId, SecretAccessKey are set |
+
+## Background Jobs Dashboard
+
+View and manage Hangfire background jobs. Requires admin authentication.
+
+**GET** `/hangfire`
+
+Access the Hangfire dashboard to monitor:
+
+- Recurring jobs (domain verification polling)
+- Failed jobs and retry status
+- Job processing metrics
+- Queue status
+
+The dashboard is available in all environments (development and production) and requires admin cookie authentication.

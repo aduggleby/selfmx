@@ -6,6 +6,17 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.26] - 2026-02-02
+
+### Added
+- **System Status Endpoint** (`GET /v1/system/status`) - Validates AWS credentials and database connectivity. Helps diagnose configuration issues immediately after deployment.
+- **Hangfire Dashboard** - Background job monitoring at `/hangfire` (now available in production, requires admin authentication). View job status, failures, and processing metrics.
+- **Configuration Error Modal** - The admin UI now displays a blocking modal when critical configuration is missing (AWS credentials, database connection), guiding users to fix issues.
+
+### Fixed
+- Improved error logging during domain setup for easier troubleshooting
+- DateTime serialization now consistently uses UTC with ISO 8601 format
+
 ## [0.9.22] - 2026-02-02
 
 ### Changed

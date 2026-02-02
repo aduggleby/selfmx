@@ -144,6 +144,7 @@ client/src/
 |----------|------|-------------|
 | `GET /health` | No | Health check |
 | `GET /` | No | Status |
+| `GET /v1/system/status` | No | System config validation (AWS, DB connectivity) |
 | `POST /v1/domains` | Yes | Create domain |
 | `GET /v1/domains` | Yes | List domains (paginated) |
 | `GET /v1/domains/{id}` | Yes | Get domain |
@@ -153,6 +154,7 @@ client/src/
 | `GET /v1/api-keys` | Admin | List API keys |
 | `POST /v1/api-keys` | Admin | Create API key |
 | `GET /v1/audit` | Admin | Audit logs (paginated) |
+| `GET /hangfire` | Admin | Hangfire job dashboard |
 
 Auth: Bearer token with API key, or Cookie auth for admin UI.
 Admin: Requires `ActorType=admin` claim (cookie auth or admin API key).

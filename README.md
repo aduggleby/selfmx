@@ -161,6 +161,7 @@ SelfMX implements the [Resend API](https://resend.com/docs/api-reference/emails/
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
+| `/v1/system/status` | GET | System status (AWS, DB connectivity) |
 | `/v1/emails` | POST | Send email |
 | `/v1/domains` | GET | List domains |
 | `/v1/domains` | POST | Add domain |
@@ -170,6 +171,7 @@ SelfMX implements the [Resend API](https://resend.com/docs/api-reference/emails/
 | `/v1/api-keys` | GET | List API keys |
 | `/v1/api-keys` | POST | Create API key |
 | `/v1/audit` | GET | Audit logs |
+| `/hangfire` | GET | Background jobs dashboard (admin) |
 
 See [full documentation](https://selfmx.com) for details.
 
