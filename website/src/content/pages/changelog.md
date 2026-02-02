@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.22] - 2026-02-02
+
+### Changed
+- Simplify user interface with a cleaner, more compact design
+
 ## [0.9.21] - 2026-02-02
 
 ### Fixed
