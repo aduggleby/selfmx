@@ -22,6 +22,14 @@ export function useDomain(id: string) {
     queryKey: domainKeys.detail(id),
     queryFn: () => api.getDomain(id),
     enabled: !!id,
+    // Poll every 5 seconds when domain is pending/verifying, stop when verified/failed
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === 'pending' || status === 'verifying') {
+        return 5000; // 5 seconds
+      }
+      return false; // Stop polling
+    },
   });
 }
 

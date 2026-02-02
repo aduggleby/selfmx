@@ -1,22 +1,15 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { DomainStatusBadge } from './DomainStatusBadge';
-import { DnsRecordsTable } from './DnsRecordsTable';
 import { cn } from '@/lib/utils';
 import type { Domain } from '@/lib/schemas';
 
 interface DomainCardProps {
   domain: Domain;
-  onDelete: (id: string) => void;
-  isDeleting: boolean;
 }
 
-export function DomainCard({ domain, onDelete, isDeleting }: DomainCardProps) {
-  const [showDns, setShowDns] = useState(false);
-  const hasDnsRecords = domain.dnsRecords && domain.dnsRecords.length > 0;
-
+export function DomainCard({ domain }: DomainCardProps) {
   return (
     <Card
       className={cn(
@@ -57,33 +50,13 @@ export function DomainCard({ domain, onDelete, isDeleting }: DomainCardProps) {
           </p>
         )}
 
-        {hasDnsRecords && (
-          <div className="mb-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDns(!showDns)}
-              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-            >
-              {showDns ? '− Hide DNS' : '+ Show DNS'}
-            </Button>
-            {showDns && (
-              <div className="mt-2">
-                <DnsRecordsTable records={domain.dnsRecords!} />
-              </div>
-            )}
-          </div>
-        )}
-
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onDelete(domain.id)}
-          disabled={isDeleting}
-          className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+        <Link
+          to={`/domains/${domain.id}`}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          {isDeleting ? 'Deleting...' : 'Delete'}
-        </Button>
+          Details
+          <ChevronRight className="h-3 w-3" />
+        </Link>
       </CardContent>
     </Card>
   );

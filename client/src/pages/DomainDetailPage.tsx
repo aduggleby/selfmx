@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Trash2, Mail } from 'lucide-react';
+import { ArrowLeft, Trash2, Mail, AlertTriangle } from 'lucide-react';
 import { useDomain, useDeleteDomain } from '@/hooks/useDomains';
 import { DomainStatusBadge } from '@/components/DomainStatusBadge';
 import { DnsRecordsTable } from '@/components/DnsRecordsTable';
@@ -10,6 +10,46 @@ import { SendTestEmailForm } from '@/components/SendTestEmailForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+
+interface DeleteConfirmModalProps {
+  domainName: string;
+  isDeleting: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function DeleteConfirmModal({ domainName, isDeleting, onConfirm, onCancel }: DeleteConfirmModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
+      <Card className="relative z-10 w-full max-w-sm" role="alertdialog" aria-modal="true">
+        <div className="p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+            </div>
+            <div>
+              <h3 className="font-display text-lg font-semibold">Delete domain</h3>
+              <p className="text-sm text-muted-foreground">This action cannot be undone</p>
+            </div>
+          </div>
+          <p className="mb-4 text-sm">
+            Are you sure you want to delete <span className="font-mono font-medium">{domainName}</span>?
+            This will also remove the domain from AWS SES and delete all DNS records from Cloudflare.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onCancel} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={onConfirm} disabled={isDeleting}>
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
 
 function DomainDetailSkeleton() {
   return (
@@ -36,6 +76,7 @@ export function DomainDetailPage() {
   const { data: domain, isLoading, error } = useDomain(id ?? '');
   const deleteMutation = useDeleteDomain();
   const [showTestEmailForm, setShowTestEmailForm] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const handleDelete = async () => {
     if (!domain) return;
@@ -46,6 +87,7 @@ export function DomainDetailPage() {
       navigate('/');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete domain');
+      setShowDeleteModal(false);
     }
   };
 
@@ -110,12 +152,11 @@ export function DomainDetailPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleDelete}
-                disabled={deleteMutation.isPending}
+                onClick={() => setShowDeleteModal(true)}
                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                Delete
               </Button>
             </div>
           </div>
@@ -178,6 +219,15 @@ export function DomainDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {showDeleteModal && (
+        <DeleteConfirmModal
+          domainName={domain.name}
+          isDeleting={deleteMutation.isPending}
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteModal(false)}
+        />
+      )}
     </div>
   );
 }

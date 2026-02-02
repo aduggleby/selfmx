@@ -81,15 +81,15 @@ test.describe('Domain List Display', () => {
     await expect(page.getByText('verified', { exact: true })).toBeVisible();
   });
 
-  test('displays delete button for each domain', async ({ page, apiMock }) => {
+  test('displays Details link for each domain', async ({ page, apiMock }) => {
     apiMock.setDomains([
       createMockDomain({ id: '1', name: 'example.com' }),
       createMockDomain({ id: '2', name: 'test.org' }),
     ]);
     await page.goto('/');
 
-    const deleteButtons = page.getByRole('button', { name: 'Delete' });
-    await expect(deleteButtons).toHaveCount(2);
+    const detailsLinks = page.getByRole('link', { name: 'Details' });
+    await expect(detailsLinks).toHaveCount(2);
   });
 });
 
@@ -259,153 +259,36 @@ test.describe('Add Domain', () => {
   });
 });
 
-test.describe('Delete Domain', () => {
-  test('successfully deletes a domain', async ({ page, apiMock }) => {
+test.describe('Domain Card Navigation', () => {
+  test('shows Details link on domain cards', async ({ page, apiMock }) => {
     apiMock.setDomains([
-      createMockDomain({ id: '1', name: 'todelete.com' }),
+      createMockDomain({ id: '1', name: 'example.com' }),
     ]);
     await page.goto('/');
 
-    // Confirm domain is visible
-    await expect(page.getByText('todelete.com')).toBeVisible();
-
-    // Click delete
-    await page.getByRole('button', { name: 'Delete' }).click();
-
-    // Domain should be removed (optimistic update)
-    await expect(page.getByText('todelete.com')).not.toBeVisible();
-    // After deletion, empty state should show
-    await expect(page.getByText('Add your first domain')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Details' })).toBeVisible();
   });
 
-  test('removes domain from list after delete (optimistic update)', async ({ page, apiMock }) => {
+  test('clicking Details navigates to domain detail page', async ({ page, apiMock }) => {
     apiMock.setDomains([
-      createMockDomain({ id: '1', name: 'optimistic-delete.com' }),
+      createMockDomain({ id: 'test-domain-1', name: 'example.com' }),
     ]);
     await page.goto('/');
 
-    // Confirm domain exists
-    await expect(page.getByText('optimistic-delete.com')).toBeVisible();
+    await page.getByRole('link', { name: 'Details' }).click();
 
-    // Click delete
-    await page.getByRole('button', { name: 'Delete' }).click();
-
-    // Domain removed immediately (optimistic update)
-    await expect(page.getByText('optimistic-delete.com')).not.toBeVisible();
+    await expect(page).toHaveURL('/domains/test-domain-1');
   });
 
-  test('deletes correct domain when multiple exist', async ({ page, apiMock }) => {
+  test('clicking domain name also navigates to detail page', async ({ page, apiMock }) => {
     apiMock.setDomains([
-      createMockDomain({ id: '1', name: 'keep-this.com' }),
-      createMockDomain({ id: '2', name: 'delete-this.com' }),
+      createMockDomain({ id: 'test-domain-1', name: 'example.com' }),
     ]);
     await page.goto('/');
 
-    // Find and click delete for the second domain
-    const domainCard = page.locator('[class*="card"]').filter({ hasText: 'delete-this.com' });
-    await domainCard.getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('link', { name: 'example.com' }).click();
 
-    // First domain should remain
-    await expect(page.getByText('keep-this.com')).toBeVisible();
-    // Second domain should be gone
-    await expect(page.getByText('delete-this.com')).not.toBeVisible();
-  });
-});
-
-test.describe('DNS Records', () => {
-  test('shows DNS toggle button for domains with records', async ({ page, apiMock }) => {
-    apiMock.setDomains([
-      createMockDomain({
-        id: '1',
-        name: 'withdns.com',
-        status: 'verifying',
-        dnsRecords: createMockDnsRecords('withdns.com'),
-      }),
-    ]);
-    await page.goto('/');
-
-    await expect(page.getByRole('button', { name: '+ Show DNS' })).toBeVisible();
-  });
-
-  test('does not show DNS toggle for domains without records', async ({ page, apiMock }) => {
-    apiMock.setDomains([
-      createMockDomain({ id: '1', name: 'nodns.com', dnsRecords: null }),
-    ]);
-    await page.goto('/');
-
-    await expect(page.getByRole('button', { name: '+ Show DNS' })).not.toBeVisible();
-  });
-
-  test('toggles DNS records visibility', async ({ page, apiMock }) => {
-    const dnsRecords = createMockDnsRecords('example.com');
-    apiMock.setDomains([
-      createMockDomain({
-        id: '1',
-        name: 'example.com',
-        status: 'verifying',
-        dnsRecords,
-      }),
-    ]);
-    await page.goto('/');
-
-    // Initially hidden
-    await expect(page.getByText('token1._domainkey.example.com')).not.toBeVisible();
-
-    // Click to show
-    await page.getByRole('button', { name: '+ Show DNS' }).click();
-    await expect(page.getByText('token1._domainkey.example.com')).toBeVisible();
-    await expect(page.getByRole('button', { name: '− Hide DNS' })).toBeVisible();
-
-    // Click to hide
-    await page.getByRole('button', { name: '− Hide DNS' }).click();
-    // Wait for the element to disappear
-    await expect(page.getByText('token1._domainkey.example.com')).not.toBeVisible();
-    await expect(page.getByRole('button', { name: '+ Show DNS' })).toBeVisible();
-  });
-
-  test('displays DNS records table with correct columns', async ({ page, apiMock }) => {
-    const dnsRecords = createMockDnsRecords('example.com');
-    apiMock.setDomains([
-      createMockDomain({
-        id: '1',
-        name: 'example.com',
-        dnsRecords,
-      }),
-    ]);
-    await page.goto('/');
-
-    await page.getByRole('button', { name: '+ Show DNS' }).click();
-
-    // Check table headers
-    await expect(page.getByRole('columnheader', { name: 'Type' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Name' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Value' })).toBeVisible();
-  });
-
-  test('displays all DNS records in table', async ({ page, apiMock }) => {
-    const dnsRecords = createMockDnsRecords('example.com');
-    apiMock.setDomains([
-      createMockDomain({
-        id: '1',
-        name: 'example.com',
-        dnsRecords,
-      }),
-    ]);
-    await page.goto('/');
-
-    await page.getByRole('button', { name: '+ Show DNS' }).click();
-
-    // Check all 3 DNS records are displayed
-    await expect(page.getByText('token1._domainkey.example.com')).toBeVisible();
-    await expect(page.getByText('token2._domainkey.example.com')).toBeVisible();
-    await expect(page.getByText('token3._domainkey.example.com')).toBeVisible();
-
-    // Check record type badges
-    const cnameLabels = page.locator('span').filter({ hasText: 'CNAME' });
-    await expect(cnameLabels).toHaveCount(3);
-
-    // Check values
-    await expect(page.getByText('token1.dkim.amazonses.com')).toBeVisible();
+    await expect(page).toHaveURL('/domains/test-domain-1');
   });
 });
 
@@ -600,7 +483,7 @@ test.describe('Multiple Domain States', () => {
     // Failure reason visible
     await expect(page.getByText('DNS verification failed')).toBeVisible();
 
-    // DNS records button only for verifying domain
-    await expect(page.getByRole('button', { name: '+ Show DNS' })).toHaveCount(1);
+    // All cards have Details link
+    await expect(page.getByRole('link', { name: 'Details' })).toHaveCount(4);
   });
 });

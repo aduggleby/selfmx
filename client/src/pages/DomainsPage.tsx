@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useDomains, useCreateDomain, useDeleteDomain } from '@/hooks/useDomains';
+import { useDomains, useCreateDomain } from '@/hooks/useDomains';
 import { DomainCard } from '@/components/DomainCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +35,6 @@ export function DomainsPage() {
 
   const { data, isLoading, error } = useDomains(page, limit);
   const createMutation = useCreateDomain();
-  const deleteMutation = useDeleteDomain();
   const domains = data?.data ?? [];
   const totalDomains = data?.total ?? 0;
   const hasDomains = domains.length > 0;
@@ -60,15 +59,6 @@ export function DomainsPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to add domain');
       return false;
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteMutation.mutateAsync(id);
-      toast.success('Domain deleted');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete domain');
     }
   };
 
@@ -133,8 +123,6 @@ export function DomainsPage() {
               <DomainCard
                 key={domain.id}
                 domain={domain}
-                onDelete={handleDelete}
-                isDeleting={deleteMutation.isPending}
               />
             ))}
           </div>

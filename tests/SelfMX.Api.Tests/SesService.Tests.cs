@@ -50,11 +50,23 @@ public class SesServiceTests
         // Act
         var (identityArn, dnsRecords) = await _service.CreateDomainIdentityAsync(domainName);
 
-        // Assert
-        dnsRecords.Should().HaveCount(3);
+        // Assert - 3 DKIM + 1 SPF + 1 DMARC = 5 records
+        dnsRecords.Should().HaveCount(5);
+
+        // DKIM records
         dnsRecords[0].Type.Should().Be("CNAME");
         dnsRecords[0].Name.Should().Be("token1._domainkey.example.com");
         dnsRecords[0].Value.Should().Be("token1.dkim.amazonses.com");
+
+        // SPF record
+        dnsRecords[3].Type.Should().Be("TXT");
+        dnsRecords[3].Name.Should().Be("example.com");
+        dnsRecords[3].Value.Should().Be("v=spf1 include:amazonses.com ~all");
+
+        // DMARC record
+        dnsRecords[4].Type.Should().Be("TXT");
+        dnsRecords[4].Name.Should().Be("_dmarc.example.com");
+        dnsRecords[4].Value.Should().Be("v=DMARC1; p=none;");
     }
 
     [Fact]

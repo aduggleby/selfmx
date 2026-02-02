@@ -250,27 +250,50 @@ test.describe('Domain Detail Page', () => {
       await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
     });
 
-    test('deletes domain and redirects to home', async ({ page, apiMock }) => {
+    test('clicking delete opens confirmation modal', async ({ page, apiMock }) => {
       const domain = createMockDomain({ id: 'test-1', name: 'example.com' });
       apiMock.setDomains([domain]);
       await page.goto('/domains/test-1');
 
       await page.getByRole('button', { name: 'Delete' }).click();
 
-      // Should redirect to home after deletion
-      await expect(page).toHaveURL('/');
-      await expect(page.getByText('Domain deleted')).toBeVisible();
+      // Confirmation modal should appear
+      await expect(page.getByRole('heading', { name: 'Delete domain' })).toBeVisible();
+      await expect(page.getByText('This action cannot be undone')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
     });
 
-    test('delete button exists on detail page', async ({ page, apiMock }) => {
+    test('canceling delete closes modal without deleting', async ({ page, apiMock }) => {
       const domain = createMockDomain({ id: 'test-1', name: 'example.com' });
       apiMock.setDomains([domain]);
       await page.goto('/domains/test-1');
 
-      // Just verify the delete button exists and is clickable
-      const deleteButton = page.getByRole('button', { name: 'Delete' });
-      await expect(deleteButton).toBeVisible();
-      await expect(deleteButton).toBeEnabled();
+      await page.getByRole('button', { name: 'Delete' }).click();
+      await expect(page.getByRole('heading', { name: 'Delete domain' })).toBeVisible();
+
+      await page.getByRole('button', { name: 'Cancel' }).click();
+
+      // Modal should close
+      await expect(page.getByRole('heading', { name: 'Delete domain' })).not.toBeVisible();
+      // Should still be on detail page
+      await expect(page).toHaveURL('/domains/test-1');
+    });
+
+    test('confirming delete removes domain and redirects to home', async ({ page, apiMock }) => {
+      const domain = createMockDomain({ id: 'test-1', name: 'example.com' });
+      apiMock.setDomains([domain]);
+      await page.goto('/domains/test-1');
+
+      await page.getByRole('button', { name: 'Delete' }).click();
+      await expect(page.getByRole('heading', { name: 'Delete domain' })).toBeVisible();
+
+      // Click the destructive Delete button in the modal
+      const modal = page.locator('.fixed.inset-0');
+      await modal.getByRole('button', { name: 'Delete' }).click();
+
+      // Should redirect to home after deletion
+      await expect(page).toHaveURL('/');
+      await expect(page.getByText('Domain deleted')).toBeVisible();
     });
   });
 

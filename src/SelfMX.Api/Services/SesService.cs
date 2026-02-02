@@ -44,7 +44,7 @@ public class SesService : ISesService
 
         var dnsRecords = new List<DnsRecordInfo>();
 
-        // Add DKIM records
+        // Add DKIM records (3 CNAME records for Easy DKIM)
         if (response.DkimAttributes?.Tokens != null)
         {
             foreach (var token in response.DkimAttributes.Tokens)
@@ -56,6 +56,20 @@ public class SesService : ISesService
                 ));
             }
         }
+
+        // Add SPF record for email authentication
+        dnsRecords.Add(new DnsRecordInfo(
+            "TXT",
+            domainName,
+            "v=spf1 include:amazonses.com ~all"
+        ));
+
+        // Add DMARC record (starter policy - recommended for deliverability)
+        dnsRecords.Add(new DnsRecordInfo(
+            "TXT",
+            $"_dmarc.{domainName}",
+            "v=DMARC1; p=none;"
+        ));
 
         _logger.LogInformation(
             "Created SES domain identity for {Domain}, DKIM records: {Count}",

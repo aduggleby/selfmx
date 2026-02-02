@@ -29,7 +29,7 @@ aws configure
 # Create IAM user for SelfMX
 aws iam create-user --user-name selfmx-ses
 
-# Create and attach the SES policy
+# Create and attach the SES policy (uses SES v2 API)
 cat > /tmp/selfmx-ses-policy.json << 'EOF'
 {
   "Version": "2012-10-17",
@@ -39,9 +39,7 @@ cat > /tmp/selfmx-ses-policy.json << 'EOF'
       "Effect": "Allow",
       "Action": [
         "ses:SendEmail",
-        "ses:SendRawEmail",
-        "ses:GetSendQuota",
-        "ses:GetSendStatistics"
+        "ses:SendRawEmail"
       ],
       "Resource": "*"
     },
@@ -49,11 +47,10 @@ cat > /tmp/selfmx-ses-policy.json << 'EOF'
       "Sid": "SelfMXSESIdentities",
       "Effect": "Allow",
       "Action": [
-        "ses:GetIdentityVerificationAttributes",
-        "ses:GetIdentityDkimAttributes",
-        "ses:VerifyDomainIdentity",
-        "ses:VerifyDomainDkim",
-        "ses:DeleteIdentity"
+        "ses:CreateEmailIdentity",
+        "ses:GetEmailIdentity",
+        "ses:DeleteEmailIdentity",
+        "ses:GetAccount"
       ],
       "Resource": "*"
     }
@@ -103,9 +100,7 @@ Never use your root AWS credentials. Create a dedicated IAM user with minimal pe
       "Effect": "Allow",
       "Action": [
         "ses:SendEmail",
-        "ses:SendRawEmail",
-        "ses:GetSendQuota",
-        "ses:GetSendStatistics"
+        "ses:SendRawEmail"
       ],
       "Resource": "*"
     },
@@ -113,11 +108,10 @@ Never use your root AWS credentials. Create a dedicated IAM user with minimal pe
       "Sid": "SelfMXSESIdentities",
       "Effect": "Allow",
       "Action": [
-        "ses:GetIdentityVerificationAttributes",
-        "ses:GetIdentityDkimAttributes",
-        "ses:VerifyDomainIdentity",
-        "ses:VerifyDomainDkim",
-        "ses:DeleteIdentity"
+        "ses:CreateEmailIdentity",
+        "ses:GetEmailIdentity",
+        "ses:DeleteEmailIdentity",
+        "ses:GetAccount"
       ],
       "Resource": "*"
     }
@@ -249,7 +243,7 @@ For maximum security, use this minimal policy that only allows sending:
 
 ### Full Policy (With Domain Management)
 
-This policy allows SelfMX to manage domain verification:
+This policy allows SelfMX to manage domain verification (uses SES v2 API):
 
 ```json
 {
@@ -260,9 +254,7 @@ This policy allows SelfMX to manage domain verification:
       "Effect": "Allow",
       "Action": [
         "ses:SendEmail",
-        "ses:SendRawEmail",
-        "ses:GetSendQuota",
-        "ses:GetSendStatistics"
+        "ses:SendRawEmail"
       ],
       "Resource": "*"
     },
@@ -270,12 +262,10 @@ This policy allows SelfMX to manage domain verification:
       "Sid": "SESIdentityManagement",
       "Effect": "Allow",
       "Action": [
-        "ses:GetIdentityVerificationAttributes",
-        "ses:GetIdentityDkimAttributes",
-        "ses:VerifyDomainIdentity",
-        "ses:VerifyDomainDkim",
-        "ses:DeleteIdentity",
-        "ses:ListIdentities"
+        "ses:CreateEmailIdentity",
+        "ses:GetEmailIdentity",
+        "ses:DeleteEmailIdentity",
+        "ses:GetAccount"
       ],
       "Resource": "*"
     }
@@ -313,6 +303,23 @@ Replace `123456789012` with your AWS account ID and `yourdomain.com` with your d
 ### "User is not authorized to perform ses:SendEmail"
 
 Your IAM user doesn't have the correct policy attached. Verify the policy includes `ses:SendEmail` and `ses:SendRawEmail`.
+
+### "User is not authorized to perform ses:GetAccount" or "ses:CreateEmailIdentity"
+
+SelfMX uses the **SES v2 API**, which has different IAM action names than the v1 API. If you're seeing this error, your IAM policy likely uses the old v1 API actions.
+
+**V1 API actions (outdated):**
+- `ses:VerifyDomainIdentity`, `ses:VerifyDomainDkim`
+- `ses:GetIdentityVerificationAttributes`, `ses:GetIdentityDkimAttributes`
+- `ses:DeleteIdentity`, `ses:ListIdentities`
+
+**V2 API actions (required by SelfMX):**
+- `ses:CreateEmailIdentity` (replaces VerifyDomainIdentity)
+- `ses:GetEmailIdentity` (replaces GetIdentityVerificationAttributes/DkimAttributes)
+- `ses:DeleteEmailIdentity` (replaces DeleteIdentity)
+- `ses:GetAccount` (for checking SES account status)
+
+Update your IAM policy to use the v2 actions as shown in the policies above.
 
 ### Domain Verification Pending
 

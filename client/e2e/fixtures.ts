@@ -63,6 +63,20 @@ export function createMockDnsRecords(domain: string): DnsRecord[] {
       priority: 0,
       verified: false,
     },
+    {
+      type: 'TXT',
+      name: domain,
+      value: 'v=spf1 include:amazonses.com ~all',
+      priority: 0,
+      verified: false,
+    },
+    {
+      type: 'TXT',
+      name: `_dmarc.${domain}`,
+      value: 'v=DMARC1; p=none;',
+      priority: 0,
+      verified: false,
+    },
   ];
 }
 
