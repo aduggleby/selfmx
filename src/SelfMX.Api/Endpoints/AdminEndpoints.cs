@@ -15,8 +15,8 @@ public static class AdminEndpoints
         var admin = group.MapGroup("/admin");
 
         admin.MapPost("/login", Login).AllowAnonymous();
-        admin.MapPost("/logout", Logout);
-        admin.MapGet("/me", GetCurrentAdmin);
+        admin.MapPost("/logout", Logout).RequireAuthorization();
+        admin.MapGet("/me", GetCurrentAdmin).RequireAuthorization();
 
         return group;
     }

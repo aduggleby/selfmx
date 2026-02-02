@@ -102,6 +102,37 @@ public class SesService : ISesService
         }
     }
 
+    public async Task<DkimVerificationResult> GetDkimVerificationDetailsAsync(string domainName, CancellationToken ct = default)
+    {
+        try
+        {
+            var request = new GetEmailIdentityRequest { EmailIdentity = domainName };
+            var response = await _ses.GetEmailIdentityAsync(request, ct);
+
+            var dkim = response.DkimAttributes;
+            return new DkimVerificationResult(
+                IsVerified: dkim?.Status == DkimStatus.SUCCESS,
+                Status: dkim?.Status?.Value ?? "UNKNOWN",
+                SigningAttributesOrigin: dkim?.SigningAttributesOrigin?.Value ?? "UNKNOWN",
+                CurrentSigningKeyLength: dkim?.CurrentSigningKeyLength?.Value ?? "UNKNOWN",
+                LastKeyGenerationTimestamp: dkim?.LastKeyGenerationTimestamp,
+                Tokens: dkim?.Tokens?.ToArray()
+            );
+        }
+        catch (NotFoundException)
+        {
+            _logger.LogWarning("Domain identity not found in SES: {Domain}", domainName);
+            return new DkimVerificationResult(
+                IsVerified: false,
+                Status: "NOT_FOUND",
+                SigningAttributesOrigin: "UNKNOWN",
+                CurrentSigningKeyLength: "UNKNOWN",
+                LastKeyGenerationTimestamp: null,
+                Tokens: null
+            );
+        }
+    }
+
     public async Task DeleteDomainIdentityAsync(string domainName, CancellationToken ct = default)
     {
         _logger.LogInformation("Deleting SES domain identity for {Domain}", domainName);

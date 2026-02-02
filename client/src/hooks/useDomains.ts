@@ -102,3 +102,15 @@ export function useSendTestEmail() {
       api.sendTestEmail(domainId, { senderPrefix, to, subject, text }),
   });
 }
+
+export function useVerifyDomain() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => api.verifyDomain(id),
+    onSuccess: (updatedDomain: Domain) => {
+      queryClient.setQueryData<Domain>(domainKeys.detail(updatedDomain.id), updatedDomain);
+      queryClient.invalidateQueries({ queryKey: domainKeys.lists() });
+    },
+  });
+}

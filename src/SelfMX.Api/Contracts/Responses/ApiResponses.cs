@@ -19,19 +19,43 @@ public record DomainResponse(
     DateTime CreatedAt,
     DateTime? VerifiedAt,
     string? FailureReason,
-    DnsRecordResponse[]? DnsRecords
+    DnsRecordResponse[]? DnsRecords,
+    DateTime? LastCheckedAt,
+    DateTime? NextCheckAt
 )
 {
-    public static DomainResponse FromEntity(Domain domain, DnsRecordResponse[]? dnsRecords = null) =>
-        new(
+    public static DomainResponse FromEntity(Domain domain, DnsRecordResponse[]? dnsRecords = null)
+    {
+        // Calculate next check time based on Hangfire cron (*/5 * * * *)
+        DateTime? nextCheckAt = null;
+        if (domain.Status == DomainStatus.Verifying)
+        {
+            var now = DateTime.UtcNow;
+            var minutes = now.Minute;
+            var nextMinute = ((minutes / 5) + 1) * 5;
+            if (nextMinute >= 60)
+            {
+                nextCheckAt = new DateTime(now.Year, now.Month, now.Day, now.Hour, 0, 0, DateTimeKind.Utc)
+                    .AddHours(1);
+            }
+            else
+            {
+                nextCheckAt = new DateTime(now.Year, now.Month, now.Day, now.Hour, nextMinute, 0, DateTimeKind.Utc);
+            }
+        }
+
+        return new(
             domain.Id,
             domain.Name,
             domain.Status.ToString().ToLowerInvariant(),
             domain.CreatedAt,
             domain.VerifiedAt,
             domain.FailureReason,
-            dnsRecords
+            dnsRecords,
+            domain.LastCheckedAt,
+            nextCheckAt
         );
+    }
 }
 
 public record PaginatedResponse<T>(

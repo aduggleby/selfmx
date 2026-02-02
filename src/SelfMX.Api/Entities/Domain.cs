@@ -23,4 +23,7 @@ public class Domain
 
     // DNS records for verification (stored as JSON)
     public string? DnsRecordsJson { get; set; }
+
+    // Last time verification was checked (for UI countdown)
+    public DateTime? LastCheckedAt { get; set; }
 }

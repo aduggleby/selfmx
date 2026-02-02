@@ -17,6 +17,8 @@ export interface Domain {
   verifiedAt: string | null;
   failureReason: string | null;
   dnsRecords: DnsRecord[] | null;
+  lastCheckedAt: string | null;
+  nextCheckAt: string | null;
 }
 
 export interface PaginatedDomains {
@@ -28,14 +30,25 @@ export interface PaginatedDomains {
 
 // Mock data factory functions
 export function createMockDomain(overrides: Partial<Domain> = {}): Domain {
+  const status = overrides.status ?? 'pending';
+  // Calculate next check time (next 5-minute interval)
+  const now = new Date();
+  const minutes = now.getMinutes();
+  const nextMinute = (Math.floor(minutes / 5) + 1) * 5;
+  const nextCheckAt = nextMinute >= 60
+    ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1, 0, 0).toISOString()
+    : new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), nextMinute, 0).toISOString();
+
   return {
     id: `domain-${Math.random().toString(36).substring(7)}`,
     name: 'example.com',
-    status: 'pending',
+    status,
     createdAt: new Date().toISOString(),
     verifiedAt: null,
     failureReason: null,
     dnsRecords: null,
+    lastCheckedAt: status === 'verifying' ? new Date(Date.now() - 60000).toISOString() : null,
+    nextCheckAt: status === 'verifying' ? nextCheckAt : null,
     ...overrides,
   };
 }

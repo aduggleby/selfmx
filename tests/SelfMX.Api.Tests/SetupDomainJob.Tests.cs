@@ -58,7 +58,7 @@ public class SetupDomainJobTests : IDisposable
     public async Task ExecuteAsync_SkipsWhenDomainNotFound()
     {
         // Act
-        await _job.ExecuteAsync("missing-id");
+        await _job.ExecuteAsync("missing-id", null);
 
         // Assert
         await _mockSesService.DidNotReceive().CreateDomainIdentityAsync(
@@ -74,7 +74,7 @@ public class SetupDomainJobTests : IDisposable
         await _domainService.UpdateAsync(domain);
 
         // Act
-        await _job.ExecuteAsync(domain.Id);
+        await _job.ExecuteAsync(domain.Id, null);
 
         // Assert
         await _mockSesService.DidNotReceive().CreateDomainIdentityAsync(
@@ -100,7 +100,7 @@ public class SetupDomainJobTests : IDisposable
             .Returns("cf-record-id");
 
         // Act
-        await _job.ExecuteAsync(domain.Id);
+        await _job.ExecuteAsync(domain.Id, null);
 
         // Assert
         await _mockSesService.Received(1).CreateDomainIdentityAsync("example.com", Arg.Any<CancellationToken>());
@@ -122,10 +122,11 @@ public class SetupDomainJobTests : IDisposable
         _mockSesService.CreateDomainIdentityAsync("example.com", Arg.Any<CancellationToken>())
             .ThrowsAsync(new Exception("SES error"));
 
-        // Act
-        await _job.ExecuteAsync(domain.Id);
+        // Act - job re-throws for Hangfire to track the failure
+        var act = () => _job.ExecuteAsync(domain.Id, null);
+        await act.Should().ThrowAsync<Exception>().WithMessage("SES error");
 
-        // Assert
+        // Assert - domain should be marked as failed before re-throwing
         var updatedDomain = await _domainService.GetByIdAsync(domain.Id);
         updatedDomain!.Status.Should().Be(DomainStatus.Failed);
         updatedDomain.FailureReason.Should().Contain("SES error");
@@ -158,7 +159,7 @@ public class SetupDomainJobTests : IDisposable
             .Returns("cf-id");
 
         // Act
-        await _job.ExecuteAsync(domain.Id);
+        await _job.ExecuteAsync(domain.Id, null);
 
         // Assert - should still set to Verifying despite one DNS error
         var updatedDomain = await _domainService.GetByIdAsync(domain.Id);

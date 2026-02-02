@@ -5,6 +5,7 @@ using Amazon;
 using Amazon.SimpleEmailV2;
 using Amazon.SimpleEmailV2.Model;
 using Hangfire;
+using Hangfire.Console;
 using Hangfire.Dashboard;
 using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Authentication;
@@ -52,7 +53,7 @@ builder.Services.AddDbContext<AuditDbContext>(options =>
         sql.CommandTimeout(30);
     }));
 
-// Hangfire with SQL Server
+// Hangfire with SQL Server and Console logging
 builder.Services.AddHangfire(config => config
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer()
@@ -64,7 +65,8 @@ builder.Services.AddHangfire(config => config
         QueuePollInterval = TimeSpan.Zero,
         UseRecommendedIsolationLevel = true,
         DisableGlobalLocks = true
-    }));
+    })
+    .UseConsole());
 
 builder.Services.AddHangfireServer(options =>
 {
@@ -306,13 +308,13 @@ app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
 var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
 recurringJobManager.AddOrUpdate<VerifyDomainsJob>(
     "verify-domains",
-    job => job.ExecuteAsync(),
+    job => job.ExecuteAsync(null),
     "*/5 * * * *");
 
 // Schedule sent email cleanup job (daily at 3 AM UTC)
 recurringJobManager.AddOrUpdate<CleanupSentEmailsJob>(
     "cleanup-sent-emails",
-    job => job.ExecuteAsync(CancellationToken.None),
+    job => job.ExecuteAsync(CancellationToken.None, null),
     "0 3 * * *",
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 

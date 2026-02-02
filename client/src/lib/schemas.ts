@@ -20,6 +20,8 @@ export const DomainSchema = z.object({
   verifiedAt: z.string().datetime().nullable(),
   failureReason: z.string().nullable(),
   dnsRecords: z.array(DnsRecordSchema).nullable(),
+  lastCheckedAt: z.string().datetime().nullable(),
+  nextCheckAt: z.string().datetime().nullable(),
 });
 export type Domain = z.infer<typeof DomainSchema>;
 

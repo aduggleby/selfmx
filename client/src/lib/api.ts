@@ -173,6 +173,12 @@ class ApiClient {
     });
   }
 
+  async verifyDomain(id: string): Promise<Domain> {
+    return this.request(`/domains/${id}/verify`, DomainSchema, {
+      method: 'POST',
+    });
+  }
+
   async login(password: string): Promise<void> {
     const requestUrl = getApiUrl('/admin/login');
     const apiHost = getApiHost('/admin/login');

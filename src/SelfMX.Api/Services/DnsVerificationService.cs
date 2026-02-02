@@ -107,4 +107,79 @@ public class DnsVerificationService : IDnsVerificationService
 
         return true;
     }
+
+    public async Task<DnsVerificationDetailedResult> VerifyAllDkimRecordsDetailedAsync(
+        DnsRecordInfo[] records,
+        CancellationToken ct = default)
+    {
+        var results = new List<DnsRecordVerificationResult>();
+
+        foreach (var record in records)
+        {
+            if (record.Type != "CNAME") continue;
+
+            var (verified, actualValue, dnsServer) = await VerifyCnameRecordDetailedAsync(record.Name, record.Value, ct);
+            results.Add(new DnsRecordVerificationResult(
+                RecordName: record.Name,
+                ExpectedValue: record.Value,
+                ActualValue: actualValue,
+                IsVerified: verified,
+                DnsServer: dnsServer
+            ));
+        }
+
+        return new DnsVerificationDetailedResult(
+            AllVerified: results.All(r => r.IsVerified),
+            Records: results.ToArray()
+        );
+    }
+
+    private async Task<(bool Verified, string? ActualValue, string DnsServer)> VerifyCnameRecordDetailedAsync(
+        string recordName,
+        string expectedValue,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            // Try primary DNS first
+            var result = await QueryCnameAsync(_dnsClient, recordName, ct);
+            if (result != null)
+            {
+                var actualValue = GetCnameValue(result);
+                if (MatchesCname(result, expectedValue))
+                {
+                    return (true, actualValue, "System DNS");
+                }
+                // Record found but doesn't match
+                return (false, actualValue, "System DNS");
+            }
+
+            // Fallback to Google DNS
+            result = await QueryCnameAsync(_fallbackDnsClient, recordName, ct);
+            if (result != null)
+            {
+                var actualValue = GetCnameValue(result);
+                if (MatchesCname(result, expectedValue))
+                {
+                    return (true, actualValue, "Google DNS (8.8.8.8)");
+                }
+                // Record found but doesn't match
+                return (false, actualValue, "Google DNS (8.8.8.8)");
+            }
+
+            return (false, null, "Not found in any DNS");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "DNS query failed for {Name}", recordName);
+            return (false, $"Error: {ex.Message}", "Query failed");
+        }
+    }
+
+    private string? GetCnameValue(IDnsQueryResponse response)
+    {
+        var cnameRecords = response.Answers.CnameRecords();
+        var first = cnameRecords.FirstOrDefault();
+        return first?.CanonicalName.Value.TrimEnd('.');
+    }
 }

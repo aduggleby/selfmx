@@ -20,6 +20,7 @@ public static class DomainEndpoints
         domains.MapPost("/", CreateDomain);
         domains.MapGet("/{id}", GetDomain);
         domains.MapDelete("/{id}", DeleteDomain);
+        domains.MapPost("/{id}/verify", VerifyDomain);
         domains.MapPost("/{id}/test-email", SendTestEmail);
 
         return group;
@@ -75,8 +76,8 @@ public static class DomainEndpoints
 
         var domain = await domainService.CreateAsync(request.Name, ct);
 
-        // Enqueue SES identity creation
-        backgroundJobs.Enqueue<SetupDomainJob>(job => job.ExecuteAsync(domain.Id));
+        // Enqueue SES identity creation (Hangfire injects PerformContext at runtime)
+        backgroundJobs.Enqueue<SetupDomainJob>(job => job.ExecuteAsync(domain.Id, null));
 
         return TypedResults.Created($"/v1/domains/{domain.Id}", DomainResponse.FromEntity(domain));
     }
@@ -93,6 +94,36 @@ public static class DomainEndpoints
         }
 
         var dnsRecords = domain.DnsRecordsJson?.DeserializeDnsRecords();
+        var recordResponses = dnsRecords?.Select(r => new DnsRecordResponse(
+            r.Type, r.Name, r.Value, r.Priority, false
+        )).ToArray();
+
+        return TypedResults.Ok(DomainResponse.FromEntity(domain, recordResponses));
+    }
+
+    private static async Task<Results<Ok<DomainResponse>, NotFound<object>, BadRequest<object>>> VerifyDomain(
+        string id,
+        DomainService domainService,
+        VerifyDomainsJob verifyJob,
+        CancellationToken ct = default)
+    {
+        var domain = await domainService.GetByIdAsync(id, ct);
+        if (domain is null)
+        {
+            return TypedResults.NotFound(ApiError.NotFound.ToResponse());
+        }
+
+        if (domain.Status != DomainStatus.Verifying)
+        {
+            return TypedResults.BadRequest(ApiError.InvalidRequest.ToResponse() as object);
+        }
+
+        // Run verification immediately (no Hangfire context when called directly)
+        await verifyJob.VerifySingleDomainAsync(id, null);
+
+        // Reload domain to get updated status
+        domain = await domainService.GetByIdAsync(id, ct);
+        var dnsRecords = domain!.DnsRecordsJson?.DeserializeDnsRecords();
         var recordResponses = dnsRecords?.Select(r => new DnsRecordResponse(
             r.Type, r.Name, r.Value, r.Priority, false
         )).ToArray();

@@ -41,6 +41,14 @@ public class VerifyDomainsJobTests : IDisposable
         _mockDnsService = Substitute.For<IDnsVerificationService>();
         _mockLogger = Substitute.For<ILogger<VerifyDomainsJob>>();
 
+        // Default mock for GetDkimVerificationDetailsAsync - returns not verified
+        _mockSesService.GetDkimVerificationDetailsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new DkimVerificationResult(false, "PENDING", "AWS_SES", "RSA_2048_BIT", null, null));
+
+        // Default mock for detailed DNS verification
+        _mockDnsService.VerifyAllDkimRecordsDetailedAsync(Arg.Any<DnsRecordInfo[]>(), Arg.Any<CancellationToken>())
+            .Returns(new DnsVerificationDetailedResult(false, Array.Empty<DnsRecordVerificationResult>()));
+
         _job = new VerifyDomainsJob(
             _domainService,
             _mockSesService,
@@ -64,15 +72,12 @@ public class VerifyDomainsJobTests : IDisposable
         verifyingDomain.VerificationStartedAt = DateTime.UtcNow;
         await _domainService.UpdateAsync(verifyingDomain);
 
-        _mockSesService.CheckDkimVerificationAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(false);
-
         // Act
-        await _job.ExecuteAsync();
+        await _job.ExecuteAsync(null);
 
         // Assert - only verifying domain should be checked
-        await _mockSesService.Received(1).CheckDkimVerificationAsync("verifying.com", Arg.Any<CancellationToken>());
-        await _mockSesService.DidNotReceive().CheckDkimVerificationAsync("pending.com", Arg.Any<CancellationToken>());
+        await _mockSesService.Received(1).GetDkimVerificationDetailsAsync("verifying.com", Arg.Any<CancellationToken>());
+        await _mockSesService.DidNotReceive().GetDkimVerificationDetailsAsync("pending.com", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -84,11 +89,11 @@ public class VerifyDomainsJobTests : IDisposable
         domain.VerificationStartedAt = DateTime.UtcNow;
         await _domainService.UpdateAsync(domain);
 
-        _mockSesService.CheckDkimVerificationAsync("example.com", Arg.Any<CancellationToken>())
-            .Returns(true);
+        _mockSesService.GetDkimVerificationDetailsAsync("example.com", Arg.Any<CancellationToken>())
+            .Returns(new DkimVerificationResult(true, "SUCCESS", "AWS_SES", "RSA_2048_BIT", DateTime.UtcNow, new[] { "token1", "token2", "token3" }));
 
         // Act
-        await _job.ExecuteAsync();
+        await _job.ExecuteAsync(null);
 
         // Assert
         var updatedDomain = await _domainService.GetByIdAsync(domain.Id);
@@ -106,7 +111,7 @@ public class VerifyDomainsJobTests : IDisposable
         await _domainService.UpdateAsync(domain);
 
         // Act
-        await _job.ExecuteAsync();
+        await _job.ExecuteAsync(null);
 
         // Assert
         var updatedDomain = await _domainService.GetByIdAsync(domain.Id);
@@ -114,7 +119,7 @@ public class VerifyDomainsJobTests : IDisposable
         updatedDomain.FailureReason.Should().Contain("timed out");
 
         // SES should not be checked for timed out domains
-        await _mockSesService.DidNotReceive().CheckDkimVerificationAsync(
+        await _mockSesService.DidNotReceive().GetDkimVerificationDetailsAsync(
             Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
@@ -131,18 +136,17 @@ public class VerifyDomainsJobTests : IDisposable
         }.SerializeDnsRecords();
         await _domainService.UpdateAsync(domain);
 
-        _mockSesService.CheckDkimVerificationAsync("example.com", Arg.Any<CancellationToken>())
-            .Returns(false);
-
-        _mockDnsService.VerifyAllDkimRecordsAsync(
-            Arg.Any<DnsRecordInfo[]>(), Arg.Any<CancellationToken>())
-            .Returns(true);
+        _mockDnsService.VerifyAllDkimRecordsDetailedAsync(Arg.Any<DnsRecordInfo[]>(), Arg.Any<CancellationToken>())
+            .Returns(new DnsVerificationDetailedResult(true, new[]
+            {
+                new DnsRecordVerificationResult("token._domainkey.example.com", "token.dkim.amazonses.com", "token.dkim.amazonses.com", true, "Google DNS")
+            }));
 
         // Act
-        await _job.ExecuteAsync();
+        await _job.ExecuteAsync(null);
 
         // Assert
-        await _mockDnsService.Received(1).VerifyAllDkimRecordsAsync(
+        await _mockDnsService.Received(1).VerifyAllDkimRecordsDetailedAsync(
             Arg.Any<DnsRecordInfo[]>(), Arg.Any<CancellationToken>());
 
         // Domain should still be verifying (waiting for SES)
@@ -164,13 +168,13 @@ public class VerifyDomainsJobTests : IDisposable
         domain2.VerificationStartedAt = DateTime.UtcNow;
         await _domainService.UpdateAsync(domain2);
 
-        _mockSesService.CheckDkimVerificationAsync("domain1.com", Arg.Any<CancellationToken>())
-            .Returns(true);
-        _mockSesService.CheckDkimVerificationAsync("domain2.com", Arg.Any<CancellationToken>())
-            .Returns(false);
+        _mockSesService.GetDkimVerificationDetailsAsync("domain1.com", Arg.Any<CancellationToken>())
+            .Returns(new DkimVerificationResult(true, "SUCCESS", "AWS_SES", "RSA_2048_BIT", null, null));
+        _mockSesService.GetDkimVerificationDetailsAsync("domain2.com", Arg.Any<CancellationToken>())
+            .Returns(new DkimVerificationResult(false, "PENDING", "AWS_SES", "RSA_2048_BIT", null, null));
 
         // Act
-        await _job.ExecuteAsync();
+        await _job.ExecuteAsync(null);
 
         // Assert
         var updatedDomain1 = await _domainService.GetByIdAsync(domain1.Id);

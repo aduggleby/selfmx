@@ -119,7 +119,7 @@ public class CleanupSentEmailsJobTests : IDisposable
         await _db.SaveChangesAsync();
 
         // Act
-        await job.ExecuteAsync();
+        await job.ExecuteAsync(CancellationToken.None, null);
 
         // Assert - email should not be deleted
         var count = await _db.SentEmails.CountAsync();
@@ -136,7 +136,7 @@ public class CleanupSentEmailsJobTests : IDisposable
         await _db.SaveChangesAsync();
 
         // Act
-        await job.ExecuteAsync();
+        await job.ExecuteAsync(CancellationToken.None, null);
 
         // Assert - email should not be deleted
         var count = await _db.SentEmails.CountAsync();
@@ -156,7 +156,7 @@ public class CleanupSentEmailsJobTests : IDisposable
         await _db.SaveChangesAsync();
 
         // Act
-        await job.ExecuteAsync();
+        await job.ExecuteAsync(CancellationToken.None, null);
 
         // Assert - only old email should be deleted
         var remaining = await _db.SentEmails.ToListAsync();
@@ -181,7 +181,7 @@ public class CleanupSentEmailsJobTests : IDisposable
         await _db.SaveChangesAsync();
 
         // Act
-        await job.ExecuteAsync();
+        await job.ExecuteAsync(CancellationToken.None, null);
 
         // Assert - emails 8, 9, 10 days old are older than 7 day cutoff (4 deleted)
         // Actually: cutoff is 7 days ago, so emails from 8+ days ago are deleted
@@ -200,7 +200,7 @@ public class CleanupSentEmailsJobTests : IDisposable
         var job = CreateJob(30);
 
         // Act - should not throw
-        await job.ExecuteAsync();
+        await job.ExecuteAsync(CancellationToken.None, null);
 
         // Assert
         var count = await _db.SentEmails.CountAsync();
@@ -217,7 +217,7 @@ public class CleanupSentEmailsJobTests : IDisposable
         await _db.SaveChangesAsync();
 
         // Act
-        await job.ExecuteAsync();
+        await job.ExecuteAsync(CancellationToken.None, null);
 
         // Assert - email should not be deleted
         var count = await _db.SentEmails.CountAsync();
@@ -239,7 +239,7 @@ public class CleanupSentEmailsJobTests : IDisposable
         await _db.SaveChangesAsync();
 
         // Act
-        await job.ExecuteAsync();
+        await job.ExecuteAsync(CancellationToken.None, null);
 
         // Assert - only at-cutoff email deleted (it's older than cutoff)
         var remaining = await _db.SentEmails.ToListAsync();

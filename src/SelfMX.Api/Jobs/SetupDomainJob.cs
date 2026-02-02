@@ -1,3 +1,4 @@
+using Hangfire.Server;
 using SelfMX.Api.Entities;
 using SelfMX.Api.Services;
 
@@ -22,37 +23,70 @@ public class SetupDomainJob
         _logger = logger;
     }
 
-    public async Task ExecuteAsync(string domainId)
+    public async Task ExecuteAsync(string domainId, PerformContext? context)
     {
-        _logger.LogInformation("SetupDomainJob started for domain {DomainId}", domainId);
+        var console = new JobConsole(_logger, context);
 
+        console.WriteLine("========================================");
+        console.WriteInfo($"SetupDomainJob started for domain ID: {domainId}");
+        console.WriteLine("========================================");
+
+        // Step 1: Fetch domain from database
+        console.WriteLine("Step 1: Fetching domain from database...");
         var domain = await _domainService.GetByIdAsync(domainId);
         if (domain is null)
         {
-            _logger.LogWarning("SetupDomainJob: Domain {DomainId} not found in database", domainId);
+            console.WriteError($"Domain {domainId} not found in database - job aborted");
             return;
         }
 
-        _logger.LogInformation("SetupDomainJob: Found domain {DomainName} with status {Status}", domain.Name, domain.Status);
+        console.WriteLine($"  Domain found: {domain.Name}");
+        console.WriteLine($"  Current status: {domain.Status}");
+        console.WriteLine($"  Created at: {domain.CreatedAt:yyyy-MM-dd HH:mm:ss} UTC");
 
+        // Step 2: Validate status
+        console.WriteLine("Step 2: Validating domain status...");
         if (domain.Status != DomainStatus.Pending)
         {
-            _logger.LogInformation("SetupDomainJob: Domain {DomainId} is not in Pending status ({Status}), skipping setup", domainId, domain.Status);
+            console.WriteWarning($"Domain is not in Pending status (current: {domain.Status}), skipping setup");
             return;
         }
+        console.WriteSuccess("  Status is Pending - proceeding with setup");
 
         try
         {
-            _logger.LogInformation("SetupDomainJob: Creating SES domain identity for {DomainName}", domain.Name);
+            // Step 3: Create SES domain identity
+            console.WriteInfo("Step 3: Creating SES domain identity...");
+            console.WriteLine($"  Calling AWS SES CreateEmailIdentity for: {domain.Name}");
 
-            // Create SES domain identity
             var (identityArn, dnsRecords) = await _sesService.CreateDomainIdentityAsync(domain.Name);
 
-            _logger.LogInformation("SetupDomainJob: SES identity created for {DomainName}, got {RecordCount} DNS records", domain.Name, dnsRecords.Length);
+            console.WriteSuccess("  SES identity created successfully!");
+            console.WriteLine($"  Identity ARN: {identityArn}");
+            console.WriteLine($"  DNS records returned: {dnsRecords.Length}");
 
-            // Create DNS records in Cloudflare
+            // Log each DNS record
+            console.WriteLine("Step 4: DNS Records from SES:");
             foreach (var record in dnsRecords)
             {
+                var recordInfo = record.Type switch
+                {
+                    "CNAME" => $"    [{record.Type}] {record.Name} -> {record.Value}",
+                    "TXT" => $"    [{record.Type}] {record.Name} = \"{record.Value}\"",
+                    "MX" => $"    [{record.Type}] {record.Name} -> {record.Value} (Priority: {record.Priority})",
+                    _ => $"    [{record.Type}] {record.Name} -> {record.Value}"
+                };
+                console.WriteLine(recordInfo);
+            }
+
+            // Step 5: Create DNS records in Cloudflare
+            console.WriteInfo("Step 5: Creating DNS records in Cloudflare...");
+            var successCount = 0;
+            var failCount = 0;
+
+            foreach (var record in dnsRecords)
+            {
+                console.WriteLine($"  Creating {record.Type} record: {record.Name}");
                 try
                 {
                     await _cloudflareService.CreateDnsRecordAsync(
@@ -61,14 +95,20 @@ public class SetupDomainJob
                         record.Value,
                         record.Priority,
                         proxied: false);
+                    console.WriteSuccess("    Created successfully");
+                    successCount++;
                 }
                 catch (CloudflareException ex)
                 {
-                    _logger.LogWarning(ex, "Failed to create DNS record {Name}, continuing...", record.Name);
+                    console.WriteWarning($"    Failed to create: {ex.Message}");
+                    failCount++;
                 }
             }
 
-            // Update domain with SES info
+            console.WriteLine($"  DNS records created: {successCount} success, {failCount} failed");
+
+            // Step 6: Update domain in database
+            console.WriteInfo("Step 6: Updating domain in database...");
             domain.SesIdentityArn = identityArn;
             domain.DnsRecordsJson = dnsRecords.SerializeDnsRecords();
             domain.Status = DomainStatus.Verifying;
@@ -76,17 +116,24 @@ public class SetupDomainJob
 
             await _domainService.UpdateAsync(domain);
 
-            _logger.LogInformation(
-                "Domain {DomainId} SES identity created, DNS records created, status set to Verifying",
-                domainId);
+            console.WriteLine("========================================");
+            console.WriteSuccess("SetupDomainJob completed successfully!");
+            console.WriteLine($"  Domain: {domain.Name}");
+            console.WriteLine($"  New status: Verifying");
+            console.WriteLine($"  DNS records stored: {dnsRecords.Length}");
+            console.WriteLine("  Verification will be checked every 5 minutes");
+            console.WriteLine("========================================");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to set up domain {DomainId}", domainId);
+            console.WriteError($"Failed to set up domain {domainId}: {ex.Message}");
 
             domain.Status = DomainStatus.Failed;
             domain.FailureReason = $"Setup failed: {ex.Message}";
             await _domainService.UpdateAsync(domain);
+
+            console.WriteLine("Domain marked as Failed in database");
+            throw; // Re-throw to mark job as failed in Hangfire
         }
     }
 }

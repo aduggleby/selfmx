@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Hangfire;
+using Hangfire.Server;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SelfMX.Api.Data;
@@ -29,23 +30,34 @@ public class CleanupSentEmailsJob
 
     [DisableConcurrentExecution(timeoutInSeconds: 3600)]
     [AutomaticRetry(Attempts = 3, OnAttemptsExceeded = AttemptsExceededAction.Fail)]
-    public async Task ExecuteAsync(CancellationToken ct = default)
+    public async Task ExecuteAsync(CancellationToken ct, PerformContext? context)
     {
+        var console = new JobConsole(_logger, context);
+
+        console.WriteLine("========================================");
+        console.WriteInfo("CleanupSentEmailsJob started");
+        console.WriteLine($"Time: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+        console.WriteLine("========================================");
+
         var retentionDays = _appSettings.Value.SentEmailRetentionDays;
 
         if (retentionDays is null or <= 0)
         {
-            _logger.LogDebug("Sent email retention disabled, skipping cleanup");
+            console.WriteLine("Sent email retention disabled (SentEmailRetentionDays not set)");
+            console.WriteWarning("No cleanup will be performed");
             return;
         }
 
         var cutoff = DateTime.UtcNow.AddDays(-retentionDays.Value);
-        _logger.LogInformation("Cleaning up sent emails older than {Cutoff}", cutoff);
+        console.WriteLine($"Retention policy: {retentionDays} days");
+        console.WriteLine($"Deleting emails sent before: {cutoff:yyyy-MM-dd HH:mm:ss} UTC");
+        console.WriteLine("");
 
         int totalDeleted = 0;
         int batchCount = 0;
         int batchSize = BaseBatchSize;
         var stopwatch = Stopwatch.StartNew();
+        var progress = console.WriteProgressBar();
 
         while (batchCount < MaxBatchesPerRun)
         {
@@ -62,31 +74,54 @@ public class CleanupSentEmailsJob
                 .ExecuteDeleteAsync(ct);
 
             if (deleted == 0)
+            {
+                console.WriteLine("No more records to delete");
                 break;
+            }
 
             totalDeleted += deleted;
             batchCount++;
 
+            // Update progress (estimate based on batch size)
+            var estimatedProgress = Math.Min(batchCount * 2, 100); // Rough estimate
+            progress?.SetValue(estimatedProgress);
+
             // Adaptive batch sizing based on execution time
             var elapsed = batchStart.ElapsedMilliseconds;
             if (elapsed < 500 && batchSize < MaxBatchSize)
+            {
+                var oldSize = batchSize;
                 batchSize = Math.Min(batchSize * 2, MaxBatchSize);
+                console.WriteLine($"  Batch {batchCount}: {deleted} deleted in {elapsed}ms (increasing batch size {oldSize} -> {batchSize})");
+            }
             else if (elapsed > 2000 && batchSize > BaseBatchSize)
+            {
+                var oldSize = batchSize;
                 batchSize = Math.Max(batchSize / 2, BaseBatchSize);
+                console.WriteWarning($"  Batch {batchCount}: {deleted} deleted in {elapsed}ms (decreasing batch size {oldSize} -> {batchSize})");
+            }
+            else
+            {
+                console.WriteLine($"  Batch {batchCount}: {deleted} deleted in {elapsed}ms");
+            }
 
             if (batchCount % 50 == 0)
             {
-                _logger.LogInformation(
-                    "Cleanup progress: {Deleted} records in {Batches} batches",
-                    totalDeleted, batchCount);
+                console.WriteInfo($"  Progress: {totalDeleted} records deleted in {batchCount} batches");
             }
 
             // Brief pause between batches to reduce lock contention
             await Task.Delay(100, ct);
         }
 
-        _logger.LogInformation(
-            "Cleanup complete: {Total} records in {Batches} batches, Duration: {Duration:mm\\:ss}",
-            totalDeleted, batchCount, stopwatch.Elapsed);
+        progress?.SetValue(100);
+
+        console.WriteLine("");
+        console.WriteLine("========================================");
+        console.WriteSuccess("CleanupSentEmailsJob completed");
+        console.WriteLine($"Total records deleted: {totalDeleted}");
+        console.WriteLine($"Batches processed: {batchCount}");
+        console.WriteLine($"Duration: {stopwatch.Elapsed:mm\\:ss}");
+        console.WriteLine("========================================");
     }
 }
