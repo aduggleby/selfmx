@@ -330,27 +330,27 @@ function ApiKeyRow({
   );
 }
 
-function RevokedApiKeyRow({
-  revokedKey,
+function RevokedKeyRow({
+  apiKey,
   domains,
 }: {
-  revokedKey: RevokedApiKey;
+  apiKey: ApiKey;
   domains: Domain[];
 }) {
-  const domainNames = revokedKey.domainIds
+  const domainNames = apiKey.domainIds
     .map((id) => domains.find((d) => d.id === id)?.name)
     .filter(Boolean);
 
   return (
     <tr className="border-b opacity-60">
       <td className="py-3 px-2">
-        <span className="line-through">{revokedKey.name}</span>
+        <span className="line-through">{apiKey.name}</span>
       </td>
       <td className="py-3 px-2 font-mono text-xs text-muted-foreground">
-        {revokedKey.keyPrefix}...
+        {apiKey.keyPrefix}...
       </td>
       <td className="py-3 px-2">
-        {revokedKey.isAdmin ? (
+        {apiKey.isAdmin ? (
           <span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-xs">
             Admin
           </span>
@@ -365,10 +365,54 @@ function RevokedApiKeyRow({
         )}
       </td>
       <td className="py-3 px-2 text-xs text-muted-foreground">
-        {formatRelativeDate(revokedKey.revokedAt)}
+        {formatRelativeDate(apiKey.revokedAt)}
       </td>
       <td className="py-3 px-2 text-xs text-muted-foreground">
-        {formatRelativeDate(revokedKey.archivedAt)}
+        {formatRelativeDate(apiKey.lastUsedAt)}
+      </td>
+    </tr>
+  );
+}
+
+function ArchivedApiKeyRow({
+  archivedKey,
+  domains,
+}: {
+  archivedKey: RevokedApiKey;
+  domains: Domain[];
+}) {
+  const domainNames = archivedKey.domainIds
+    .map((id) => domains.find((d) => d.id === id)?.name)
+    .filter(Boolean);
+
+  return (
+    <tr className="border-b opacity-60">
+      <td className="py-3 px-2">
+        <span className="line-through">{archivedKey.name}</span>
+      </td>
+      <td className="py-3 px-2 font-mono text-xs text-muted-foreground">
+        {archivedKey.keyPrefix}...
+      </td>
+      <td className="py-3 px-2">
+        {archivedKey.isAdmin ? (
+          <span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-xs">
+            Admin
+          </span>
+        ) : (
+          <span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-xs">
+            {domainNames.length === 0 ? 'No domains' : (
+              domainNames.length <= 2
+                ? domainNames.join(', ')
+                : `${domainNames.slice(0, 2).join(', ')} +${domainNames.length - 2}`
+            )}
+          </span>
+        )}
+      </td>
+      <td className="py-3 px-2 text-xs text-muted-foreground">
+        {formatRelativeDate(archivedKey.revokedAt)}
+      </td>
+      <td className="py-3 px-2 text-xs text-muted-foreground">
+        {formatRelativeDate(archivedKey.archivedAt)}
       </td>
     </tr>
   );
@@ -392,12 +436,13 @@ function EmptyApiKeys({ onCreateClick }: { onCreateClick: () => void }) {
 
 export function ApiKeysPage() {
   const [page, setPage] = useState(1);
-  const [revokedPage, setRevokedPage] = useState(1);
+  const [archivedPage, setArchivedPage] = useState(1);
   const [showRevokedKeys, setShowRevokedKeys] = useState(false);
+  const [showArchivedKeys, setShowArchivedKeys] = useState(false);
   const limit = 20;
 
   const { data, isLoading, error, refetch } = useApiKeys(page, limit);
-  const { data: revokedData, isLoading: revokedLoading } = useRevokedApiKeys(revokedPage, limit);
+  const { data: archivedData, isLoading: archivedLoading } = useRevokedApiKeys(archivedPage, limit);
   const { data: domainsData } = useDomains(1, 100); // Get all domains for selection
   const createMutation = useCreateApiKey();
   const deleteMutation = useDeleteApiKey();
@@ -406,15 +451,20 @@ export function ApiKeysPage() {
   const [createdKey, setCreatedKey] = useState<ApiKeyCreated | null>(null);
   const [keyToDelete, setKeyToDelete] = useState<ApiKey | null>(null);
 
-  const apiKeys = data?.data ?? [];
-  const revokedApiKeys = revokedData?.data ?? [];
+  const allApiKeys = data?.data ?? [];
+  const archivedApiKeys = archivedData?.data ?? [];
   const domains = domainsData?.data ?? [];
-  const totalKeys = data?.total ?? 0;
-  const totalRevokedKeys = revokedData?.total ?? 0;
+
+  // Split keys into active and revoked (not yet archived)
+  const activeKeys = allApiKeys.filter(k => !k.revokedAt);
+  const revokedKeys = allApiKeys.filter(k => !!k.revokedAt);
+
+  const totalArchivedKeys = archivedData?.total ?? 0;
   const totalPages = data ? Math.ceil(data.total / limit) : 0;
-  const totalRevokedPages = revokedData ? Math.ceil(revokedData.total / limit) : 0;
-  const hasKeys = apiKeys.length > 0;
-  const hasRevokedKeys = totalRevokedKeys > 0;
+  const totalArchivedPages = archivedData ? Math.ceil(archivedData.total / limit) : 0;
+  const hasKeys = allApiKeys.length > 0;
+  const hasRevokedKeys = revokedKeys.length > 0;
+  const hasArchivedKeys = totalArchivedKeys > 0;
 
   const handleCreate = async (name: string, domainIds: string[], isAdmin: boolean) => {
     try {
@@ -484,7 +534,7 @@ export function ApiKeysPage() {
         <>
           <div className="mb-4 flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              {totalKeys} API key{totalKeys !== 1 ? 's' : ''}
+              {activeKeys.length} active API key{activeKeys.length !== 1 ? 's' : ''}
             </div>
             <Button onClick={() => setShowCreateModal(true)} size="sm">
               <Plus className="h-4 w-4 mr-1.5" />
@@ -506,7 +556,7 @@ export function ApiKeysPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {apiKeys.map((apiKey) => (
+                  {activeKeys.map((apiKey) => (
                     <ApiKeyRow
                       key={apiKey.id}
                       apiKey={apiKey}
@@ -543,7 +593,7 @@ export function ApiKeysPage() {
             </div>
           )}
 
-          {/* Revoked Keys Section */}
+          {/* Revoked Keys Section (not yet archived) */}
           {hasRevokedKeys && (
             <div className="mt-8">
               <button
@@ -555,17 +605,68 @@ export function ApiKeysPage() {
                 ) : (
                   <ChevronRight className="h-4 w-4" />
                 )}
-                <Archive className="h-4 w-4" />
-                <span>Archived Keys ({totalRevokedKeys})</span>
+                <Trash2 className="h-4 w-4" />
+                <span>Revoked Keys ({revokedKeys.length})</span>
               </button>
 
               {showRevokedKeys && (
                 <div className="mt-3">
                   <p className="text-xs text-muted-foreground mb-3">
+                    These keys have been revoked and will be archived after 90 days.
+                  </p>
+
+                  <Card>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left text-xs text-muted-foreground">
+                            <th className="py-2 px-2 font-medium">Name</th>
+                            <th className="py-2 px-2 font-medium">Key</th>
+                            <th className="py-2 px-2 font-medium">Access</th>
+                            <th className="py-2 px-2 font-medium">Revoked</th>
+                            <th className="py-2 px-2 font-medium">Last Used</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {revokedKeys.map((apiKey) => (
+                            <RevokedKeyRow
+                              key={apiKey.id}
+                              apiKey={apiKey}
+                              domains={domains}
+                            />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </Card>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Archived Keys Section (90+ days old) */}
+          {hasArchivedKeys && (
+            <div className="mt-8">
+              <button
+                onClick={() => setShowArchivedKeys(!showArchivedKeys)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showArchivedKeys ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+                <Archive className="h-4 w-4" />
+                <span>Archived Keys ({totalArchivedKeys})</span>
+              </button>
+
+              {showArchivedKeys && (
+                <div className="mt-3">
+                  <p className="text-xs text-muted-foreground mb-3">
                     Keys that were revoked more than 90 days ago are moved here.
                   </p>
 
-                  {revokedLoading ? (
+                  {archivedLoading ? (
                     <Card>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
@@ -600,10 +701,10 @@ export function ApiKeysPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {revokedApiKeys.map((revokedKey) => (
-                              <RevokedApiKeyRow
-                                key={revokedKey.id}
-                                revokedKey={revokedKey}
+                            {archivedApiKeys.map((archivedKey) => (
+                              <ArchivedApiKeyRow
+                                key={archivedKey.id}
+                                archivedKey={archivedKey}
                                 domains={domains}
                               />
                             ))}
@@ -613,24 +714,24 @@ export function ApiKeysPage() {
                     </Card>
                   )}
 
-                  {totalRevokedPages > 1 && (
+                  {totalArchivedPages > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setRevokedPage((p) => Math.max(1, p - 1))}
-                        disabled={revokedPage === 1}
+                        onClick={() => setArchivedPage((p) => Math.max(1, p - 1))}
+                        disabled={archivedPage === 1}
                       >
                         Previous
                       </Button>
                       <span className="px-2 text-sm text-muted-foreground">
-                        {revokedPage} / {totalRevokedPages}
+                        {archivedPage} / {totalArchivedPages}
                       </span>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setRevokedPage((p) => Math.min(totalRevokedPages, p + 1))}
-                        disabled={revokedPage === totalRevokedPages}
+                        onClick={() => setArchivedPage((p) => Math.min(totalArchivedPages, p + 1))}
+                        disabled={archivedPage === totalArchivedPages}
                       >
                         Next
                       </Button>
