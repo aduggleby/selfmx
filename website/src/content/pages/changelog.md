@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.32] - 2026-02-03
+
+### Changed
+- Simplify domain detail page by removing manual verification check button
+
 ## [0.9.31] - 2026-02-03
 
 ### Fixed
