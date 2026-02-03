@@ -108,6 +108,11 @@ builder.Services.AddAuthentication(options =>
 // Authorization policies
 builder.Services.AddAuthorization(options =>
 {
+    // Default policy: just require authenticated user (no specific claims)
+    options.DefaultPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+
     // Admin-only policy: require ActorType=admin claim
     options.AddPolicy("AdminOnly", policy =>
         policy.RequireClaim("ActorType", "admin"));
