@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.42] - 2026-02-03
+
+### Added
+- Auto-archive revoked API keys after 90 days to keep your key list clean
+
 ## [0.9.41] - 2026-02-03
 
 ### Changed

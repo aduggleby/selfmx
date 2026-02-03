@@ -156,6 +156,7 @@ client/src/
 | `POST /v1/emails` | Yes | Send email (Resend-compatible) |
 | `GET /v1/api-keys` | Admin | List API keys |
 | `POST /v1/api-keys` | Admin | Create API key |
+| `GET /v1/api-keys/revoked` | Admin | List archived API keys |
 | `GET /v1/audit` | Admin | Audit logs (paginated) |
 | `GET /hangfire` | Admin | Hangfire job dashboard |
 

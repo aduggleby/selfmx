@@ -36,6 +36,7 @@ API keys are created in the admin UI and use the Resend format: `re_` followed b
 | `/v1/domains/{id}/test-email` | POST | API Key | Send test email |
 | `/v1/api-keys` | GET | Admin | List API keys |
 | `/v1/api-keys` | POST | Admin | Create API key |
+| `/v1/api-keys/revoked` | GET | Admin | List archived API keys |
 | `/v1/api-keys/{id}` | DELETE | Admin | Revoke API key |
 | `/v1/sent-emails` | GET | Admin | List sent emails |
 | `/v1/sent-emails/{id}` | GET | Admin | Get sent email details |
@@ -365,6 +366,48 @@ Revoke an API key. Requires admin authentication.
 ```
 204 No Content
 ```
+
+## List Archived API Keys (Admin)
+
+Get archived (previously revoked) API keys. Revoked API keys are automatically archived after 90 days by a daily cleanup job. Requires admin authentication.
+
+**GET** `/v1/api-keys/revoked`
+
+### Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | integer | 1 | Page number |
+| `limit` | integer | 20 | Items per page |
+
+### Response
+
+```json
+{
+  "data": [
+    {
+      "id": "k5f2a3b1-...",
+      "name": "Old Production Key",
+      "keyPrefix": "re_abc123",
+      "isAdmin": false,
+      "createdAt": "2024-01-15T10:30:00Z",
+      "revokedAt": "2024-04-15T10:30:00Z",
+      "archivedAt": "2024-07-15T04:00:00Z",
+      "lastUsedAt": "2024-04-10T08:15:00Z",
+      "domainIds": ["d5f2a3b1-...", "d5f2a3b2-..."]
+    }
+  ],
+  "page": 1,
+  "limit": 20,
+  "total": 5
+}
+```
+
+### Notes
+
+- Revoked keys are archived (moved to a separate table) after 90 days
+- The cleanup job runs daily at 4 AM UTC
+- Archived keys preserve historical data for audit purposes
 
 ## List Sent Emails (Admin)
 
