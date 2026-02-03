@@ -51,3 +51,68 @@ export const HealthResponseSchema = z.object({
   timestamp: z.string().datetime(),
 });
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
+
+// API Key schemas
+export const ApiKeySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  keyPrefix: z.string(),
+  isAdmin: z.boolean(),
+  createdAt: z.string().datetime(),
+  revokedAt: z.string().datetime().nullable(),
+  lastUsedAt: z.string().datetime().nullable(),
+  domainIds: z.array(z.string()),
+});
+export type ApiKey = z.infer<typeof ApiKeySchema>;
+
+export const ApiKeyCreatedSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  key: z.string(),
+  keyPrefix: z.string(),
+  isAdmin: z.boolean(),
+  createdAt: z.string().datetime(),
+});
+export type ApiKeyCreated = z.infer<typeof ApiKeyCreatedSchema>;
+
+export const PaginatedApiKeysSchema = z.object({
+  data: z.array(ApiKeySchema),
+  page: z.number(),
+  limit: z.number(),
+  total: z.number(),
+});
+export type PaginatedApiKeys = z.infer<typeof PaginatedApiKeysSchema>;
+
+// Sent Email schemas
+export const SentEmailListItemSchema = z.object({
+  id: z.string(),
+  messageId: z.string(),
+  sentAt: z.string().datetime(),
+  fromAddress: z.string(),
+  to: z.array(z.string()),
+  subject: z.string(),
+  domainId: z.string(),
+});
+export type SentEmailListItem = z.infer<typeof SentEmailListItemSchema>;
+
+export const SentEmailDetailSchema = z.object({
+  id: z.string(),
+  messageId: z.string(),
+  sentAt: z.string().datetime(),
+  fromAddress: z.string(),
+  to: z.array(z.string()),
+  cc: z.array(z.string()).nullable(),
+  replyTo: z.string().nullable(),
+  subject: z.string(),
+  htmlBody: z.string().nullable(),
+  textBody: z.string().nullable(),
+  domainId: z.string(),
+});
+export type SentEmailDetail = z.infer<typeof SentEmailDetailSchema>;
+
+export const CursorPagedSentEmailsSchema = z.object({
+  data: z.array(SentEmailListItemSchema),
+  nextCursor: z.string().nullable(),
+  hasMore: z.boolean(),
+});
+export type CursorPagedSentEmails = z.infer<typeof CursorPagedSentEmailsSchema>;

@@ -3,9 +3,17 @@ import {
   DomainSchema,
   PaginatedDomainsSchema,
   SendEmailResponseSchema,
+  PaginatedApiKeysSchema,
+  ApiKeyCreatedSchema,
+  CursorPagedSentEmailsSchema,
+  SentEmailDetailSchema,
   type Domain,
   type PaginatedDomains,
   type SendEmailResponse,
+  type PaginatedApiKeys,
+  type ApiKeyCreated,
+  type CursorPagedSentEmails,
+  type SentEmailDetail,
 } from './schemas';
 
 const API_BASE = '/v1';
@@ -142,7 +150,7 @@ class ApiClient {
         const errorBody = await response.json();
         message = errorBody?.error?.message || message;
       } catch {
-        // Ignore JSON parse errors and keep fallback message.
+        // Ignore JSON parse errors
       }
       const err = new Error(message) as Error & { status: number };
       err.status = response.status;
@@ -245,6 +253,93 @@ class ApiClient {
     }
 
     return response.json();
+  }
+
+  // API Key methods
+  async listApiKeys(page = 1, limit = 20): Promise<PaginatedApiKeys> {
+    return this.request(
+      `/api-keys?page=${page}&limit=${limit}`,
+      PaginatedApiKeysSchema
+    );
+  }
+
+  async createApiKey(request: {
+    name: string;
+    domainIds?: string[];
+    isAdmin?: boolean;
+  }): Promise<ApiKeyCreated> {
+    return this.request(`/api-keys`, ApiKeyCreatedSchema, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async deleteApiKey(id: string): Promise<void> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (this.apiKey) {
+      headers['Authorization'] = `Bearer ${this.apiKey}`;
+    }
+
+    const requestUrl = getApiUrl(`/api-keys/${id}`);
+    const apiHost = getApiHost(`/api-keys/${id}`);
+    let response: Response;
+
+    try {
+      response = await fetch(requestUrl, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers,
+      });
+    } catch {
+      throw new Error(
+        `API unreachable at ${apiHost}. Check that the server and port are running.`
+      );
+    }
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        window.dispatchEvent(new Event('selfmx:unauthorized'));
+      }
+      let message = `Delete failed with status ${response.status} from ${apiHost}.`;
+      try {
+        const errorBody = await response.json();
+        message = errorBody?.error?.message || message;
+      } catch {
+        // Ignore JSON parse errors
+      }
+      const err = new Error(message) as Error & { status: number };
+      err.status = response.status;
+      throw err;
+    }
+  }
+
+  // Sent Email methods
+  async listSentEmails(params: {
+    domainId?: string;
+    from?: string;
+    to?: string;
+    cursor?: string;
+    pageSize?: number;
+  } = {}): Promise<CursorPagedSentEmails> {
+    const searchParams = new URLSearchParams();
+    if (params.domainId) searchParams.set('domainId', params.domainId);
+    if (params.from) searchParams.set('from', params.from);
+    if (params.to) searchParams.set('to', params.to);
+    if (params.cursor) searchParams.set('cursor', params.cursor);
+    if (params.pageSize) searchParams.set('pageSize', params.pageSize.toString());
+
+    const query = searchParams.toString();
+    return this.request(
+      `/sent-emails${query ? `?${query}` : ''}`,
+      CursorPagedSentEmailsSchema
+    );
+  }
+
+  async getSentEmail(id: string): Promise<SentEmailDetail> {
+    return this.request(`/sent-emails/${id}`, SentEmailDetailSchema);
   }
 }
 

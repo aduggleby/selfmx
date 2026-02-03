@@ -8,6 +8,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { DomainsPage } from './pages/DomainsPage';
 import { DomainDetailPage } from './pages/DomainDetailPage';
+import { ApiKeysPage } from './pages/ApiKeysPage';
+import { SentEmailsPage } from './pages/SentEmailsPage';
 import { LoginPage } from './pages/LoginPage';
 import { Button } from './components/ui/button';
 import { Card } from './components/ui/card';
@@ -152,6 +154,18 @@ function AuthenticatedApp() {
             </span>
           </Link>
           <div className="flex items-center gap-1">
+            <Link
+              to="/api-keys"
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              API Keys
+            </Link>
+            <Link
+              to="/sent-emails"
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Sent Emails
+            </Link>
             <a
               href="/hangfire"
               target="_blank"
@@ -180,6 +194,8 @@ function AuthenticatedApp() {
         <Routes>
           <Route path="/" element={<DomainsPage />} />
           <Route path="/domains/:id" element={<DomainDetailPage />} />
+          <Route path="/api-keys" element={<ApiKeysPage />} />
+          <Route path="/sent-emails" element={<SentEmailsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
