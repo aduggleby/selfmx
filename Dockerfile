@@ -67,7 +67,7 @@ RUN chmod +x /app/healthcheck.sh
 # Environment configuration
 # DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false overrides the Alpine base image default
 # This is required for SQL Server client which needs ICU for culture support
-ENV ASPNETCORE_URLS=http://+:5000 \
+ENV ASPNETCORE_URLS=http://+:17400 \
     ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
@@ -76,8 +76,8 @@ ENV ASPNETCORE_URLS=http://+:5000 \
 # Switch to non-root user
 USER selfmx
 
-# Expose port
-EXPOSE 5000
+# Expose port (SelfMX reserved port range: 17400-17499)
+EXPOSE 17400
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \

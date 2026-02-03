@@ -32,7 +32,7 @@ services:
     container_name: selfmx-app
     restart: unless-stopped
     expose:
-      - "5000"
+      - "17400"
     volumes:
       - selfmx_data:/app/data
     networks:
@@ -60,7 +60,7 @@ services:
       # CORS
       - Cors__Origins__0=https://${SELFMX_DOMAIN}
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5000/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:17400/health"]
       interval: 30s
       timeout: 10s
       start_period: 15s

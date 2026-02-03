@@ -17,8 +17,8 @@
         -Server
     }
 
-    # Reverse proxy to SelfMX
-    reverse_proxy selfmx:5000 {
+    # Reverse proxy to SelfMX (port 17400)
+    reverse_proxy selfmx:17400 {
         health_uri /health
         health_interval 30s
         health_timeout 10s

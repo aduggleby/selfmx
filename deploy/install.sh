@@ -600,7 +600,7 @@ services:
     volumes:
       - /data/selfmx/logs:/app/logs
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5000/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:17400/health"]
       interval: 30s
       timeout: 10s
       start_period: 30s
@@ -646,7 +646,7 @@ ${SELFMX_DOMAIN} {
         -Server
     }
 
-    reverse_proxy selfmx:5000 {
+    reverse_proxy selfmx:17400 {
         health_uri /health
         health_interval 30s
         health_timeout 10s
@@ -763,7 +763,7 @@ docker start selfmx-app
 # Wait for health
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for application to be healthy..."
 for i in {1..30}; do
-    if docker exec selfmx-app wget -qO- http://127.0.0.1:5000/health &>/dev/null; then
+    if docker exec selfmx-app wget -qO- http://127.0.0.1:17400/health &>/dev/null; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restore complete! Application is healthy."
         exit 0
     fi
@@ -893,7 +893,7 @@ verify_installation() {
     i=0
 
     while [ $i -lt $retries ]; do
-        if docker exec selfmx-app wget -qO- http://127.0.0.1:5000/health &>/dev/null; then
+        if docker exec selfmx-app wget -qO- http://127.0.0.1:17400/health &>/dev/null; then
             success "SelfMX is healthy!"
             return 0
         fi
