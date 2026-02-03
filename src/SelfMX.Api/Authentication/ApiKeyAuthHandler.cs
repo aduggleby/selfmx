@@ -96,6 +96,9 @@ public class ApiKeyAuthHandler : AuthenticationHandler<AuthenticationSchemeOptio
                 var principal = new ClaimsPrincipal(identity);
                 var ticket = new AuthenticationTicket(principal, Scheme.Name);
 
+                _logger.LogInformation("Auth: API key validated - Scheme={Scheme}, IsAuthenticated={IsAuth}, Identity.AuthType={AuthType}, ClaimsCount={Count}",
+                    Scheme.Name, identity.IsAuthenticated, identity.AuthenticationType, claims.Count);
+
                 return AuthenticateResult.Success(ticket);
             }
         }
