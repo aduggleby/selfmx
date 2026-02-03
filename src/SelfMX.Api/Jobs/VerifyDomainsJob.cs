@@ -134,8 +134,10 @@ public class VerifyDomainsJob
         }
         else
         {
-            console.WriteLine($"  Checking {dnsRecords.Count(r => r.Type == "CNAME")} CNAME records:");
-            var dnsResult = await _dnsVerificationService.VerifyAllDkimRecordsDetailedAsync(dnsRecords);
+            var cnameCount = dnsRecords.Count(r => r.Type == "CNAME");
+            var txtCount = dnsRecords.Count(r => r.Type == "TXT");
+            console.WriteLine($"  Checking {cnameCount} CNAME records (DKIM) and {txtCount} TXT records (SPF/DMARC):");
+            var dnsResult = await _dnsVerificationService.VerifyAllRecordsDetailedAsync(dnsRecords);
 
             foreach (var record in dnsResult.Records)
             {

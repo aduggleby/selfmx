@@ -26,14 +26,19 @@ public interface IDnsVerificationService
         string expectedValue,
         CancellationToken ct = default);
 
+    Task<bool> VerifyTxtRecordAsync(
+        string recordName,
+        string expectedValue,
+        CancellationToken ct = default);
+
     Task<bool> VerifyAllDkimRecordsAsync(
         DnsRecordInfo[] records,
         CancellationToken ct = default);
 
     /// <summary>
-    /// Verify all DKIM records and return detailed results showing what was found.
+    /// Verify all DNS records (CNAME for DKIM, TXT for SPF/DMARC) and return detailed results.
     /// </summary>
-    Task<DnsVerificationDetailedResult> VerifyAllDkimRecordsDetailedAsync(
+    Task<DnsVerificationDetailedResult> VerifyAllRecordsDetailedAsync(
         DnsRecordInfo[] records,
         CancellationToken ct = default);
 }
