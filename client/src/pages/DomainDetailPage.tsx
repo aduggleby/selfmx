@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Trash2, Mail, AlertTriangle, RefreshCw } from 'lucide-react';
-import { useDomain, useDeleteDomain, useVerifyDomain } from '@/hooks/useDomains';
+import { ArrowLeft, Trash2, Mail, AlertTriangle } from 'lucide-react';
+import { useDomain, useDeleteDomain } from '@/hooks/useDomains';
 import { DomainStatusBadge } from '@/components/DomainStatusBadge';
 import { DnsRecordsTable } from '@/components/DnsRecordsTable';
 import { DnsActions } from '@/components/DnsActions';
@@ -21,13 +21,10 @@ interface DeleteConfirmModalProps {
 interface VerificationStatusProps {
   lastCheckedAt: string | null;
   nextCheckAt: string | null;
-  onCheckNow: () => void;
-  isChecking: boolean;
 }
 
-function VerificationStatus({ lastCheckedAt, nextCheckAt, onCheckNow, isChecking }: VerificationStatusProps) {
+function VerificationStatus({ lastCheckedAt, nextCheckAt }: VerificationStatusProps) {
   const [timeUntilNext, setTimeUntilNext] = useState<string>('');
-  const [showCheckNow, setShowCheckNow] = useState(false);
 
   useEffect(() => {
     if (!nextCheckAt) return;
@@ -39,7 +36,6 @@ function VerificationStatus({ lastCheckedAt, nextCheckAt, onCheckNow, isChecking
 
       if (diffMs <= 0) {
         setTimeUntilNext('any moment now');
-        setShowCheckNow(false);
         return;
       }
 
@@ -52,9 +48,6 @@ function VerificationStatus({ lastCheckedAt, nextCheckAt, onCheckNow, isChecking
       } else {
         setTimeUntilNext(`${seconds}s`);
       }
-
-      // Show "Check now" if more than 5 minutes away (shouldn't happen with */5 cron, but just in case)
-      setShowCheckNow(diffMs > 5 * 60 * 1000);
     };
 
     updateCountdown();
@@ -64,31 +57,15 @@ function VerificationStatus({ lastCheckedAt, nextCheckAt, onCheckNow, isChecking
 
   return (
     <div className="rounded border border-[var(--status-verifying-text)]/20 bg-[var(--status-verifying-bg)] px-3 py-2 text-sm text-[var(--status-verifying-text)]">
-      <div className="flex items-center justify-between">
-        <div>
-          <span className="text-xs uppercase tracking-wide">Verifying</span>
-          <p className="mt-1">
-            DNS records are being verified. Next check in <span className="font-medium">{timeUntilNext || '...'}</span>
-          </p>
-          {lastCheckedAt && (
-            <p className="mt-0.5 text-xs opacity-75">
-              Last checked: {new Date(lastCheckedAt).toLocaleTimeString()}
-            </p>
-          )}
-        </div>
-        {showCheckNow && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onCheckNow}
-            disabled={isChecking}
-            className="ml-3 shrink-0"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isChecking ? 'animate-spin' : ''}`} />
-            {isChecking ? 'Checking...' : 'Check now'}
-          </Button>
-        )}
-      </div>
+      <span className="text-xs uppercase tracking-wide">Verifying</span>
+      <p className="mt-1">
+        DNS records are being verified. Next check in <span className="font-medium">{timeUntilNext || '...'}</span>
+      </p>
+      {lastCheckedAt && (
+        <p className="mt-0.5 text-xs opacity-75">
+          Last checked: {new Date(lastCheckedAt).toLocaleTimeString()}
+        </p>
+      )}
     </div>
   );
 }
@@ -150,19 +127,8 @@ export function DomainDetailPage() {
   const navigate = useNavigate();
   const { data: domain, isLoading, error } = useDomain(id ?? '');
   const deleteMutation = useDeleteDomain();
-  const verifyMutation = useVerifyDomain();
   const [showTestEmailForm, setShowTestEmailForm] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-
-  const handleCheckNow = async () => {
-    if (!domain) return;
-    try {
-      await verifyMutation.mutateAsync(domain.id);
-      toast.success('Verification check completed');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Verification check failed');
-    }
-  };
 
   const handleDelete = async () => {
     if (!domain) return;
@@ -278,8 +244,6 @@ export function DomainDetailPage() {
             <VerificationStatus
               lastCheckedAt={domain.lastCheckedAt}
               nextCheckAt={domain.nextCheckAt}
-              onCheckNow={handleCheckNow}
-              isChecking={verifyMutation.isPending}
             />
           )}
 
