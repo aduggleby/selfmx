@@ -6,6 +6,12 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.33] - 2026-02-03
+
+### Added
+- Verify SPF and DMARC TXT records during domain verification
+- Fallback DNS verification via Cloudflare when direct lookups fail
+
 ## [0.9.32] - 2026-02-03
 
 ### Changed
