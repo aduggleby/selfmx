@@ -9,6 +9,7 @@ using Hangfire.Console;
 using Hangfire.Dashboard;
 using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -99,8 +100,17 @@ builder.Services.AddAuthentication(options =>
 // Authorization policies
 builder.Services.AddAuthorization(options =>
 {
+    // Default policy: require authenticated user via either Cookie or ApiKey scheme
+    var defaultPolicyBuilder = new AuthorizationPolicyBuilder("Cookie", "ApiKey");
+    defaultPolicyBuilder.RequireAuthenticatedUser();
+    options.DefaultPolicy = defaultPolicyBuilder.Build();
+
+    // Admin-only policy: require ActorType=admin claim
     options.AddPolicy("AdminOnly", policy =>
-        policy.RequireClaim("ActorType", "admin"));
+    {
+        policy.AddAuthenticationSchemes("Cookie", "ApiKey");
+        policy.RequireClaim("ActorType", "admin");
+    });
 });
 
 // AWS SES
