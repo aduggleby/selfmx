@@ -25,6 +25,8 @@ API keys are created in the admin UI and use the Resend format: `re_` followed b
 |----------|--------|------|-------------|
 | `/health` | GET | No | Health check |
 | `/v1/system/status` | GET | No | System status check |
+| `/v1/system/version` | GET | No | Version and build info |
+| `/v1/system/logs` | GET | Admin | Application logs |
 | `/v1/emails` | POST | API Key | Send email |
 | `/v1/domains` | GET | API Key | List domains |
 | `/v1/domains` | POST | API Key | Create domain |
@@ -555,6 +557,89 @@ When configuration issues are detected:
 | AWS SES | Verifies credentials can access SES account |
 | Database | Tests database connectivity |
 | AWS Config | Validates Region, AccessKeyId, SecretAccessKey are set |
+
+## System Version
+
+Get the API version and build information. Useful for debugging and verifying deployments.
+
+**GET** `/v1/system/version`
+
+### Response
+
+```json
+{
+  "version": "0.9.38.0",
+  "informationalVersion": "0.9.38+3d4f16e",
+  "buildDate": "2026-02-03T13:21:28Z",
+  "environment": "Production"
+}
+```
+
+### Fields
+
+| Field | Description |
+|-------|-------------|
+| `version` | Assembly version (Major.Minor.Patch.Revision) |
+| `informationalVersion` | Full version including git commit hash |
+| `buildDate` | Build timestamp (UTC) |
+| `environment` | ASP.NET environment (Development, Production) |
+
+## System Logs (Admin)
+
+Get recent application logs for remote diagnostics. Requires admin authentication.
+
+**GET** `/v1/system/logs`
+
+### Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `count` | integer | 1000 | Number of log entries to return (max 2000) |
+| `level` | string | - | Filter by log level (e.g., `Error`, `Warning`, `Information`) |
+| `category` | string | - | Filter by logger category (partial match) |
+
+### Response
+
+```json
+{
+  "count": 150,
+  "logs": [
+    {
+      "timestamp": "2026-02-03T14:21:05Z",
+      "level": "Information",
+      "category": "SelfMX.Api.Services.SesService",
+      "message": "Email sent successfully to recipient@example.com",
+      "exception": null
+    },
+    {
+      "timestamp": "2026-02-03T14:20:58Z",
+      "level": "Error",
+      "category": "Microsoft.AspNetCore.Server.Kestrel",
+      "message": "Connection reset by peer",
+      "exception": "System.IO.IOException: Connection reset..."
+    }
+  ]
+}
+```
+
+### Example
+
+```bash
+# Get last 100 error logs
+curl "https://mail.yourdomain.com/v1/system/logs?count=100&level=Error" \
+  -H "Cookie: auth_session=your_session_cookie"
+
+# Get logs from a specific category
+curl "https://mail.yourdomain.com/v1/system/logs?category=SesService" \
+  -H "Cookie: auth_session=your_session_cookie"
+```
+
+### Notes
+
+- Logs are stored in memory (circular buffer of 2000 entries)
+- Logs are lost on application restart
+- Captures all log levels (Debug and above)
+- Useful for debugging issues without SSH access
 
 ## Background Jobs Dashboard
 

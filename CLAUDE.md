@@ -145,6 +145,8 @@ client/src/
 | `GET /health` | No | Health check |
 | `GET /` | No | Status |
 | `GET /v1/system/status` | No | System config validation (AWS, DB connectivity) |
+| `GET /v1/system/version` | No | API version and build info |
+| `GET /v1/system/logs` | Admin | In-memory application logs for diagnostics |
 | `POST /v1/domains` | Yes | Create domain |
 | `GET /v1/domains` | Yes | List domains (paginated) |
 | `GET /v1/domains/{id}` | Yes | Get domain |

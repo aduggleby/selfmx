@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.38] - 2026-02-03
+
+### Added
+- Add version and diagnostics endpoint for troubleshooting server issues
+
 ## [0.9.37] - 2026-02-03
 
 ### Fixed
