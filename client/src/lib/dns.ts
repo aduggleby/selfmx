@@ -1,6 +1,33 @@
 import type { DnsRecord } from './schemas';
 
 /**
+ * Convert a full DNS record name to a relative name for the zone file.
+ * For example:
+ * - "abc._domainkey.example.com" with domain "example.com" -> "abc._domainkey"
+ * - "example.com" with domain "example.com" -> "@"
+ * - "_dmarc.example.com" with domain "example.com" -> "_dmarc"
+ */
+function toRelativeName(fullName: string, domain: string): string {
+  // Normalize: remove any trailing dots
+  const normalizedName = fullName.replace(/\.+$/, '');
+  const normalizedDomain = domain.replace(/\.+$/, '');
+
+  // If name equals domain exactly, it's the apex
+  if (normalizedName === normalizedDomain) {
+    return '@';
+  }
+
+  // If name ends with .domain, strip it
+  const suffix = `.${normalizedDomain}`;
+  if (normalizedName.endsWith(suffix)) {
+    return normalizedName.slice(0, -suffix.length);
+  }
+
+  // Otherwise return as-is (shouldn't happen with valid data)
+  return normalizedName;
+}
+
+/**
  * Generate a BIND zone file from DNS records
  */
 export function generateBindFile(domain: string, records: DnsRecord[]): string {
@@ -15,10 +42,12 @@ export function generateBindFile(domain: string, records: DnsRecord[]): string {
   ];
 
   for (const record of records) {
+    // Convert full name to relative name for BIND format
+    const name = toRelativeName(record.name, domain);
     // BIND format: name TTL class type value
     // CNAME values need trailing dot for FQDNs
     const value = record.type === 'CNAME' ? `${record.value}.` : record.value;
-    lines.push(`${record.name}\tIN\t${record.type}\t${value}`);
+    lines.push(`${name}\tIN\t${record.type}\t${value}`);
   }
 
   return lines.join('\n');
