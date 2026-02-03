@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.37] - 2026-02-03
+
+### Fixed
+- Fix authentication to properly support both API key and session-based access
+
 ## [0.9.36] - 2026-02-03
 
 ### Changed
