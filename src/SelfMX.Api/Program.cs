@@ -200,11 +200,18 @@ app.UseExceptionHandler(errorApp =>
 // Auto-migrate on startup
 using (var scope = app.Services.CreateScope())
 {
+    var startupLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Startup");
+
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.EnsureCreatedAsync();
+    // Apply schema updates for SQL Server (EnsureCreated doesn't add new columns)
+    await SchemaUpdater.UpdateAppSchemaAsync(db, startupLogger);
 
     var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
     await auditDb.Database.EnsureCreatedAsync();
+    // Apply schema updates for audit database
+    await SchemaUpdater.UpdateAuditSchemaAsync(auditDb, startupLogger);
 }
 
 app.UseCors();

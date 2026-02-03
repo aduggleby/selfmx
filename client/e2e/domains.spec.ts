@@ -417,6 +417,32 @@ test.describe('Error Handling', () => {
     // Error modal shows "Error"
     await expect(page.getByRole('heading', { name: 'Error' })).toBeVisible();
   });
+
+  test('displays error when database schema is out of sync', async ({ page, apiMock }) => {
+    // First mock auth to succeed
+    apiMock.setAuthenticated(true);
+
+    // Mock a database schema error (like missing column)
+    await page.route('**/v1/domains?*', async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: {
+            code: 'database_error',
+            message: 'Invalid column name \'LastCheckedAt\'.',
+          },
+        }),
+      });
+    });
+
+    await page.goto('/');
+
+    // Error modal shows "Error" heading
+    await expect(page.getByRole('heading', { name: 'Error' })).toBeVisible();
+    // And displays the error message
+    await expect(page.getByText("Invalid column name 'LastCheckedAt'.")).toBeVisible();
+  });
 });
 
 test.describe('Domain Card Grid Layout', () => {
