@@ -22,6 +22,13 @@ interface SystemStatus {
   timestamp: string;
 }
 
+interface SystemVersion {
+  version: string;
+  informationalVersion: string;
+  buildDate: string;
+  environment: string;
+}
+
 // Handle 401 errors globally at the React Query level
 const handleQueryError = (error: unknown) => {
   if ((error as Error & { status?: number }).status === 401) {
@@ -57,6 +64,14 @@ async function fetchSystemStatus(): Promise<SystemStatus> {
   const response = await fetch('/v1/system/status');
   if (!response.ok) {
     throw new Error('Failed to fetch system status');
+  }
+  return response.json();
+}
+
+async function fetchSystemVersion(): Promise<SystemVersion> {
+  const response = await fetch('/v1/system/version');
+  if (!response.ok) {
+    throw new Error('Failed to fetch system version');
   }
   return response.json();
 }
@@ -127,6 +142,14 @@ function AuthenticatedApp() {
     retry: false,
   });
 
+  // Fetch version info
+  const { data: versionInfo } = useQuery({
+    queryKey: ['system-version'],
+    queryFn: fetchSystemVersion,
+    staleTime: Infinity, // Version doesn't change during session
+    retry: false,
+  });
+
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener('scroll', handleScroll);
@@ -149,9 +172,14 @@ function AuthenticatedApp() {
         <div className="container mx-auto max-w-4xl flex items-center justify-between py-3 px-4">
           <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <h1 className="font-display text-lg font-semibold">SelfMX</h1>
-            <span className="text-xs text-muted-foreground hidden sm:inline">
-              Email API
-            </span>
+            {versionInfo && (
+              <span
+                className="text-xs text-muted-foreground font-mono hidden sm:inline"
+                title={`Build: ${versionInfo.buildDate}\nEnv: ${versionInfo.environment}`}
+              >
+                v{versionInfo.version}
+              </span>
+            )}
           </Link>
           <div className="flex items-center gap-1">
             <Link

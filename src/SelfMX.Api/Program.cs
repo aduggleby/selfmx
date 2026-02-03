@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -22,6 +23,11 @@ using SelfMX.Api.Services;
 using SelfMX.Api.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// In-memory log sink for remote diagnostics
+var logSink = new InMemoryLogSink(maxEntries: 2000);
+builder.Services.AddSingleton(logSink);
+builder.Logging.AddProvider(new InMemoryLoggerProvider(logSink, LogLevel.Debug));
 
 // Configure JSON serialization for consistent datetime format (ISO 8601 with Z)
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -79,7 +85,9 @@ builder.Services.AddHangfireServer(options =>
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultScheme = "ApiKey";
+        options.DefaultAuthenticateScheme = "ApiKey";
         options.DefaultChallengeScheme = "ApiKey";
+        options.DefaultForbidScheme = "ApiKey";
     })
     .AddCookie("Cookie", options =>
     {
@@ -100,18 +108,13 @@ builder.Services.AddAuthentication(options =>
 // Authorization policies
 builder.Services.AddAuthorization(options =>
 {
-    // Default policy: require authenticated user via either Cookie or ApiKey scheme
-    var defaultPolicyBuilder = new AuthorizationPolicyBuilder("Cookie", "ApiKey");
-    defaultPolicyBuilder.RequireAuthenticatedUser();
-    options.DefaultPolicy = defaultPolicyBuilder.Build();
-
     // Admin-only policy: require ActorType=admin claim
     options.AddPolicy("AdminOnly", policy =>
-    {
-        policy.AddAuthenticationSchemes("Cookie", "ApiKey");
-        policy.RequireClaim("ActorType", "admin");
-    });
+        policy.RequireClaim("ActorType", "admin"));
 });
+
+// Diagnostic handler to log authorization state (for debugging)
+builder.Services.AddSingleton<IAuthorizationHandler, DiagnosticAuthorizationHandler>();
 
 // AWS SES
 builder.Services.AddSingleton<IAmazonSimpleEmailServiceV2>(sp =>
@@ -295,6 +298,66 @@ app.MapGet("/v1/system/status", async (
         timestamp = DateTime.UtcNow
     });
 });
+
+// Version endpoint (no auth - needed by frontend)
+app.MapGet("/v1/system/version", () =>
+{
+    var version = typeof(Program).Assembly.GetName().Version;
+    var informationalVersion = typeof(Program).Assembly
+        .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+        .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+        .FirstOrDefault()?.InformationalVersion;
+
+    return Results.Ok(new
+    {
+        version = version?.ToString() ?? "unknown",
+        informationalVersion = informationalVersion ?? version?.ToString() ?? "unknown",
+        buildDate = File.GetLastWriteTimeUtc(typeof(Program).Assembly.Location),
+        environment = app.Environment.EnvironmentName
+    });
+});
+
+// Logs endpoint (admin only - for remote diagnostics)
+app.MapGet("/v1/system/logs", (
+    InMemoryLogSink sink,
+    ClaimsPrincipal user,
+    int count = 1000,
+    string? level = null,
+    string? category = null) =>
+{
+    // Require admin
+    if (user.FindFirst("ActorType")?.Value != "admin")
+    {
+        return Results.Forbid();
+    }
+
+    var logs = sink.GetLogs(Math.Min(count, 2000));
+
+    // Filter by level if specified
+    if (!string.IsNullOrEmpty(level))
+    {
+        logs = logs.Where(l => l.Level.Equals(level, StringComparison.OrdinalIgnoreCase)).ToList();
+    }
+
+    // Filter by category if specified
+    if (!string.IsNullOrEmpty(category))
+    {
+        logs = logs.Where(l => l.Category.Contains(category, StringComparison.OrdinalIgnoreCase)).ToList();
+    }
+
+    return Results.Ok(new
+    {
+        count = logs.Count,
+        logs = logs.Select(l => new
+        {
+            timestamp = l.Timestamp,
+            level = l.Level,
+            category = l.Category,
+            message = l.Message,
+            exception = l.Exception
+        })
+    });
+}).RequireAuthorization();
 
 // API v1 routes
 var v1 = app.MapGroup("/v1");
