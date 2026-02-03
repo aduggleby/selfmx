@@ -83,9 +83,19 @@ public static class SentEmailEndpoints
                 e.FromAddress,
                 e.ToAddresses,
                 e.Subject,
-                e.DomainId
+                e.DomainId,
+                e.ApiKeyId
             })
             .ToListAsync(ct);
+
+        // Batch fetch API key names for items that have an ApiKeyId
+        var apiKeyIds = rawItems.Where(e => e.ApiKeyId != null).Select(e => e.ApiKeyId!).Distinct().ToList();
+        var apiKeyNames = apiKeyIds.Count > 0
+            ? await db.ApiKeys
+                .Where(k => apiKeyIds.Contains(k.Id))
+                .Select(k => new { k.Id, k.Name })
+                .ToDictionaryAsync(k => k.Id, k => k.Name, ct)
+            : new Dictionary<string, string>();
 
         // Deserialize JSON after query execution
         var items = rawItems.Select(e => new SentEmailListItem(
@@ -95,7 +105,9 @@ public static class SentEmailEndpoints
             e.FromAddress,
             JsonSerializer.Deserialize<string[]>(e.ToAddresses) ?? Array.Empty<string>(),
             e.Subject,
-            e.DomainId
+            e.DomainId,
+            e.ApiKeyId,
+            e.ApiKeyId != null && apiKeyNames.TryGetValue(e.ApiKeyId, out var name) ? name : null
         )).ToList();
 
         var hasMore = items.Count > pageSize;
@@ -133,7 +145,8 @@ public static class SentEmailEndpoints
                 e.Subject,
                 e.HtmlBody,
                 e.TextBody,
-                e.DomainId
+                e.DomainId,
+                e.ApiKeyId
             })
             .FirstOrDefaultAsync(ct);
 
@@ -143,6 +156,16 @@ public static class SentEmailEndpoints
         // Authorization check
         if (!apiKeyService.CanAccessDomain(user, email.DomainId))
             return TypedResults.Forbid();
+
+        // Look up API key name if present
+        string? apiKeyName = null;
+        if (email.ApiKeyId != null)
+        {
+            apiKeyName = await db.ApiKeys
+                .Where(k => k.Id == email.ApiKeyId)
+                .Select(k => k.Name)
+                .FirstOrDefaultAsync(ct);
+        }
 
         var detail = new SentEmailDetail(
             email.Id,
@@ -155,7 +178,9 @@ public static class SentEmailEndpoints
             email.Subject,
             email.HtmlBody,
             email.TextBody,
-            email.DomainId
+            email.DomainId,
+            email.ApiKeyId,
+            apiKeyName
         );
 
         return TypedResults.Ok(detail);

@@ -22,6 +22,7 @@ function SentEmailRowSkeleton() {
       <td className="py-3 px-2"><Skeleton className="h-4 w-40" /></td>
       <td className="py-3 px-2"><Skeleton className="h-4 w-36" /></td>
       <td className="py-3 px-2"><Skeleton className="h-4 w-48" /></td>
+      <td className="py-3 px-2"><Skeleton className="h-4 w-20" /></td>
     </tr>
   );
 }
@@ -119,6 +120,9 @@ function SentEmailDetailModal({ email, onClose }: SentEmailDetailModalProps) {
                 <span className="font-mono text-xs">{email.replyTo}</span>
               </>
             )}
+
+            <span className="text-muted-foreground">API Key:</span>
+            <span className="text-xs">{email.apiKeyName || (email.apiKeyId ? 'Unknown' : 'Admin')}</span>
           </div>
         </div>
 
@@ -214,6 +218,9 @@ function SentEmailRow({
       </td>
       <td className="py-3 px-2 truncate max-w-[250px]">
         {email.subject}
+      </td>
+      <td className="py-3 px-2 text-xs text-muted-foreground truncate max-w-[120px]">
+        {email.apiKeyName || (email.apiKeyId ? 'Unknown' : 'Admin')}
       </td>
     </tr>
   );
@@ -386,6 +393,7 @@ export function SentEmailsPage() {
                   <th className="py-2 px-2 font-medium">From</th>
                   <th className="py-2 px-2 font-medium">To</th>
                   <th className="py-2 px-2 font-medium">Subject</th>
+                  <th className="py-2 px-2 font-medium">API Key</th>
                 </tr>
               </thead>
               <tbody>
@@ -419,6 +427,7 @@ export function SentEmailsPage() {
                     <th className="py-2 px-2 font-medium">From</th>
                     <th className="py-2 px-2 font-medium">To</th>
                     <th className="py-2 px-2 font-medium">Subject</th>
+                    <th className="py-2 px-2 font-medium">API Key</th>
                   </tr>
                 </thead>
                 <tbody>

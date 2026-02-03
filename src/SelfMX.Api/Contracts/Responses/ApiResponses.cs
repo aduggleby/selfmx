@@ -91,7 +91,9 @@ public record SentEmailListItem(
     string FromAddress,
     string[] To,
     string Subject,
-    string DomainId
+    string DomainId,
+    string? ApiKeyId,
+    string? ApiKeyName
 );
 
 public record SentEmailDetail(
@@ -106,7 +108,9 @@ public record SentEmailDetail(
     string Subject,
     string? HtmlBody,
     string? TextBody,
-    string DomainId
+    string DomainId,
+    string? ApiKeyId,
+    string? ApiKeyName
 );
 
 public record CursorPagedResponse<T>(

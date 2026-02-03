@@ -114,6 +114,8 @@ export const SentEmailListItemSchema = z.object({
   to: z.array(z.string()),
   subject: z.string(),
   domainId: z.string(),
+  apiKeyId: z.string().nullable(),
+  apiKeyName: z.string().nullable(),
 });
 export type SentEmailListItem = z.infer<typeof SentEmailListItemSchema>;
 
@@ -129,6 +131,8 @@ export const SentEmailDetailSchema = z.object({
   htmlBody: z.string().nullable(),
   textBody: z.string().nullable(),
   domainId: z.string(),
+  apiKeyId: z.string().nullable(),
+  apiKeyName: z.string().nullable(),
 });
 export type SentEmailDetail = z.infer<typeof SentEmailDetailSchema>;
 
