@@ -437,7 +437,9 @@ Get sent emails with cursor-based pagination and filtering. Requires admin authe
       "fromAddress": "hello@yourdomain.com",
       "to": ["recipient@example.com"],
       "subject": "Hello from SelfMX",
-      "domainId": "d5f2a3b1-..."
+      "domainId": "d5f2a3b1-...",
+      "apiKeyId": "k5f2a3b1-...",
+      "apiKeyName": "Production"
     }
   ],
   "nextCursor": "eyJpZCI6IjEyMyJ9",
@@ -477,9 +479,17 @@ Get details of a specific sent email including the full body. Requires admin aut
   "subject": "Hello from SelfMX",
   "htmlBody": "<p>HTML content</p>",
   "textBody": "Plain text content",
-  "domainId": "d5f2a3b1-..."
+  "domainId": "d5f2a3b1-...",
+  "apiKeyId": "k5f2a3b1-...",
+  "apiKeyName": "Production"
 }
 ```
+
+### Notes
+
+- `apiKeyId` and `apiKeyName` identify which API key was used to send the email
+- `apiKeyName` is `null` if the API key has been deleted
+- Both fields are `null` for emails sent via admin session authentication
 
 ## Audit Logs (Admin)
 

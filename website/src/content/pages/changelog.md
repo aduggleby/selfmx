@@ -6,6 +6,14 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.43] - 2026-02-03
+
+### Added
+- Show which API key was used when viewing sent emails
+
+### Fixed
+- Improve organization of revoked API keys in a collapsible section
+
 ## [0.9.42] - 2026-02-03
 
 ### Added
