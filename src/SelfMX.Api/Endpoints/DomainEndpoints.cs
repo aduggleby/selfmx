@@ -7,6 +7,7 @@ using SelfMX.Api.Contracts.Responses;
 using SelfMX.Api.Entities;
 using SelfMX.Api.Jobs;
 using SelfMX.Api.Services;
+using Microsoft.Extensions.Logging;
 
 namespace SelfMX.Api.Endpoints;
 
@@ -29,15 +30,24 @@ public static class DomainEndpoints
     private static async Task<Results<Ok<PaginatedResponse<DomainResponse>>, BadRequest<object>>> ListDomains(
         DomainService domainService,
         ClaimsPrincipal user,
+        ILoggerFactory loggerFactory,
         int page = 1,
         int limit = 20,
         CancellationToken ct = default)
     {
+        var logger = loggerFactory.CreateLogger("DomainEndpoints");
+
         if (page < 1) page = 1;
         if (limit < 1 || limit > 100) limit = 20;
 
         var isAdmin = user.FindFirst("ActorType")?.Value == "admin";
         var allowedDomainIds = user.FindAll("AllowedDomain").Select(c => c.Value).ToList();
+
+        logger.LogInformation("ListDomains: ActorType={ActorType}, IsAdmin={IsAdmin}, AllowedDomainIds=[{Domains}], AllClaims=[{Claims}]",
+            user.FindFirst("ActorType")?.Value,
+            isAdmin,
+            string.Join(", ", allowedDomainIds),
+            string.Join(", ", user.Claims.Select(c => $"{c.Type}={c.Value}")));
 
         var (items, total) = isAdmin
             ? await domainService.ListAsync(page, limit, ct)

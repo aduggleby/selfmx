@@ -81,6 +81,11 @@ public class ApiKeyAuthHandler : AuthenticationHandler<AuthenticationSchemeOptio
                 // Add allowed domains as claims (for non-admin keys)
                 if (!validatedKey.IsAdmin)
                 {
+                    _logger.LogInformation("Auth: Non-admin key {Prefix}, AllowedDomains count: {Count}, DomainIds: [{Domains}]",
+                        validatedKey.KeyPrefix,
+                        validatedKey.AllowedDomains.Count,
+                        string.Join(", ", validatedKey.AllowedDomains.Select(d => d.DomainId)));
+
                     foreach (var domain in validatedKey.AllowedDomains)
                     {
                         claims.Add(new Claim("AllowedDomain", domain.DomainId));
