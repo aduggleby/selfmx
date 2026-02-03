@@ -370,18 +370,20 @@ var v1 = app.MapGroup("/v1");
 // Admin auth endpoints - rate limited for brute force protection
 v1.MapAdminEndpoints().RequireRateLimiting("login");
 
-// Authenticated endpoints - require valid API key or cookie
-var authenticated = v1.RequireAuthorization().RequireRateLimiting("api");
+// Authenticated endpoints - require valid API key or cookie (uses DefaultPolicy)
+var authenticated = v1.MapGroup("")
+    .RequireAuthorization()
+    .RequireRateLimiting("api");
 authenticated.MapDomainEndpoints();
 authenticated.MapEmailEndpoints();
+authenticated.MapSentEmailEndpoints();
 
-// Admin-only endpoints - require admin actor type
-var adminOnly = v1.RequireAuthorization("AdminOnly").RequireRateLimiting("api");
+// Admin-only endpoints - require admin actor type (uses AdminOnly policy)
+var adminOnly = v1.MapGroup("")
+    .RequireAuthorization("AdminOnly")
+    .RequireRateLimiting("api");
 adminOnly.MapApiKeyEndpoints();
 adminOnly.MapAuditEndpoints();
-
-// Sent emails - authenticated users can view their domain's emails, admin can view all
-authenticated.MapSentEmailEndpoints();
 
 // Hangfire dashboard - admin only, available in all environments
 app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
