@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.30] - 2026-02-03
+
+### Added
+- Automatic database schema updates on startup for smoother upgrades
+
 ## [0.9.29] - 2026-02-02
 
 ### Fixed
