@@ -171,6 +171,9 @@ SelfMX implements the [Resend API](https://resend.com/docs/api-reference/emails/
 | `/v1/domains/{id}/test-email` | POST | Send test email |
 | `/v1/api-keys` | GET | List API keys |
 | `/v1/api-keys` | POST | Create API key |
+| `/v1/api-keys/{id}` | DELETE | Revoke API key (admin) |
+| `/v1/sent-emails` | GET | List sent emails (admin) |
+| `/v1/sent-emails/{id}` | GET | Get sent email details (admin) |
 | `/v1/audit` | GET | Audit logs |
 | `/hangfire` | GET | Background jobs dashboard (admin) |
 

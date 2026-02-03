@@ -6,6 +6,14 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.34] - 2026-02-03
+
+### Added
+- **API Keys Management UI** - View, create, and revoke API keys from the admin dashboard
+- **Sent Emails UI** - Browse sent emails with filtering by domain, sender, and recipient
+- **Sent Emails API** - New endpoints `GET /v1/sent-emails` and `GET /v1/sent-emails/{id}` for accessing email history
+- **Revoke API Key endpoint** - `DELETE /v1/api-keys/{id}` for revoking keys via API
+
 ## [0.9.33] - 2026-02-03
 
 ### Added

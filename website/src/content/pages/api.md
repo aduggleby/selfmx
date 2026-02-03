@@ -34,6 +34,9 @@ API keys are created in the admin UI and use the Resend format: `re_` followed b
 | `/v1/domains/{id}/test-email` | POST | API Key | Send test email |
 | `/v1/api-keys` | GET | Admin | List API keys |
 | `/v1/api-keys` | POST | Admin | Create API key |
+| `/v1/api-keys/{id}` | DELETE | Admin | Revoke API key |
+| `/v1/sent-emails` | GET | Admin | List sent emails |
+| `/v1/sent-emails/{id}` | GET | Admin | Get sent email details |
 | `/v1/audit` | GET | Admin | Audit logs |
 | `/hangfire` | GET | Admin | Background jobs dashboard |
 
@@ -348,6 +351,90 @@ Create a new API key. Requires admin authentication.
 ```
 
 > **Important**: The `key` field is only returned once at creation time. Store it securely.
+
+## Revoke API Key (Admin)
+
+Revoke an API key. Requires admin authentication.
+
+**DELETE** `/v1/api-keys/{id}`
+
+### Response
+
+```
+204 No Content
+```
+
+## List Sent Emails (Admin)
+
+Get sent emails with cursor-based pagination and filtering. Requires admin authentication.
+
+**GET** `/v1/sent-emails`
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `domainId` | string | Filter by domain ID |
+| `from` | string | Filter by sender address (partial match) |
+| `to` | string | Filter by recipient address (partial match) |
+| `cursor` | string | Cursor for next page |
+| `pageSize` | integer | Items per page (default: 50) |
+
+### Response
+
+```json
+{
+  "data": [
+    {
+      "id": "e5f2a3b1-...",
+      "messageId": "msg_xxxxxxxxxxxx",
+      "sentAt": "2024-01-15T10:30:00Z",
+      "fromAddress": "hello@yourdomain.com",
+      "to": ["recipient@example.com"],
+      "subject": "Hello from SelfMX",
+      "domainId": "d5f2a3b1-..."
+    }
+  ],
+  "nextCursor": "eyJpZCI6IjEyMyJ9",
+  "hasMore": true
+}
+```
+
+### Pagination
+
+Use cursor-based pagination for large datasets:
+
+```bash
+# First page
+curl https://mail.yourdomain.com/v1/sent-emails?pageSize=50
+
+# Next page (use nextCursor from previous response)
+curl https://mail.yourdomain.com/v1/sent-emails?cursor=eyJpZCI6IjEyMyJ9
+```
+
+## Get Sent Email (Admin)
+
+Get details of a specific sent email including the full body. Requires admin authentication.
+
+**GET** `/v1/sent-emails/{id}`
+
+### Response
+
+```json
+{
+  "id": "e5f2a3b1-...",
+  "messageId": "msg_xxxxxxxxxxxx",
+  "sentAt": "2024-01-15T10:30:00Z",
+  "fromAddress": "hello@yourdomain.com",
+  "to": ["recipient@example.com"],
+  "cc": ["cc@example.com"],
+  "replyTo": "reply@yourdomain.com",
+  "subject": "Hello from SelfMX",
+  "htmlBody": "<p>HTML content</p>",
+  "textBody": "Plain text content",
+  "domainId": "d5f2a3b1-..."
+}
+```
 
 ## Audit Logs (Admin)
 
