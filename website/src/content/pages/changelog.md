@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.35] - 2026-02-03
+
+### Fixed
+- Fix API key domain scoping to properly restrict access to authorized domains only
+
 ## [0.9.34] - 2026-02-03
 
 ### Added
