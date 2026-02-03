@@ -28,6 +28,7 @@ public static class DomainEndpoints
 
     private static async Task<Results<Ok<PaginatedResponse<DomainResponse>>, BadRequest<object>>> ListDomains(
         DomainService domainService,
+        ClaimsPrincipal user,
         int page = 1,
         int limit = 20,
         CancellationToken ct = default)
@@ -35,7 +36,12 @@ public static class DomainEndpoints
         if (page < 1) page = 1;
         if (limit < 1 || limit > 100) limit = 20;
 
-        var (items, total) = await domainService.ListAsync(page, limit, ct);
+        var isAdmin = user.FindFirst("ActorType")?.Value == "admin";
+        var allowedDomainIds = user.FindAll("AllowedDomain").Select(c => c.Value).ToList();
+
+        var (items, total) = isAdmin
+            ? await domainService.ListAsync(page, limit, ct)
+            : await domainService.ListAsync(page, limit, allowedDomainIds, ct);
 
         var responses = items.Select(d =>
         {
@@ -82,15 +88,22 @@ public static class DomainEndpoints
         return TypedResults.Created($"/v1/domains/{domain.Id}", DomainResponse.FromEntity(domain));
     }
 
-    private static async Task<Results<Ok<DomainResponse>, NotFound<object>>> GetDomain(
+    private static async Task<Results<Ok<DomainResponse>, NotFound<object>, ForbidHttpResult>> GetDomain(
         string id,
         DomainService domainService,
+        ApiKeyService apiKeyService,
+        ClaimsPrincipal user,
         CancellationToken ct = default)
     {
         var domain = await domainService.GetByIdAsync(id, ct);
         if (domain is null)
         {
             return TypedResults.NotFound(ApiError.NotFound.ToResponse());
+        }
+
+        if (!apiKeyService.CanAccessDomain(user, domain.Id))
+        {
+            return TypedResults.Forbid();
         }
 
         var dnsRecords = domain.DnsRecordsJson?.DeserializeDnsRecords();
@@ -101,16 +114,23 @@ public static class DomainEndpoints
         return TypedResults.Ok(DomainResponse.FromEntity(domain, recordResponses));
     }
 
-    private static async Task<Results<Ok<DomainResponse>, NotFound<object>, BadRequest<object>>> VerifyDomain(
+    private static async Task<Results<Ok<DomainResponse>, NotFound<object>, BadRequest<object>, ForbidHttpResult>> VerifyDomain(
         string id,
         DomainService domainService,
+        ApiKeyService apiKeyService,
         VerifyDomainsJob verifyJob,
+        ClaimsPrincipal user,
         CancellationToken ct = default)
     {
         var domain = await domainService.GetByIdAsync(id, ct);
         if (domain is null)
         {
             return TypedResults.NotFound(ApiError.NotFound.ToResponse());
+        }
+
+        if (!apiKeyService.CanAccessDomain(user, domain.Id))
+        {
+            return TypedResults.Forbid();
         }
 
         if (domain.Status != DomainStatus.Verifying)
@@ -131,17 +151,24 @@ public static class DomainEndpoints
         return TypedResults.Ok(DomainResponse.FromEntity(domain, recordResponses));
     }
 
-    private static async Task<Results<NoContent, NotFound<object>>> DeleteDomain(
+    private static async Task<Results<NoContent, NotFound<object>, ForbidHttpResult>> DeleteDomain(
         string id,
         DomainService domainService,
+        ApiKeyService apiKeyService,
         ISesService sesService,
         ICloudflareService cloudflareService,
+        ClaimsPrincipal user,
         CancellationToken ct = default)
     {
         var domain = await domainService.GetByIdAsync(id, ct);
         if (domain is null)
         {
             return TypedResults.NotFound(ApiError.NotFound.ToResponse());
+        }
+
+        if (!apiKeyService.CanAccessDomain(user, domain.Id))
+        {
+            return TypedResults.Forbid();
         }
 
         // Delete SES identity

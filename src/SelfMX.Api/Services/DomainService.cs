@@ -35,6 +35,19 @@ public class DomainService
         return (items, total);
     }
 
+    public async Task<(Domain[] Items, int Total)> ListAsync(int page, int limit, IReadOnlyList<string> allowedDomainIds, CancellationToken ct = default)
+    {
+        var query = _db.Domains.Where(d => allowedDomainIds.Contains(d.Id));
+        var total = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(d => d.CreatedAt)
+            .Skip((page - 1) * limit)
+            .Take(limit)
+            .ToArrayAsync(ct);
+
+        return (items, total);
+    }
+
     public async Task<Domain> CreateAsync(string name, CancellationToken ct = default)
     {
         var domain = new Domain
