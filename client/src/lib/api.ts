@@ -4,6 +4,7 @@ import {
   PaginatedDomainsSchema,
   SendEmailResponseSchema,
   PaginatedApiKeysSchema,
+  PaginatedRevokedApiKeysSchema,
   ApiKeyCreatedSchema,
   CursorPagedSentEmailsSchema,
   SentEmailDetailSchema,
@@ -11,6 +12,7 @@ import {
   type PaginatedDomains,
   type SendEmailResponse,
   type PaginatedApiKeys,
+  type PaginatedRevokedApiKeys,
   type ApiKeyCreated,
   type CursorPagedSentEmails,
   type SentEmailDetail,
@@ -260,6 +262,13 @@ class ApiClient {
     return this.request(
       `/api-keys?page=${page}&limit=${limit}`,
       PaginatedApiKeysSchema
+    );
+  }
+
+  async listRevokedApiKeys(page = 1, limit = 20): Promise<PaginatedRevokedApiKeys> {
+    return this.request(
+      `/api-keys/revoked?page=${page}&limit=${limit}`,
+      PaginatedRevokedApiKeysSchema
     );
   }
 

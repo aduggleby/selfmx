@@ -83,6 +83,28 @@ export const PaginatedApiKeysSchema = z.object({
 });
 export type PaginatedApiKeys = z.infer<typeof PaginatedApiKeysSchema>;
 
+// Revoked API Key schemas
+export const RevokedApiKeySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  keyPrefix: z.string(),
+  isAdmin: z.boolean(),
+  createdAt: z.string().datetime(),
+  revokedAt: z.string().datetime(),
+  archivedAt: z.string().datetime(),
+  lastUsedAt: z.string().datetime().nullable(),
+  domainIds: z.array(z.string()),
+});
+export type RevokedApiKey = z.infer<typeof RevokedApiKeySchema>;
+
+export const PaginatedRevokedApiKeysSchema = z.object({
+  data: z.array(RevokedApiKeySchema),
+  page: z.number(),
+  limit: z.number(),
+  total: z.number(),
+});
+export type PaginatedRevokedApiKeys = z.infer<typeof PaginatedRevokedApiKeysSchema>;
+
 // Sent Email schemas
 export const SentEmailListItemSchema = z.object({
   id: z.string(),

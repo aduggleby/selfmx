@@ -24,6 +24,35 @@ public static class SchemaUpdater
         // Check and add missing columns to Domains table
         await AddColumnIfNotExistsAsync(db, "Domains", "LastCheckedAt", "datetime2 NULL", logger);
 
+        // Create RevokedApiKeys table if it doesn't exist
+        var revokedKeysExists = await TableExistsAsync(db, "RevokedApiKeys");
+        if (!revokedKeysExists)
+        {
+            logger.LogInformation("Creating RevokedApiKeys table...");
+            await db.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [RevokedApiKeys] (
+                    [Id] nvarchar(36) NOT NULL,
+                    [Name] nvarchar(100) NOT NULL,
+                    [KeyPrefix] nvarchar(11) NOT NULL,
+                    [IsAdmin] bit NOT NULL,
+                    [CreatedAt] datetime2 NOT NULL,
+                    [RevokedAt] datetime2 NOT NULL,
+                    [ArchivedAt] datetime2 NOT NULL,
+                    [LastUsedIp] nvarchar(45) NULL,
+                    [LastUsedAt] datetime2 NULL,
+                    [AllowedDomainIds] nvarchar(1000) NULL,
+                    CONSTRAINT [PK_RevokedApiKeys] PRIMARY KEY ([Id])
+                )");
+            logger.LogInformation("RevokedApiKeys table created");
+
+            // Create indexes
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX [IX_RevokedApiKeys_RevokedAt] ON [RevokedApiKeys] ([RevokedAt])");
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX [IX_RevokedApiKeys_KeyPrefix] ON [RevokedApiKeys] ([KeyPrefix])");
+            logger.LogInformation("RevokedApiKeys indexes created");
+        }
+
         logger.LogInformation("Schema update check complete");
     }
 

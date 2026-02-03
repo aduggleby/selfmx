@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<ApiKeyDomain> ApiKeyDomains => Set<ApiKeyDomain>();
     public DbSet<SentEmail> SentEmails => Set<SentEmail>();
+    public DbSet<RevokedApiKey> RevokedApiKeys => Set<RevokedApiKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,6 +76,18 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.DomainId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<RevokedApiKey>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasMaxLength(36);
+            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.KeyPrefix).HasMaxLength(11).IsRequired();
+            entity.Property(e => e.LastUsedIp).HasMaxLength(45);
+            entity.Property(e => e.AllowedDomainIds).HasMaxLength(1000);
+            entity.HasIndex(e => e.RevokedAt);
+            entity.HasIndex(e => e.KeyPrefix);
         });
     }
 }

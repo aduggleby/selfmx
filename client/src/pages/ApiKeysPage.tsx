@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Key, Plus, Trash2, AlertTriangle, Copy, Check } from 'lucide-react';
-import { useApiKeys, useCreateApiKey, useDeleteApiKey } from '@/hooks/useApiKeys';
+import { Key, Plus, Trash2, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, Archive } from 'lucide-react';
+import { useApiKeys, useCreateApiKey, useDeleteApiKey, useRevokedApiKeys } from '@/hooks/useApiKeys';
 import { useDomains } from '@/hooks/useDomains';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { ApiKey, ApiKeyCreated, Domain } from '@/lib/schemas';
+import type { ApiKey, ApiKeyCreated, Domain, RevokedApiKey } from '@/lib/schemas';
 
 interface CreateApiKeyModalProps {
   domains: Domain[];
@@ -330,6 +330,50 @@ function ApiKeyRow({
   );
 }
 
+function RevokedApiKeyRow({
+  revokedKey,
+  domains,
+}: {
+  revokedKey: RevokedApiKey;
+  domains: Domain[];
+}) {
+  const domainNames = revokedKey.domainIds
+    .map((id) => domains.find((d) => d.id === id)?.name)
+    .filter(Boolean);
+
+  return (
+    <tr className="border-b opacity-60">
+      <td className="py-3 px-2">
+        <span className="line-through">{revokedKey.name}</span>
+      </td>
+      <td className="py-3 px-2 font-mono text-xs text-muted-foreground">
+        {revokedKey.keyPrefix}...
+      </td>
+      <td className="py-3 px-2">
+        {revokedKey.isAdmin ? (
+          <span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-xs">
+            Admin
+          </span>
+        ) : (
+          <span className="inline-flex items-center rounded bg-muted px-2 py-0.5 text-xs">
+            {domainNames.length === 0 ? 'No domains' : (
+              domainNames.length <= 2
+                ? domainNames.join(', ')
+                : `${domainNames.slice(0, 2).join(', ')} +${domainNames.length - 2}`
+            )}
+          </span>
+        )}
+      </td>
+      <td className="py-3 px-2 text-xs text-muted-foreground">
+        {formatRelativeDate(revokedKey.revokedAt)}
+      </td>
+      <td className="py-3 px-2 text-xs text-muted-foreground">
+        {formatRelativeDate(revokedKey.archivedAt)}
+      </td>
+    </tr>
+  );
+}
+
 function EmptyApiKeys({ onCreateClick }: { onCreateClick: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -348,9 +392,12 @@ function EmptyApiKeys({ onCreateClick }: { onCreateClick: () => void }) {
 
 export function ApiKeysPage() {
   const [page, setPage] = useState(1);
+  const [revokedPage, setRevokedPage] = useState(1);
+  const [showRevokedKeys, setShowRevokedKeys] = useState(false);
   const limit = 20;
 
   const { data, isLoading, error, refetch } = useApiKeys(page, limit);
+  const { data: revokedData, isLoading: revokedLoading } = useRevokedApiKeys(revokedPage, limit);
   const { data: domainsData } = useDomains(1, 100); // Get all domains for selection
   const createMutation = useCreateApiKey();
   const deleteMutation = useDeleteApiKey();
@@ -360,10 +407,14 @@ export function ApiKeysPage() {
   const [keyToDelete, setKeyToDelete] = useState<ApiKey | null>(null);
 
   const apiKeys = data?.data ?? [];
+  const revokedApiKeys = revokedData?.data ?? [];
   const domains = domainsData?.data ?? [];
   const totalKeys = data?.total ?? 0;
+  const totalRevokedKeys = revokedData?.total ?? 0;
   const totalPages = data ? Math.ceil(data.total / limit) : 0;
+  const totalRevokedPages = revokedData ? Math.ceil(revokedData.total / limit) : 0;
   const hasKeys = apiKeys.length > 0;
+  const hasRevokedKeys = totalRevokedKeys > 0;
 
   const handleCreate = async (name: string, domainIds: string[], isAdmin: boolean) => {
     try {
@@ -489,6 +540,104 @@ export function ApiKeysPage() {
               >
                 Next
               </Button>
+            </div>
+          )}
+
+          {/* Revoked Keys Section */}
+          {hasRevokedKeys && (
+            <div className="mt-8">
+              <button
+                onClick={() => setShowRevokedKeys(!showRevokedKeys)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showRevokedKeys ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+                <Archive className="h-4 w-4" />
+                <span>Archived Keys ({totalRevokedKeys})</span>
+              </button>
+
+              {showRevokedKeys && (
+                <div className="mt-3">
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Keys that were revoked more than 90 days ago are moved here.
+                  </p>
+
+                  {revokedLoading ? (
+                    <Card>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b text-left text-xs text-muted-foreground">
+                              <th className="py-2 px-2 font-medium">Name</th>
+                              <th className="py-2 px-2 font-medium">Key</th>
+                              <th className="py-2 px-2 font-medium">Access</th>
+                              <th className="py-2 px-2 font-medium">Revoked</th>
+                              <th className="py-2 px-2 font-medium">Archived</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...Array(3)].map((_, i) => (
+                              <ApiKeyRowSkeleton key={i} />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+                  ) : (
+                    <Card>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b text-left text-xs text-muted-foreground">
+                              <th className="py-2 px-2 font-medium">Name</th>
+                              <th className="py-2 px-2 font-medium">Key</th>
+                              <th className="py-2 px-2 font-medium">Access</th>
+                              <th className="py-2 px-2 font-medium">Revoked</th>
+                              <th className="py-2 px-2 font-medium">Archived</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {revokedApiKeys.map((revokedKey) => (
+                              <RevokedApiKeyRow
+                                key={revokedKey.id}
+                                revokedKey={revokedKey}
+                                domains={domains}
+                              />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+                  )}
+
+                  {totalRevokedPages > 1 && (
+                    <div className="mt-4 flex items-center justify-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRevokedPage((p) => Math.max(1, p - 1))}
+                        disabled={revokedPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <span className="px-2 text-sm text-muted-foreground">
+                        {revokedPage} / {totalRevokedPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRevokedPage((p) => Math.min(totalRevokedPages, p + 1))}
+                        disabled={revokedPage === totalRevokedPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </>

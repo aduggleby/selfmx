@@ -403,6 +403,13 @@ recurringJobManager.AddOrUpdate<CleanupSentEmailsJob>(
     "0 3 * * *",
     new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
+// Schedule revoked API keys cleanup job (daily at 4 AM UTC)
+recurringJobManager.AddOrUpdate<CleanupRevokedApiKeysJob>(
+    "cleanup-revoked-api-keys",
+    job => job.ExecuteAsync(null),
+    "0 4 * * *",
+    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+
 // SPA fallback - serve index.html for client-side routing
 app.MapFallbackToFile("index.html");
 

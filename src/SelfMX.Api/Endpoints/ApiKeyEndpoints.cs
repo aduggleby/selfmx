@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.EntityFrameworkCore;
 using SelfMX.Api.Contracts.Responses;
+using SelfMX.Api.Data;
 using SelfMX.Api.Entities;
 using SelfMX.Api.Services;
 
@@ -14,6 +16,7 @@ public static class ApiKeyEndpoints
 
         keys.MapGet("/", ListApiKeys);
         keys.MapPost("/", CreateApiKey);
+        keys.MapGet("/revoked", ListRevokedApiKeys);
         keys.MapGet("/{id}", GetApiKey);
         keys.MapDelete("/{id}", RevokeApiKey);
 
@@ -29,6 +32,24 @@ public static class ApiKeyEndpoints
         var (items, total) = await apiKeyService.ListAsync(page, limit, ct);
         var responses = items.Select(ApiKeyResponse.FromEntity).ToArray();
         return TypedResults.Ok(new PaginatedResponse<ApiKeyResponse>(responses, page, limit, total));
+    }
+
+    private static async Task<Ok<PaginatedResponse<RevokedApiKeyResponse>>> ListRevokedApiKeys(
+        AppDbContext db,
+        int page = 1,
+        int limit = 20,
+        CancellationToken ct = default)
+    {
+        var total = await db.RevokedApiKeys.CountAsync(ct);
+
+        var items = await db.RevokedApiKeys
+            .OrderByDescending(k => k.ArchivedAt)
+            .Skip((page - 1) * limit)
+            .Take(limit)
+            .ToListAsync(ct);
+
+        var responses = items.Select(RevokedApiKeyResponse.FromEntity).ToArray();
+        return TypedResults.Ok(new PaginatedResponse<RevokedApiKeyResponse>(responses, page, limit, total));
     }
 
     private static async Task<Results<Created<ApiKeyCreatedResponse>, BadRequest<object>>> CreateApiKey(
@@ -137,3 +158,27 @@ public record ApiKeyCreatedResponse(
     string KeyPrefix,
     bool IsAdmin,
     DateTime CreatedAt);
+
+public record RevokedApiKeyResponse(
+    string Id,
+    string Name,
+    string KeyPrefix,
+    bool IsAdmin,
+    DateTime CreatedAt,
+    DateTime RevokedAt,
+    DateTime ArchivedAt,
+    DateTime? LastUsedAt,
+    string[] DomainIds)
+{
+    public static RevokedApiKeyResponse FromEntity(RevokedApiKey key) => new(
+        key.Id,
+        key.Name,
+        key.KeyPrefix,
+        key.IsAdmin,
+        key.CreatedAt,
+        key.RevokedAt,
+        key.ArchivedAt,
+        key.LastUsedAt,
+        key.AllowedDomainIds?.Split(',', StringSplitOptions.RemoveEmptyEntries) ?? []
+    );
+}

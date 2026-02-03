@@ -8,12 +8,21 @@ export const apiKeyKeys = {
   list: (page: number, limit: number) => [...apiKeyKeys.lists(), { page, limit }] as const,
   details: () => [...apiKeyKeys.all, 'detail'] as const,
   detail: (id: string) => [...apiKeyKeys.details(), id] as const,
+  revokedLists: () => [...apiKeyKeys.all, 'revoked'] as const,
+  revokedList: (page: number, limit: number) => [...apiKeyKeys.revokedLists(), { page, limit }] as const,
 };
 
 export function useApiKeys(page = 1, limit = 20) {
   return useQuery({
     queryKey: apiKeyKeys.list(page, limit),
     queryFn: () => api.listApiKeys(page, limit),
+  });
+}
+
+export function useRevokedApiKeys(page = 1, limit = 20) {
+  return useQuery({
+    queryKey: apiKeyKeys.revokedList(page, limit),
+    queryFn: () => api.listRevokedApiKeys(page, limit),
   });
 }
 
