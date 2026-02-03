@@ -308,15 +308,13 @@ app.MapGet("/v1/system/status", async (
 app.MapGet("/v1/system/version", () =>
 {
     var version = typeof(Program).Assembly.GetName().Version;
-    var informationalVersion = typeof(Program).Assembly
-        .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
-        .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
-        .FirstOrDefault()?.InformationalVersion;
+    var versionString = version is not null
+        ? $"{version.Major}.{version.Minor}.{version.Build}"
+        : "unknown";
 
     return Results.Ok(new
     {
-        version = version?.ToString() ?? "unknown",
-        informationalVersion = informationalVersion ?? version?.ToString() ?? "unknown",
+        version = versionString,
         buildDate = File.GetLastWriteTimeUtc(typeof(Program).Assembly.Location),
         environment = app.Environment.EnvironmentName
     });

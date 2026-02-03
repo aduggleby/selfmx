@@ -21,7 +21,7 @@ public class AuditDbContext : DbContext
             entity.Property(e => e.ActorType).HasMaxLength(20).IsRequired();
             entity.Property(e => e.ActorId).HasMaxLength(20);
             entity.Property(e => e.ResourceType).HasMaxLength(50).IsRequired();
-            entity.Property(e => e.ResourceId).HasMaxLength(36);
+            entity.Property(e => e.ResourceId).HasMaxLength(100); // SES message IDs are ~61 chars
             entity.Property(e => e.IpAddress).HasMaxLength(45);
             entity.Property(e => e.UserAgent).HasMaxLength(500);
             entity.Property(e => e.ErrorMessage).HasMaxLength(500);
