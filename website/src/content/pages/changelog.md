@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.31] - 2026-02-03
+
+### Fixed
+- Fix DNS record names in BIND file export to use correct relative format
+
 ## [0.9.30] - 2026-02-03
 
 ### Added
