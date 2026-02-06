@@ -144,6 +144,6 @@ public static class EmailEndpoints
             logger.LogError(ex, "Failed to store sent email {MessageId}", messageId);
         }
 
-        return TypedResults.Ok(new SendEmailResponse(messageId));
+        return TypedResults.Ok(new SendEmailResponse(sentEmail.Id));
     }
 }
