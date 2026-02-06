@@ -13,7 +13,7 @@ SelfMX provides a Resend-compatible REST API for sending transactional emails (s
 All API requests require authentication via Bearer token:
 
 ```bash
-curl https://mail.yourdomain.com/v1/emails \
+curl https://mail.yourdomain.com/emails \
   -H "Authorization: Bearer re_xxxxxxxxxxxx"
 ```
 
@@ -24,30 +24,30 @@ API keys are created in the admin UI and use the Resend format: `re_` followed b
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
 | `/health` | GET | No | Health check |
-| `/v1/system/status` | GET | No | System status check |
-| `/v1/system/version` | GET | No | Version and build info |
-| `/v1/system/logs` | GET | Admin | Application logs |
-| `/v1/emails` | POST | API Key | Send email |
-| `/v1/domains` | GET | API Key | List domains |
-| `/v1/domains` | POST | API Key | Create domain |
-| `/v1/domains/{id}` | GET | API Key | Get domain |
-| `/v1/domains/{id}` | DELETE | API Key | Delete domain |
-| `/v1/domains/{id}/verify` | POST | API Key | Trigger verification check |
-| `/v1/domains/{id}/test-email` | POST | API Key | Send test email |
-| `/v1/api-keys` | GET | Admin | List API keys |
-| `/v1/api-keys` | POST | Admin | Create API key |
-| `/v1/api-keys/revoked` | GET | Admin | List archived API keys |
-| `/v1/api-keys/{id}` | DELETE | Admin | Revoke API key |
-| `/v1/sent-emails` | GET | Admin | List sent emails |
-| `/v1/sent-emails/{id}` | GET | Admin | Get sent email details |
-| `/v1/audit` | GET | Admin | Audit logs |
+| `/system/status` | GET | No | System status check |
+| `/system/version` | GET | No | Version and build info |
+| `/system/logs` | GET | Admin | Application logs |
+| `/emails` | POST | API Key | Send email |
+| `/domains` | GET | API Key | List domains |
+| `/domains` | POST | API Key | Create domain |
+| `/domains/{id}` | GET | API Key | Get domain |
+| `/domains/{id}` | DELETE | API Key | Delete domain |
+| `/domains/{id}/verify` | POST | API Key | Trigger verification check |
+| `/domains/{id}/test-email` | POST | API Key | Send test email |
+| `/api-keys` | GET | Admin | List API keys |
+| `/api-keys` | POST | Admin | Create API key |
+| `/api-keys/revoked` | GET | Admin | List archived API keys |
+| `/api-keys/{id}` | DELETE | Admin | Revoke API key |
+| `/sent-emails` | GET | Admin | List sent emails |
+| `/sent-emails/{id}` | GET | Admin | Get sent email details |
+| `/audit` | GET | Admin | Audit logs |
 | `/hangfire` | GET | Admin | Background jobs dashboard |
 
 ## Send Email
 
 Send a transactional email.
 
-**POST** `/v1/emails`
+**POST** `/emails`
 
 ### Request
 
@@ -90,7 +90,7 @@ Send a transactional email.
 ### Example
 
 ```bash
-curl -X POST https://mail.yourdomain.com/v1/emails \
+curl -X POST https://mail.yourdomain.com/emails \
   -H "Authorization: Bearer re_xxxxxxxxxxxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -105,7 +105,7 @@ curl -X POST https://mail.yourdomain.com/v1/emails \
 
 Get all domains for the authenticated API key.
 
-**GET** `/v1/domains`
+**GET** `/domains`
 
 ### Response
 
@@ -137,7 +137,7 @@ Get all domains for the authenticated API key.
 
 Add a domain for email sending.
 
-**POST** `/v1/domains`
+**POST** `/domains`
 
 ### Request
 
@@ -163,7 +163,7 @@ Add a domain for email sending.
 ### Example
 
 ```bash
-curl -X POST https://mail.yourdomain.com/v1/domains \
+curl -X POST https://mail.yourdomain.com/domains \
   -H "Authorization: Bearer re_xxxxxxxxxxxx" \
   -H "Content-Type: application/json" \
   -d '{"name": "example.com"}'
@@ -173,7 +173,7 @@ curl -X POST https://mail.yourdomain.com/v1/domains \
 
 Get details for a specific domain including DNS records.
 
-**GET** `/v1/domains/{id}`
+**GET** `/domains/{id}`
 
 ### Response
 
@@ -209,7 +209,7 @@ Get details for a specific domain including DNS records.
 
 Remove a domain from SelfMX and AWS SES.
 
-**DELETE** `/v1/domains/{id}`
+**DELETE** `/domains/{id}`
 
 ### Response
 
@@ -221,7 +221,7 @@ Remove a domain from SelfMX and AWS SES.
 
 Manually trigger a verification check for a domain. Only works for domains in `Verifying` status.
 
-**POST** `/v1/domains/{id}/verify`
+**POST** `/domains/{id}/verify`
 
 ### Response
 
@@ -242,7 +242,7 @@ Returns the updated domain with current verification status:
 ### Example
 
 ```bash
-curl -X POST https://mail.yourdomain.com/v1/domains/{id}/verify \
+curl -X POST https://mail.yourdomain.com/domains/{id}/verify \
   -H "Authorization: Bearer re_xxxxxxxxxxxx"
 ```
 
@@ -256,7 +256,7 @@ curl -X POST https://mail.yourdomain.com/v1/domains/{id}/verify \
 
 Send a test email from a verified domain. Useful for verifying domain configuration.
 
-**POST** `/v1/domains/{id}/test-email`
+**POST** `/domains/{id}/test-email`
 
 ### Request
 
@@ -289,7 +289,7 @@ Send a test email from a verified domain. Useful for verifying domain configurat
 ### Example
 
 ```bash
-curl -X POST https://mail.yourdomain.com/v1/domains/{id}/test-email \
+curl -X POST https://mail.yourdomain.com/domains/{id}/test-email \
   -H "Authorization: Bearer re_xxxxxxxxxxxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -310,7 +310,7 @@ curl -X POST https://mail.yourdomain.com/v1/domains/{id}/test-email \
 
 Get all API keys. Requires admin authentication.
 
-**GET** `/v1/api-keys`
+**GET** `/api-keys`
 
 ### Response
 
@@ -331,7 +331,7 @@ Get all API keys. Requires admin authentication.
 
 Create a new API key. Requires admin authentication.
 
-**POST** `/v1/api-keys`
+**POST** `/api-keys`
 
 ### Request
 
@@ -359,7 +359,7 @@ Create a new API key. Requires admin authentication.
 
 Revoke an API key. Requires admin authentication.
 
-**DELETE** `/v1/api-keys/{id}`
+**DELETE** `/api-keys/{id}`
 
 ### Response
 
@@ -371,7 +371,7 @@ Revoke an API key. Requires admin authentication.
 
 Get archived (previously revoked) API keys. Revoked API keys are automatically archived after 90 days by a daily cleanup job. Requires admin authentication.
 
-**GET** `/v1/api-keys/revoked`
+**GET** `/api-keys/revoked`
 
 ### Query Parameters
 
@@ -413,7 +413,7 @@ Get archived (previously revoked) API keys. Revoked API keys are automatically a
 
 Get sent emails with cursor-based pagination and filtering. Requires admin authentication.
 
-**GET** `/v1/sent-emails`
+**GET** `/sent-emails`
 
 ### Query Parameters
 
@@ -453,17 +453,17 @@ Use cursor-based pagination for large datasets:
 
 ```bash
 # First page
-curl https://mail.yourdomain.com/v1/sent-emails?pageSize=50
+curl https://mail.yourdomain.com/sent-emails?pageSize=50
 
 # Next page (use nextCursor from previous response)
-curl https://mail.yourdomain.com/v1/sent-emails?cursor=eyJpZCI6IjEyMyJ9
+curl https://mail.yourdomain.com/sent-emails?cursor=eyJpZCI6IjEyMyJ9
 ```
 
 ## Get Sent Email (Admin)
 
 Get details of a specific sent email including the full body. Requires admin authentication.
 
-**GET** `/v1/sent-emails/{id}`
+**GET** `/sent-emails/{id}`
 
 ### Response
 
@@ -495,7 +495,7 @@ Get details of a specific sent email including the full body. Requires admin aut
 
 Get audit logs. Requires admin authentication.
 
-**GET** `/v1/audit`
+**GET** `/audit`
 
 ### Query Parameters
 
@@ -578,7 +578,7 @@ Check if the API is running.
 
 Check system configuration and connectivity. Returns AWS and database health status. Use this to verify your deployment is properly configured.
 
-**GET** `/v1/system/status`
+**GET** `/system/status`
 
 ### Response
 
@@ -615,7 +615,7 @@ When configuration issues are detected:
 
 Get the API version and build information. Useful for debugging and verifying deployments.
 
-**GET** `/v1/system/version`
+**GET** `/system/version`
 
 ### Response
 
@@ -641,7 +641,7 @@ Get the API version and build information. Useful for debugging and verifying de
 
 Get recent application logs for remote diagnostics. Requires admin authentication.
 
-**GET** `/v1/system/logs`
+**GET** `/system/logs`
 
 ### Query Parameters
 
@@ -679,11 +679,11 @@ Get recent application logs for remote diagnostics. Requires admin authenticatio
 
 ```bash
 # Get last 100 error logs
-curl "https://mail.yourdomain.com/v1/system/logs?count=100&level=Error" \
+curl "https://mail.yourdomain.com/system/logs?count=100&level=Error" \
   -H "Cookie: auth_session=your_session_cookie"
 
 # Get logs from a specific category
-curl "https://mail.yourdomain.com/v1/system/logs?category=SesService" \
+curl "https://mail.yourdomain.com/system/logs?category=SesService" \
   -H "Cookie: auth_session=your_session_cookie"
 ```
 

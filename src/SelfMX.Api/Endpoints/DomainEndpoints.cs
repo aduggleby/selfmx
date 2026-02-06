@@ -95,7 +95,7 @@ public static class DomainEndpoints
         // Enqueue SES identity creation (Hangfire injects PerformContext at runtime)
         backgroundJobs.Enqueue<SetupDomainJob>(job => job.ExecuteAsync(domain.Id, null));
 
-        return TypedResults.Created($"/v1/domains/{domain.Id}", DomainResponse.FromEntity(domain));
+        return TypedResults.Created($"/domains/{domain.Id}", DomainResponse.FromEntity(domain));
     }
 
     private static async Task<Results<Ok<DomainResponse>, NotFound<object>, ForbidHttpResult>> GetDomain(

@@ -196,7 +196,7 @@ test.describe('Add Domain', () => {
     apiMock.setDomains([]);
 
     // Add delay to see loading state
-    await page.route('**/v1/domains', async (route) => {
+    await page.route('**/domains', async (route) => {
       if (route.request().method() === 'POST') {
         await new Promise(resolve => setTimeout(resolve, 500));
         const body = route.request().postDataJSON();
@@ -382,7 +382,7 @@ test.describe('Pagination', () => {
 test.describe('Loading States', () => {
   test('shows loading state while app initializes', async ({ page }) => {
     // Delay auth check to see loading state
-    await page.route('**/v1/admin/me', async (route) => {
+    await page.route('**/admin/me', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
       await route.fulfill({
         status: 200,
@@ -404,7 +404,7 @@ test.describe('Error Handling', () => {
     apiMock.setAuthenticated(true);
 
     // Then mock domains to fail
-    await page.route('**/v1/domains?*', async (route) => {
+    await page.route('**/domains?*', async (route) => {
       await route.fulfill({
         status: 500,
         contentType: 'application/json',
@@ -423,7 +423,7 @@ test.describe('Error Handling', () => {
     apiMock.setAuthenticated(true);
 
     // Mock a database schema error (like missing column)
-    await page.route('**/v1/domains?*', async (route) => {
+    await page.route('**/domains?*', async (route) => {
       await route.fulfill({
         status: 500,
         contentType: 'application/json',

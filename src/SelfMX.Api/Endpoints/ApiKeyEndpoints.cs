@@ -84,7 +84,7 @@ public static class ApiKeyEndpoints
 
         // Return the plain text key ONCE - it cannot be retrieved again
         return TypedResults.Created(
-            $"/v1/api-keys/{key.Id}",
+            $"/api-keys/{key.Id}",
             new ApiKeyCreatedResponse(key.Id, key.Name, plainTextKey, key.KeyPrefix, key.IsAdmin, key.CreatedAt)
         );
     }

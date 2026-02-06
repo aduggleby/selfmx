@@ -59,8 +59,8 @@ All notable changes to SelfMX are documented here.
 ### Added
 - **API Keys Management UI** - View, create, and revoke API keys from the admin dashboard
 - **Sent Emails UI** - Browse sent emails with filtering by domain, sender, and recipient
-- **Sent Emails API** - New endpoints `GET /v1/sent-emails` and `GET /v1/sent-emails/{id}` for accessing email history
-- **Revoke API Key endpoint** - `DELETE /v1/api-keys/{id}` for revoking keys via API
+- **Sent Emails API** - New endpoints `GET /sent-emails` and `GET /sent-emails/{id}` for accessing email history
+- **Revoke API Key endpoint** - `DELETE /api-keys/{id}` for revoking keys via API
 
 ## [0.9.33] - 2026-02-03
 
@@ -92,7 +92,7 @@ All notable changes to SelfMX are documented here.
 
 ### Added
 - Manual verification check button to re-check domain status on demand
-- New API endpoint `POST /v1/domains/{id}/verify` for triggering verification checks
+- New API endpoint `POST /domains/{id}/verify` for triggering verification checks
 - Verification status tracking with `lastCheckedAt` and `nextCheckAt` timestamps in domain responses
 
 ## [0.9.27] - 2026-02-02
@@ -104,7 +104,7 @@ All notable changes to SelfMX are documented here.
 ## [0.9.26] - 2026-02-02
 
 ### Added
-- **System Status Endpoint** (`GET /v1/system/status`) - Validates AWS credentials and database connectivity. Helps diagnose configuration issues immediately after deployment.
+- **System Status Endpoint** (`GET /system/status`) - Validates AWS credentials and database connectivity. Helps diagnose configuration issues immediately after deployment.
 - **Hangfire Dashboard** - Background job monitoring at `/hangfire` (now available in production, requires admin authentication). View job status, failures, and processing metrics.
 - **Configuration Error Modal** - The admin UI now displays a blocking modal when critical configuration is missing (AWS credentials, database connection), guiding users to fix issues.
 

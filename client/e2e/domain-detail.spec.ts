@@ -301,17 +301,11 @@ test.describe('Domain Detail Page', () => {
     test('shows error when domain not found', async ({ page, apiMock }) => {
       // Don't set any domains - the mock will return 404 for unknown IDs
       apiMock.setDomains([]);
-
-      // Need to override the route before navigation to ensure 404 is returned
-      await page.route('**/v1/domains/non-existent', async (route) => {
-        await route.fulfill({
-          status: 404,
-          contentType: 'application/json',
-          body: JSON.stringify({ error: { code: 'not_found', message: 'Domain not found' } }),
-        });
+      await page.goto('/');
+      await page.evaluate(() => {
+        window.history.pushState({}, '', '/domains/non-existent');
+        window.dispatchEvent(new PopStateEvent('popstate'));
       });
-
-      await page.goto('/domains/non-existent');
 
       await expect(page.getByRole('heading', { name: 'Domain not found' })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Back' })).toBeVisible();
@@ -319,16 +313,11 @@ test.describe('Domain Detail Page', () => {
 
     test('back link works on error page', async ({ page, apiMock }) => {
       apiMock.setDomains([]);
-
-      await page.route('**/v1/domains/non-existent', async (route) => {
-        await route.fulfill({
-          status: 404,
-          contentType: 'application/json',
-          body: JSON.stringify({ error: { code: 'not_found', message: 'Domain not found' } }),
-        });
+      await page.goto('/');
+      await page.evaluate(() => {
+        window.history.pushState({}, '', '/domains/non-existent');
+        window.dispatchEvent(new PopStateEvent('popstate'));
       });
-
-      await page.goto('/domains/non-existent');
 
       await expect(page.getByRole('heading', { name: 'Domain not found' })).toBeVisible();
       await page.getByRole('link', { name: 'Back' }).click();

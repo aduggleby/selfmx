@@ -18,7 +18,7 @@ import {
   type SentEmailDetail,
 } from './schemas';
 
-const API_BASE = '/v1';
+const API_BASE = '';
 
 const getApiUrl = (path: string) => {
   if (typeof window === 'undefined') return `${API_BASE}${path}`;

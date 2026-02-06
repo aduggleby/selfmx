@@ -34,7 +34,7 @@ dotnet run --project src/SelfMX.Api  # Run API (port 17400)
 ```bash
 cd client
 npm install                        # Install dependencies
-npm run dev                        # Dev server (port 17401, proxies /v1 to :17400)
+npm run dev                        # Dev server (port 17401, proxies API routes to :17400)
 npm run build                      # TypeScript check + Vite build
 npm run lint                       # ESLint
 npm run test                       # Playwright E2E tests (headless)
@@ -70,8 +70,8 @@ Find Ando documentation at https://andobuild.com/llms.txt
 src/SelfMX.Api/
 ├── Program.cs              # DI setup, middleware, route registration
 ├── Endpoints/              # Minimal API route handlers
-│   ├── DomainEndpoints.cs  # /v1/domains CRUD
-│   └── EmailEndpoints.cs   # /v1/emails send
+│   ├── DomainEndpoints.cs  # /domains CRUD
+│   └── EmailEndpoints.cs   # /emails send
 ├── Services/               # Business logic
 │   ├── DomainService.cs    # Domain CRUD, verification state
 │   ├── SesService.cs       # AWS SES integration
@@ -144,20 +144,20 @@ client/src/
 |----------|------|-------------|
 | `GET /health` | No | Health check |
 | `GET /` | No | Status |
-| `GET /v1/system/status` | No | System config validation (AWS, DB connectivity) |
-| `GET /v1/system/version` | No | API version and build info |
-| `GET /v1/system/logs` | Admin | In-memory application logs for diagnostics |
-| `POST /v1/domains` | Yes | Create domain |
-| `GET /v1/domains` | Yes | List domains (paginated) |
-| `GET /v1/domains/{id}` | Yes | Get domain |
-| `DELETE /v1/domains/{id}` | Yes | Delete domain |
-| `POST /v1/domains/{id}/verify` | Yes | Trigger manual verification check |
-| `POST /v1/domains/{id}/test-email` | Yes | Send test email (verified domains) |
-| `POST /v1/emails` | Yes | Send email (Resend-compatible) |
-| `GET /v1/api-keys` | Admin | List API keys |
-| `POST /v1/api-keys` | Admin | Create API key |
-| `GET /v1/api-keys/revoked` | Admin | List archived API keys |
-| `GET /v1/audit` | Admin | Audit logs (paginated) |
+| `GET /system/status` | No | System config validation (AWS, DB connectivity) |
+| `GET /system/version` | No | API version and build info |
+| `GET /system/logs` | Admin | In-memory application logs for diagnostics |
+| `POST /domains` | Yes | Create domain |
+| `GET /domains` | Yes | List domains (paginated) |
+| `GET /domains/{id}` | Yes | Get domain |
+| `DELETE /domains/{id}` | Yes | Delete domain |
+| `POST /domains/{id}/verify` | Yes | Trigger manual verification check |
+| `POST /domains/{id}/test-email` | Yes | Send test email (verified domains) |
+| `POST /emails` | Yes | Send email (Resend-compatible) |
+| `GET /api-keys` | Admin | List API keys |
+| `POST /api-keys` | Admin | Create API key |
+| `GET /api-keys/revoked` | Admin | List archived API keys |
+| `GET /audit` | Admin | Audit logs (paginated) |
 | `GET /hangfire` | Admin | Hangfire job dashboard |
 
 Auth: Bearer token with API key, or Cookie auth for admin UI.

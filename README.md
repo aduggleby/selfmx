@@ -9,7 +9,7 @@ Self-hosted email sending platform with a Resend-compatible API, powered by AWS 
 SelfMX provides a drop-in replacement for Resend's email API that you can self-host. It handles domain verification, DNS record management (via Cloudflare), and email delivery through AWS SES.
 
 **Key Features:**
-- Resend-compatible API (`POST /v1/emails`)
+- Resend-compatible API (`POST /emails`)
 - Automatic domain verification with DNS management
 - Multi-tenant API keys with domain scoping
 - Admin dashboard for key management and audit logs
@@ -53,7 +53,7 @@ The installer will:
 
 4. **Send Email**:
    ```bash
-   curl -X POST https://your-domain.com/v1/emails \
+   curl -X POST https://your-domain.com/emails \
      -H "Authorization: Bearer re_your_api_key" \
      -H "Content-Type: application/json" \
      -d '{
@@ -161,22 +161,22 @@ SelfMX implements the [Resend API](https://resend.com/docs/api-reference/emails/
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/v1/system/status` | GET | System status (AWS, DB connectivity) |
-| `/v1/system/version` | GET | API version and build info |
-| `/v1/system/logs` | GET | Application logs (admin) |
-| `/v1/emails` | POST | Send email |
-| `/v1/domains` | GET | List domains |
-| `/v1/domains` | POST | Add domain |
-| `/v1/domains/{id}` | GET | Get domain |
-| `/v1/domains/{id}` | DELETE | Delete domain |
-| `/v1/domains/{id}/verify` | POST | Trigger verification check |
-| `/v1/domains/{id}/test-email` | POST | Send test email |
-| `/v1/api-keys` | GET | List API keys |
-| `/v1/api-keys` | POST | Create API key |
-| `/v1/api-keys/{id}` | DELETE | Revoke API key (admin) |
-| `/v1/sent-emails` | GET | List sent emails (admin) |
-| `/v1/sent-emails/{id}` | GET | Get sent email details (admin) |
-| `/v1/audit` | GET | Audit logs |
+| `/system/status` | GET | System status (AWS, DB connectivity) |
+| `/system/version` | GET | API version and build info |
+| `/system/logs` | GET | Application logs (admin) |
+| `/emails` | POST | Send email |
+| `/domains` | GET | List domains |
+| `/domains` | POST | Add domain |
+| `/domains/{id}` | GET | Get domain |
+| `/domains/{id}` | DELETE | Delete domain |
+| `/domains/{id}/verify` | POST | Trigger verification check |
+| `/domains/{id}/test-email` | POST | Send test email |
+| `/api-keys` | GET | List API keys |
+| `/api-keys` | POST | Create API key |
+| `/api-keys/{id}` | DELETE | Revoke API key (admin) |
+| `/sent-emails` | GET | List sent emails (admin) |
+| `/sent-emails/{id}` | GET | Get sent email details (admin) |
+| `/audit` | GET | Audit logs |
 | `/hangfire` | GET | Background jobs dashboard (admin) |
 
 See [full documentation](https://selfmx.com) for details.

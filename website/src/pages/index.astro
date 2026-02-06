@@ -4,7 +4,7 @@ import CodeBlock from "../components/CodeBlock.astro";
 
 const installCode = `curl -fsSL https://selfmx.com/install.sh | bash -s user@your-server-ip`;
 
-const sendEmailCode = `curl -X POST https://mail.yourdomain.com/v1/emails \\
+const sendEmailCode = `curl -X POST https://mail.yourdomain.com/emails \\
   -H "Authorization: Bearer re_your_api_key" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -104,7 +104,7 @@ v0.9.43
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                              YOUR APPLICATION                                   │
 │                                                                                 │
-│    Send email via REST API: POST /v1/emails                                     │
+│    Send email via REST API: POST /emails                                     │
 └─────────────────────────────────────────────────────────────────────────────────┘
                                        │
                                        ▼

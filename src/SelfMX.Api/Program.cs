@@ -244,7 +244,7 @@ app.UseStaticFiles();
 app.MapHealthChecks("/health");
 
 // System status endpoint - checks AWS, database connectivity (no auth, needed before login)
-app.MapGet("/v1/system/status", async (
+app.MapGet("/system/status", async (
     IAmazonSimpleEmailServiceV2 ses,
     AppDbContext db,
     IOptions<AwsSettings> awsSettings,
@@ -305,7 +305,7 @@ app.MapGet("/v1/system/status", async (
 });
 
 // Version endpoint (no auth - needed by frontend)
-app.MapGet("/v1/system/version", () =>
+app.MapGet("/system/version", () =>
 {
     var version = typeof(Program).Assembly.GetName().Version;
     var versionString = version is not null
@@ -321,7 +321,7 @@ app.MapGet("/v1/system/version", () =>
 });
 
 // Logs endpoint (admin only - for remote diagnostics)
-app.MapGet("/v1/system/logs", (
+app.MapGet("/system/logs", (
     InMemoryLogSink sink,
     ClaimsPrincipal user,
     int count = 1000,
@@ -362,14 +362,12 @@ app.MapGet("/v1/system/logs", (
     });
 }).RequireAuthorization();
 
-// API v1 routes
-var v1 = app.MapGroup("/v1");
-
 // Admin auth endpoints - rate limited for brute force protection
-v1.MapAdminEndpoints().RequireRateLimiting("login");
+var root = app.MapGroup("");
+root.MapAdminEndpoints().RequireRateLimiting("login");
 
 // Authenticated endpoints - require valid API key or cookie (uses DefaultPolicy)
-var authenticated = v1.MapGroup("")
+var authenticated = app.MapGroup("")
     .RequireAuthorization()
     .RequireRateLimiting("api");
 authenticated.MapDomainEndpoints();
@@ -377,7 +375,7 @@ authenticated.MapEmailEndpoints();
 authenticated.MapSentEmailEndpoints();
 
 // Admin-only endpoints - require admin actor type (uses AdminOnly policy)
-var adminOnly = v1.MapGroup("")
+var adminOnly = app.MapGroup("")
     .RequireAuthorization("AdminOnly")
     .RequireRateLimiting("api");
 adminOnly.MapApiKeyEndpoints();

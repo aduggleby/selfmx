@@ -61,7 +61,7 @@ const queryClient = new QueryClient({
 });
 
 async function fetchSystemStatus(): Promise<SystemStatus> {
-  const response = await fetch('/v1/system/status');
+  const response = await fetch('/system/status');
   if (!response.ok) {
     throw new Error('Failed to fetch system status');
   }
@@ -69,7 +69,7 @@ async function fetchSystemStatus(): Promise<SystemStatus> {
 }
 
 async function fetchSystemVersion(): Promise<SystemVersion> {
-  const response = await fetch('/v1/system/version');
+  const response = await fetch('/system/version');
   if (!response.ok) {
     throw new Error('Failed to fetch system version');
   }

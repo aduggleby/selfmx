@@ -46,7 +46,7 @@ test.describe('Authentication', () => {
       apiMock.setAuthenticated(false);
 
       // Add delay to login response
-      await page.route('**/v1/admin/login', async (route) => {
+      await page.route('**/admin/login', async (route) => {
         await new Promise((r) => setTimeout(r, 500));
         await route.fulfill({
           status: 200,
@@ -132,7 +132,7 @@ test.describe('Authentication', () => {
 
       // After first successful load, simulate session expiry
       let domainsCallCount = 0;
-      await page.route('**/v1/domains?*', async (route) => {
+      await page.route('**/domains?*', async (route) => {
         domainsCallCount++;
         if (domainsCallCount === 1) {
           await route.fulfill({
@@ -167,7 +167,7 @@ test.describe('Authentication', () => {
     test('rate limiting shows appropriate error', async ({ page, apiMock }) => {
       apiMock.setAuthenticated(false);
 
-      await page.route('**/v1/admin/login', async (route) => {
+      await page.route('**/admin/login', async (route) => {
         await route.fulfill({
           status: 429,
           contentType: 'application/json',
@@ -185,7 +185,7 @@ test.describe('Authentication', () => {
     test('server error shows appropriate message', async ({ page, apiMock }) => {
       apiMock.setAuthenticated(false);
 
-      await page.route('**/v1/admin/login', async (route) => {
+      await page.route('**/admin/login', async (route) => {
         await route.fulfill({
           status: 500,
           contentType: 'application/json',
@@ -203,7 +203,7 @@ test.describe('Authentication', () => {
     test('network error shows appropriate message', async ({ page, apiMock }) => {
       apiMock.setAuthenticated(false);
 
-      await page.route('**/v1/admin/login', async (route) => {
+      await page.route('**/admin/login', async (route) => {
         await route.abort('connectionrefused');
       });
 
@@ -217,7 +217,7 @@ test.describe('Authentication', () => {
 
   test.describe('Loading States', () => {
     test('shows loading during initial auth check', async ({ page }) => {
-      await page.route('**/v1/admin/me', async (route) => {
+      await page.route('**/admin/me', async (route) => {
         await new Promise((r) => setTimeout(r, 500));
         await route.fulfill({ status: 401 });
       });

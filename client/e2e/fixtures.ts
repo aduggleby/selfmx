@@ -134,7 +134,7 @@ export class ApiMock {
   // Setup all route handlers
   async setup() {
     // System status (always healthy in tests)
-    await this.page.route('**/v1/system/status', async (route) => {
+    await this.page.route('**/system/status', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -147,7 +147,7 @@ export class ApiMock {
     });
 
     // Auth check
-    await this.page.route('**/v1/admin/me', async (route) => {
+    await this.page.route('**/admin/me', async (route) => {
       if (this.isAuthenticated) {
         await route.fulfill({
           status: 200,
@@ -164,7 +164,7 @@ export class ApiMock {
     });
 
     // Login
-    await this.page.route('**/v1/admin/login', async (route) => {
+    await this.page.route('**/admin/login', async (route) => {
       if (route.request().method() !== 'POST') {
         await route.continue();
         return;
@@ -210,7 +210,7 @@ export class ApiMock {
     });
 
     // Logout
-    await this.page.route('**/v1/admin/logout', async (route) => {
+    await this.page.route('**/admin/logout', async (route) => {
       if (route.request().method() !== 'POST') {
         await route.continue();
         return;
@@ -225,7 +225,23 @@ export class ApiMock {
     });
 
     // List domains
-    await this.page.route('**/v1/domains?*', async (route) => {
+    await this.page.route('**/domains?*', async (route) => {
+      const fetchDest = route.request().headers()['sec-fetch-dest'] ?? '';
+      const fetchMode = route.request().headers()['sec-fetch-mode'] ?? '';
+      if (fetchDest === 'document' || fetchMode === 'navigate') {
+        await route.continue();
+        return;
+      }
+      const accept = route.request().headers()['accept'] ?? '';
+      if (accept.includes('text/html')) {
+        await route.continue();
+        return;
+      }
+      const resourceType = route.request().resourceType();
+      if (resourceType !== 'xhr' && resourceType !== 'fetch') {
+        await route.continue();
+        return;
+      }
       const url = new URL(route.request().url());
       const page = parseInt(url.searchParams.get('page') || '1');
       const limit = parseInt(url.searchParams.get('limit') || '20');
@@ -250,7 +266,23 @@ export class ApiMock {
     });
 
     // Create domain
-    await this.page.route('**/v1/domains', async (route) => {
+    await this.page.route('**/domains', async (route) => {
+      const fetchDest = route.request().headers()['sec-fetch-dest'] ?? '';
+      const fetchMode = route.request().headers()['sec-fetch-mode'] ?? '';
+      if (fetchDest === 'document' || fetchMode === 'navigate') {
+        await route.continue();
+        return;
+      }
+      const accept = route.request().headers()['accept'] ?? '';
+      if (accept.includes('text/html')) {
+        await route.continue();
+        return;
+      }
+      const resourceType = route.request().resourceType();
+      if (resourceType !== 'xhr' && resourceType !== 'fetch') {
+        await route.continue();
+        return;
+      }
       if (route.request().method() !== 'POST') {
         await route.continue();
         return;
@@ -294,7 +326,23 @@ export class ApiMock {
     });
 
     // Get single domain
-    await this.page.route('**/v1/domains/*', async (route) => {
+    await this.page.route('**/domains/*', async (route) => {
+      const fetchDest = route.request().headers()['sec-fetch-dest'] ?? '';
+      const fetchMode = route.request().headers()['sec-fetch-mode'] ?? '';
+      if (fetchDest === 'document' || fetchMode === 'navigate') {
+        await route.continue();
+        return;
+      }
+      const accept = route.request().headers()['accept'] ?? '';
+      if (accept.includes('text/html')) {
+        await route.continue();
+        return;
+      }
+      const resourceType = route.request().resourceType();
+      if (resourceType !== 'xhr' && resourceType !== 'fetch') {
+        await route.continue();
+        return;
+      }
       const method = route.request().method();
       const url = route.request().url();
       const idMatch = url.match(/\/domains\/([^?/]+)/);
