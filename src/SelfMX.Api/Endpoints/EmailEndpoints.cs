@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using SelfMX.Api.Contracts.Requests;
 using SelfMX.Api.Contracts.Responses;
@@ -17,7 +18,7 @@ public static class EmailEndpoints
         return group;
     }
 
-    private static async Task<Results<Ok<SendEmailResponse>, BadRequest<object>, UnprocessableEntity<object>, ForbidHttpResult>> SendEmail(
+    private static async Task<Results<JsonHttpResult<SendEmailResponse>, BadRequest<object>, UnprocessableEntity<object>, ForbidHttpResult>> SendEmail(
         SendEmailRequest request,
         DomainService domainService,
         ApiKeyService apiKeyService,
@@ -144,6 +145,6 @@ public static class EmailEndpoints
             logger.LogError(ex, "Failed to store sent email {MessageId}", messageId);
         }
 
-        return TypedResults.Ok(new SendEmailResponse(sentEmail.Id));
+        return TypedResults.Json(new SendEmailResponse(sentEmail.Id), statusCode: StatusCodes.Status200OK);
     }
 }
