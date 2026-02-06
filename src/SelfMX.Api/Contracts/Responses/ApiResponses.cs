@@ -2,7 +2,12 @@ using SelfMX.Api.Entities;
 
 namespace SelfMX.Api.Contracts.Responses;
 
-public record SendEmailResponse(string Id);
+using System.Text.Json.Serialization;
+
+public record SendEmailResponse(
+    [property: JsonPropertyName("id")] string Id,
+    [property: JsonPropertyName("object")] string Object = "email"
+);
 
 public record DnsRecordResponse(
     string Type,
