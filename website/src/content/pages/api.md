@@ -83,11 +83,17 @@ Send a transactional email.
 
 ```json
 {
-  "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "object": "email"
 }
 ```
 
-The response `id` is a GUID that uniquely identifies the sent email in SelfMX. This format is compatible with the official Resend .NET SDK.
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | GUID that uniquely identifies the sent email in SelfMX |
+| `object` | string | Always `"email"` |
+
+This format is compatible with official Resend SDKs.
 
 ### Example
 

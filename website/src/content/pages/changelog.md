@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.46] - 2026-02-06
+
+### Improved
+- Improve email send response format for better compatibility with official Resend SDKs
+
 ## [0.9.45] - 2026-02-06
 
 ### Fixed
