@@ -100,7 +100,7 @@ services:
   selfmx:
     image: ghcr.io/aduggleby/selfmx:latest
     ports:
-      - "8080:5000"
+      - "8080:17400"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - App__Fqdn=YOUR_DOMAIN

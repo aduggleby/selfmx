@@ -6,6 +6,12 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.44] - 2026-02-06
+
+### Changed
+- **API routes simplified** - Removed `/v1` prefix from all endpoints (e.g., `/v1/emails` → `/emails`). This improves compatibility with official Resend SDKs that expect root-level paths.
+- **Container port updated** - Internal container port changed from 5000 to 17400 (SelfMX reserved port range). Update your `docker-compose.yml` port mappings if you use a custom deployment.
+
 ## [0.9.43] - 2026-02-03
 
 ### Added
