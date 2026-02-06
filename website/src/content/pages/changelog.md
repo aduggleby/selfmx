@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.47] - 2026-02-06
+
+### Improved
+- Improve email send API response consistency
+
 ## [0.9.46] - 2026-02-06
 
 ### Improved
