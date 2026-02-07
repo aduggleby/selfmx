@@ -37,6 +37,7 @@ API keys are created in the admin UI and use the Resend format: `re_` followed b
 | `/domains/{id}` | DELETE | API Key | Delete domain |
 | `/domains/{id}/verify` | POST | API Key | Trigger verification check |
 | `/domains/{id}/test-email` | POST | API Key | Send test email |
+| `/tokens/me` | GET | API Key | Token introspection |
 | `/api-keys` | GET | Admin | List API keys |
 | `/api-keys` | POST | Admin | Create API key |
 | `/api-keys/revoked` | GET | Admin | List archived API keys |
@@ -448,6 +449,51 @@ curl -X POST https://mail.yourdomain.com/domains/{id}/test-email \
 - Domain must be in `Verified` status
 - Sender prefix must contain only alphanumeric characters, dots, underscores, and hyphens
 - The full sender address is constructed as `{senderPrefix}@{domainName}`
+
+## Token Introspection
+
+Get effective permissions for the current authentication token. Useful for verifying token validity and discovering which domains an API key can access.
+
+**GET** `/tokens/me`
+
+### Response
+
+```json
+{
+  "authenticated": true,
+  "actorType": "api_key",
+  "isAdmin": false,
+  "name": "Production",
+  "keyId": "k5f2a3b1-...",
+  "keyPrefix": "re_abc123",
+  "allowedDomainIds": ["d5f2a3b1-...", "d5f2a3b2-..."]
+}
+```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `authenticated` | boolean | Always `true` for successful requests |
+| `actorType` | string | `"admin"` for admin sessions/keys, `"api_key"` for regular keys |
+| `isAdmin` | boolean | Whether the caller has admin privileges |
+| `name` | string | Identity name (null for some auth types) |
+| `keyId` | string | API key ID (present for API key auth) |
+| `keyPrefix` | string | API key prefix (present for API key auth) |
+| `allowedDomainIds` | array | Domain IDs this key can access (empty for admin) |
+
+### Example
+
+```bash
+curl https://mail.yourdomain.com/tokens/me \
+  -H "Authorization: Bearer re_xxxxxxxxxxxx"
+```
+
+### Notes
+
+- Returns `401` if the token is invalid or missing
+- Admin sessions return `actorType: "admin"` with an empty `allowedDomainIds` array
+- `keyId` and `keyPrefix` are `null` when authenticated via cookie session
 
 ## List API Keys (Admin)
 

@@ -6,6 +6,14 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.51] - 2026-02-07
+
+### Added
+- Add token management API endpoints
+
+### Fixed
+- Improve test reliability with better database isolation
+
 ## [0.9.50] - 2026-02-07
 
 ### Fixed

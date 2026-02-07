@@ -72,7 +72,8 @@ src/SelfMX.Api/
 ├── Program.cs              # DI setup, middleware, route registration
 ├── Endpoints/              # Minimal API route handlers
 │   ├── DomainEndpoints.cs  # /domains CRUD
-│   └── EmailEndpoints.cs   # /emails send, get, list, batch
+│   ├── EmailEndpoints.cs   # /emails send, get, list, batch
+│   └── TokenEndpoints.cs   # /tokens/me introspection
 ├── Services/               # Business logic
 │   ├── DomainService.cs    # Domain CRUD, verification state
 │   ├── SesService.cs       # AWS SES integration
@@ -158,6 +159,7 @@ client/src/
 | `GET /emails/{id}` | Yes | Get sent email (Resend-compatible) |
 | `GET /emails` | Yes | List sent emails (cursor-based pagination) |
 | `POST /emails/batch` | Yes | Send batch emails |
+| `GET /tokens/me` | Yes | Token introspection (effective permissions) |
 | `GET /api-keys` | Admin | List API keys |
 | `POST /api-keys` | Admin | Create API key |
 | `GET /api-keys/revoked` | Admin | List archived API keys |
