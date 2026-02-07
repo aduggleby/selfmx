@@ -173,7 +173,8 @@ public class ResendCompatibilityTests : IClassFixture<SelfMxTestFactory>
 
 public class SelfMxTestFactory : WebApplicationFactory<Program>
 {
-    private const string TestConnectionString = "Data Source=SelfMxTestDb;Mode=Memory;Cache=Shared";
+    private readonly string _testConnectionString =
+        $"Data Source=file:SelfMxTestDb_{Guid.NewGuid():N}?mode=memory&cache=shared";
     private SqliteConnection? _keepAlive;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -185,14 +186,22 @@ public class SelfMxTestFactory : WebApplicationFactory<Program>
             config.Sources.Clear();
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Test:SqliteConnectionString"] = TestConnectionString
+                ["Test:SqliteConnectionString"] = _testConnectionString
             });
         });
 
         builder.ConfigureServices(services =>
         {
-            _keepAlive = new SqliteConnection(TestConnectionString);
+            _keepAlive = new SqliteConnection(_testConnectionString);
             _keepAlive.Open();
+
+            // Use a single shared open SQLite connection for all DbContexts in tests.
+            // This avoids flaky in-memory DB behavior when contexts open/close separate connections.
+            services.RemoveAll<DbContextOptions<AppDbContext>>();
+            services.AddDbContext<AppDbContext>(options => options.UseSqlite(_keepAlive));
+
+            services.RemoveAll<DbContextOptions<AuditDbContext>>();
+            services.AddDbContext<AuditDbContext>(options => options.UseSqlite(_keepAlive));
 
             var auditHostedServices = services
                 .Where(d =>

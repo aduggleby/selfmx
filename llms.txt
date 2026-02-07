@@ -1,0 +1,334 @@
+SelfMX (selfmx) - LLM-Oriented API Reference
+============================================
+
+This file is a machine-readable, comprehensive description of the SelfMX API as implemented in this repository.
+
+Base URL
+--------
+- Local dev (API): http://localhost:17400
+- UI (served by API in production builds): /ui/
+
+Authentication & Authorization
+------------------------------
+SelfMX supports two auth mechanisms:
+
+1) Bearer token (API key) for programmatic access
+   - Header: Authorization: Bearer <token>
+   - Token formats:
+     - Non-admin keys begin with "re_" (example: "re_...")
+     - Admin keys begin with "re_admin_" (example: "re_admin_...")
+     - Legacy single-key mode may be enabled by server configuration; if enabled, any Bearer token that matches the configured legacy hash is treated as admin.
+   - Token restrictions:
+     - Non-admin keys are scoped to a set of allowed domain IDs.
+       - Requests that read or write domain/email resources are filtered/authorized against the allowed domains.
+     - Admin keys have full access to all domains and admin-only endpoints.
+   - Revocation:
+     - Revoked tokens are rejected (401) and cannot be used.
+
+2) Cookie auth for the browser admin UI
+   - Cookie name: SelfMX.Admin
+   - Used by /admin/login to establish a session for the UI.
+
+Important nuance (current server behavior):
+- The API’s default authentication scheme is the API-key scheme, but it first attempts to authenticate the Cookie scheme.
+- That means requests to protected API endpoints can be authenticated either by:
+  - a valid admin cookie session, OR
+  - a valid Bearer token.
+
+Authorization policies
+----------------------
+- Default policy: authenticated user required (cookie OR API key).
+- AdminOnly policy: requires claim ActorType=admin (admin cookie OR admin API key).
+
+Rate limiting
+-------------
+- /admin/* endpoints are rate-limited with policy "login" (fixed window, intended for brute-force protection).
+- Most authenticated API endpoints use policy "api" (sliding window).
+
+Error format
+------------
+Many endpoints (especially Resend-compatible ones) return errors in a Resend-like JSON envelope:
+{
+  "statusCode": <int>,
+  "name": "<string>",
+  "message": "<string>",
+  "error": { "code": "<string>", "message": "<string>" }
+}
+
+Some endpoints (notably /admin/login on failure) may return a bare 401 without JSON.
+
+Endpoint Index
+==============
+
+UI and Static Assets
+--------------------
+- GET /                      -> 302 redirect to /ui/
+- GET /ui/                   -> serves the UI entry document (index.html)
+- GET /ui/assets/*           -> serves built UI assets
+- GET /ui/{clientRoute...}   -> SPA fallback (serves index.html for non-file paths)
+
+Health & System (no auth)
+-------------------------
+- GET /health
+  - Auth: none
+  - Purpose: container/orchestrator health checks.
+
+- GET /system/status
+  - Auth: none
+  - Response: { healthy: boolean, issues: string[], timestamp: string }
+  - Notes: validates AWS SES connectivity/credentials and DB connectivity.
+
+- GET /system/version
+  - Auth: none
+  - Response: { version: string, buildDate: string, environment: string }
+
+System Logs (admin-only)
+------------------------
+- GET /system/logs
+  - Auth: required, and caller must be admin (ActorType=admin)
+  - Query params:
+    - count (int, default 1000, max 2000)
+    - level (string?, optional)
+    - category (string?, optional)
+  - Response: { count: int, logs: [{ timestamp, level, category, message, exception }] }
+
+Hangfire Dashboard (admin-only)
+-------------------------------
+- GET /hangfire (and subpaths)
+  - Auth: admin-only (Hangfire dashboard authorization filter).
+
+Admin Session (cookie auth; some routes allow token auth if admin)
+-----------------------------------------------------------------
+- POST /admin/login
+  - Auth: none (AllowAnonymous)
+  - Rate limit: "login"
+  - Body (JSON):
+    - password (string)
+  - Success response (200): { name: "admin", isAuthenticated: true }
+  - Side effect: sets cookie "SelfMX.Admin"
+  - Failure: 401 Unauthorized
+
+- POST /admin/logout
+  - Auth: required (cookie session or admin token)
+  - Response: 200 OK
+  - Side effect: clears cookie session.
+
+- GET /admin/me
+  - Auth: required
+  - Success response (200): { name: "admin", isAuthenticated: true } (admin only)
+  - If authenticated but not admin: 401 Unauthorized
+
+Token Introspection (auth required)
+----------------------------------
+- GET /tokens/me
+  - Auth: required (cookie OR Bearer token)
+  - Purpose: allow clients (including LLM agents) to verify token validity and see effective permissions.
+  - Success response (200):
+    {
+      authenticated: true,
+      actorType: "admin" | "api_key" | "unknown",
+      isAdmin: boolean,
+      name: string?,
+      keyId: string?,        // present for API keys
+      keyPrefix: string?,    // present for API keys
+      allowedDomainIds: string[] // empty for admin
+    }
+  - Failure (401): invalid/missing token or missing cookie session.
+
+Domains (auth required; token-scoped)
+------------------------------------
+All /domains endpoints require authentication. Non-admin API keys are restricted to their allowedDomainIds.
+
+- GET /domains/
+  - Query params:
+    - page (int, default 1; min 1)
+    - limit (int, default 20; clamp 1..100)
+  - Auth:
+    - Admin: sees all domains.
+    - Non-admin key: only domains in allowedDomainIds.
+  - Response (200):
+    PaginatedResponse<DomainResponse>
+    {
+      data: DomainResponse[],
+      page: int,
+      limit: int,
+      total: int
+    }
+
+- POST /domains/
+  - Body (JSON): { name: string }
+  - Response:
+    - 201 Created with DomainResponse
+    - 409 Conflict if domain already exists
+
+- GET /domains/{id}
+  - Path params:
+    - id (string domain ID)
+  - Auth: must have access to this domain (admin or allowedDomainIds contains id)
+  - Response: 200 DomainResponse, or 404, or 403
+
+- DELETE /domains/{id}
+  - Auth: must have access to this domain
+  - Response: 204 No Content, or 404, or 403
+
+- POST /domains/{id}/verify
+  - Auth: must have access to this domain
+  - Notes: only valid when the domain is currently in "verifying" status; otherwise returns 400.
+  - Response: 200 DomainResponse, or 400/403/404
+
+- POST /domains/{id}/test-email
+  - Auth: must have access to this domain; domain must be verified
+  - Body (JSON):
+    - senderPrefix (string; allowed chars: [a-zA-Z0-9._-])
+    - to (string; email)
+    - subject (string)
+    - text (string)
+  - Response (200): SendEmailResponse { id: string, object: "email" }
+
+DomainResponse shape
+--------------------
+{
+  id: string,
+  name: string,
+  status: "pending" | "verifying" | "verified" | "failed" | ...,
+  createdAt: string (ISO-8601),
+  verifiedAt: string? (ISO-8601),
+  failureReason: string?,
+  dnsRecords: [{ type, name, value, priority, verified }]?,
+  lastCheckedAt: string?,
+  nextCheckAt: string?
+}
+
+Emails (Resend-compatible; auth required; token-scoped by From domain)
+---------------------------------------------------------------------
+
+- POST /emails
+  - Auth: required
+  - Body (JSON): SendEmailRequest
+    - from (string; must contain an email address; domain part determines authorization scope)
+    - to (string[]; at least 1)
+    - subject (string; required)
+    - html (string?, optional)
+    - text (string?, optional)
+    - cc (string[]?, optional)
+    - bcc (string[]?, optional)
+    - replyTo (string[]?, optional)
+    - headers (object<string,string>?, optional; may be ignored by provider)
+  - Authorization rules:
+    - Domain must exist and be verified.
+    - Non-admin keys must be authorized for the domain extracted from `from`.
+  - Success (200): SendEmailResponse { id: "<guid-string>", object: "email" }
+
+- GET /emails/{id}
+  - Auth: required
+  - Path params:
+    - id (string; must be a GUID)
+  - Authorization rules:
+    - Must be able to access the email’s domain (admin or allowedDomainIds contains domainId).
+  - Response (200): ResendEmailReceipt (Resend-like)
+  - Errors:
+    - 400 invalid_parameter (invalid GUID)
+    - 403 invalid_access
+    - 404 not_found
+
+- GET /emails
+  - Auth: required
+  - Query params:
+    - before (string?, optional; email id cursor)
+    - after (string?, optional; email id cursor)
+    - limit (int, default 20; clamp 1..100)
+  - Authorization rules:
+    - Admin: sees all.
+    - Non-admin: filtered to allowed domains.
+  - Response (200):
+    { data: ResendEmailReceipt[], hasMore: boolean }
+  - Errors:
+    - 400 invalid_parameter if before/after cursor is invalid
+
+- POST /emails/batch
+  - Auth: required
+  - Header:
+    - x-batch-validation: "strict" | "permissive" (optional; default "strict")
+  - Body: SendEmailRequest[]
+  - Behavior:
+    - strict: if any item invalid, whole request fails (400/422)
+    - permissive: sends valid items and returns per-item errors
+  - Response (200), strict:
+    { data: [{ id: "<guid>" }] }
+  - Response (200), permissive:
+    { data: [{ id: "<guid>" }], errors: [{ index: int, message: string }]? }
+
+Sent Emails (SelfMX admin visibility; auth required; token-scoped)
+-----------------------------------------------------------------
+
+- GET /sent-emails/
+  - Auth: required
+  - Query params:
+    - domainId (string?, optional)
+    - from (string? ISO date-time, optional)
+    - to (string? ISO date-time, optional)
+    - cursor (string?, optional; opaque base64 cursor)
+    - pageSize (int, default 50; clamp 1..100)
+  - Authorization rules:
+    - Admin: sees all
+    - Non-admin: filtered to allowed domains; specifying domainId outside scope returns 400 unauthorized-like error
+  - Response (200):
+    { data: SentEmailListItem[], nextCursor: string?, hasMore: boolean }
+
+- GET /sent-emails/{id}
+  - Auth: required
+  - Authorization rules:
+    - Must have access to the email’s domain
+  - Response (200): SentEmailDetail
+  - Notes:
+    - BCC is never returned.
+
+API Keys (admin-only)
+---------------------
+All /api-keys and /audit-logs endpoints require AdminOnly (ActorType=admin).
+
+- GET /api-keys/
+  - Query params:
+    - page (int, default 1)
+    - limit (int, default 20)
+  - Response: PaginatedResponse<ApiKeyResponse>
+
+- POST /api-keys/
+  - Body (JSON):
+    - name (string; required)
+    - domainIds (string[]?; required when isAdmin=false)
+    - isAdmin (bool; default false)
+  - Response (201): ApiKeyCreatedResponse
+    - IMPORTANT: `key` is returned only once and cannot be retrieved later.
+
+- GET /api-keys/revoked
+  - Query params:
+    - page (int, default 1)
+    - limit (int, default 20)
+  - Response: PaginatedResponse<RevokedApiKeyResponse>
+
+- GET /api-keys/{id}
+  - Response: ApiKeyResponse or 404
+
+- DELETE /api-keys/{id}
+  - Effect: revokes the API key
+  - Response: 200 OK or 404
+
+Audit Logs (admin-only)
+-----------------------
+- GET /audit-logs/
+  - Query params:
+    - page (int, default 1)
+    - limit (int, default 50)
+    - action (string?, optional)
+    - actorId (string?, optional)
+    - from (string? ISO date-time, optional)
+    - to (string? ISO date-time, optional)
+  - Response: PaginatedResponse<AuditLogResponse>
+
+Security Notes for LLM Agents
+-----------------------------
+- Never place tokens in query parameters; use the Authorization header.
+- Treat ApiKeyCreatedResponse.key as a secret; it is shown once on creation.
+- Use GET /tokens/me to validate a token and discover allowedDomainIds before attempting domain-scoped operations.
+

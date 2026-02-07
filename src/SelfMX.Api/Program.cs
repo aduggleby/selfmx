@@ -253,8 +253,9 @@ app.UseExceptionHandler(errorApp =>
 });
 
 // Auto-migrate on startup
-using (var scope = app.Services.CreateScope())
+if (!app.Environment.IsEnvironment("Test"))
 {
+    using var scope = app.Services.CreateScope();
     var startupLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
         .CreateLogger("Startup");
 
@@ -421,6 +422,7 @@ var authenticated = app.MapGroup("")
 authenticated.MapDomainEndpoints();
 authenticated.MapEmailEndpoints();
 authenticated.MapSentEmailEndpoints();
+authenticated.MapTokenEndpoints();
 
 // Admin-only endpoints - require admin actor type (uses AdminOnly policy)
 var adminOnly = app.MapGroup("")
