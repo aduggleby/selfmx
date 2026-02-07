@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using SelfMX.Api.Contracts.Responses;
@@ -60,11 +61,12 @@ public static class ApiKeyEndpoints
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
-            return TypedResults.BadRequest(ApiError.InvalidRequest.ToResponse());
+            return TypedResults.BadRequest(ApiError.InvalidRequest.ToResendResponse(StatusCodes.Status400BadRequest));
 
         // Admin keys don't need domains, regular keys do
         if (!request.IsAdmin && (request.DomainIds is null || request.DomainIds.Length == 0))
-            return TypedResults.BadRequest(new ApiError("invalid_request", "Non-admin keys must have at least one domain").ToResponse());
+            return TypedResults.BadRequest(new ApiError("invalid_request", "Non-admin keys must have at least one domain")
+                .ToResendResponse(StatusCodes.Status400BadRequest));
 
         var (key, plainTextKey) = await apiKeyService.CreateAsync(
             request.Name,
@@ -96,7 +98,7 @@ public static class ApiKeyEndpoints
     {
         var key = await apiKeyService.GetByIdAsync(id, ct);
         if (key is null)
-            return TypedResults.NotFound(ApiError.NotFound.ToResponse());
+            return TypedResults.NotFound(ApiError.NotFound.ToResendResponse(StatusCodes.Status404NotFound));
 
         return TypedResults.Ok(ApiKeyResponse.FromEntity(key));
     }
@@ -110,7 +112,7 @@ public static class ApiKeyEndpoints
     {
         var key = await apiKeyService.GetByIdAsync(id, ct);
         if (key is null)
-            return TypedResults.NotFound(ApiError.NotFound.ToResponse());
+            return TypedResults.NotFound(ApiError.NotFound.ToResendResponse(StatusCodes.Status404NotFound));
 
         await apiKeyService.RevokeAsync(id, ct);
 

@@ -5,7 +5,10 @@ import path from 'path'
 
 const isTest = process.env.PLAYWRIGHT_TEST === 'true'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // The admin UI is hosted by the backend under /ui in production.
+  // Keep dev server at / for convenience (and to avoid changing Playwright tests).
+  base: command === 'build' ? '/ui/' : '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -46,4 +49,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

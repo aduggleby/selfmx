@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Hangfire;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using SelfMX.Api.Contracts.Requests;
 using SelfMX.Api.Contracts.Responses;
@@ -81,13 +82,13 @@ public static class DomainEndpoints
     {
         if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return TypedResults.BadRequest(ApiError.InvalidRequest.ToResponse());
+            return TypedResults.BadRequest(ApiError.InvalidRequest.ToResendResponse(StatusCodes.Status400BadRequest));
         }
 
         var existing = await domainService.GetByNameAsync(request.Name, ct);
         if (existing is not null)
         {
-            return TypedResults.Conflict(ApiError.DomainAlreadyExists.ToResponse());
+            return TypedResults.Conflict(ApiError.DomainAlreadyExists.ToResendResponse(StatusCodes.Status409Conflict));
         }
 
         var domain = await domainService.CreateAsync(request.Name, ct);
@@ -108,7 +109,7 @@ public static class DomainEndpoints
         var domain = await domainService.GetByIdAsync(id, ct);
         if (domain is null)
         {
-            return TypedResults.NotFound(ApiError.NotFound.ToResponse());
+            return TypedResults.NotFound(ApiError.NotFound.ToResendResponse(StatusCodes.Status404NotFound));
         }
 
         if (!apiKeyService.CanAccessDomain(user, domain.Id))
@@ -135,7 +136,7 @@ public static class DomainEndpoints
         var domain = await domainService.GetByIdAsync(id, ct);
         if (domain is null)
         {
-            return TypedResults.NotFound(ApiError.NotFound.ToResponse());
+            return TypedResults.NotFound(ApiError.NotFound.ToResendResponse(StatusCodes.Status404NotFound));
         }
 
         if (!apiKeyService.CanAccessDomain(user, domain.Id))
@@ -145,7 +146,7 @@ public static class DomainEndpoints
 
         if (domain.Status != DomainStatus.Verifying)
         {
-            return TypedResults.BadRequest(ApiError.InvalidRequest.ToResponse() as object);
+            return TypedResults.BadRequest(ApiError.InvalidRequest.ToResendResponse(StatusCodes.Status400BadRequest) as object);
         }
 
         // Run verification immediately (no Hangfire context when called directly)
@@ -173,7 +174,7 @@ public static class DomainEndpoints
         var domain = await domainService.GetByIdAsync(id, ct);
         if (domain is null)
         {
-            return TypedResults.NotFound(ApiError.NotFound.ToResponse());
+            return TypedResults.NotFound(ApiError.NotFound.ToResendResponse(StatusCodes.Status404NotFound));
         }
 
         if (!apiKeyService.CanAccessDomain(user, domain.Id))
@@ -223,7 +224,7 @@ public static class DomainEndpoints
                 StatusCode: 400,
                 ErrorMessage: "Missing required fields"
             ));
-            return TypedResults.BadRequest(ApiError.InvalidRequest.ToResponse());
+            return TypedResults.BadRequest(ApiError.InvalidRequest.ToResendResponse(StatusCodes.Status400BadRequest));
         }
 
         // Validate sender prefix format
@@ -238,7 +239,7 @@ public static class DomainEndpoints
                 StatusCode: 400,
                 ErrorMessage: $"Invalid sender prefix: {request.SenderPrefix}"
             ));
-            return TypedResults.BadRequest(ApiError.InvalidSenderPrefix.ToResponse());
+            return TypedResults.BadRequest(ApiError.InvalidSenderPrefix.ToResendResponse(StatusCodes.Status400BadRequest));
         }
 
         // Validate recipient email format
@@ -253,7 +254,7 @@ public static class DomainEndpoints
                 StatusCode: 400,
                 ErrorMessage: $"Invalid recipient email: {request.To}"
             ));
-            return TypedResults.BadRequest(ApiError.InvalidRecipientEmail.ToResponse());
+            return TypedResults.BadRequest(ApiError.InvalidRecipientEmail.ToResendResponse(StatusCodes.Status400BadRequest));
         }
 
         // Get domain
@@ -269,7 +270,7 @@ public static class DomainEndpoints
                 StatusCode: 404,
                 ErrorMessage: "Domain not found"
             ));
-            return TypedResults.NotFound(ApiError.NotFound.ToResponse());
+            return TypedResults.NotFound(ApiError.NotFound.ToResendResponse(StatusCodes.Status404NotFound));
         }
 
         // Check domain is verified
@@ -284,7 +285,7 @@ public static class DomainEndpoints
                 StatusCode: 422,
                 ErrorMessage: $"Domain not verified: {domain.Name}"
             ));
-            return TypedResults.UnprocessableEntity(ApiError.DomainNotVerified.ToResponse());
+            return TypedResults.UnprocessableEntity(ApiError.DomainNotVerified.ToResendResponse(StatusCodes.Status422UnprocessableEntity));
         }
 
         // Check authorization

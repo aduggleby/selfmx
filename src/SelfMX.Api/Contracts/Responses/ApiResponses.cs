@@ -74,6 +74,40 @@ public record ApiError(string Code, string Message)
 {
     public object ToResponse() => new { error = new { code = Code, message = Message } };
 
+    public object ToResendResponse(int statusCode)
+    {
+        var name = MapResendName(Code);
+        return new
+        {
+            statusCode,
+            name,
+            message = Message,
+            error = new
+            {
+                code = Code,
+                message = Message
+            }
+        };
+    }
+
+    private static string MapResendName(string code)
+    {
+        return code switch
+        {
+            "unauthorized" => "invalid_api_key",
+            "not_found" => "not_found",
+            "rate_limited" => "rate_limit_exceeded",
+            "invalid_request" => "validation_error",
+            "domain_not_verified" => "validation_error",
+            "domain_exists" => "validation_error",
+            "internal_error" => "internal_server_error",
+            "forbidden" => "invalid_access",
+            "invalid_sender_prefix" => "validation_error",
+            "invalid_recipient_email" => "validation_error",
+            _ => "application_error"
+        };
+    }
+
     public static readonly ApiError Unauthorized = new("unauthorized", "Invalid or missing API key");
     public static readonly ApiError NotFound = new("not_found", "Resource not found");
     public static readonly ApiError RateLimited = new("rate_limited", "Too many requests");

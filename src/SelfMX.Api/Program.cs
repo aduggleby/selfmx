@@ -43,43 +43,77 @@ builder.Services.Configure<AwsSettings>(builder.Configuration.GetSection("Aws"))
 builder.Services.Configure<CloudflareSettings>(builder.Configuration.GetSection("Cloudflare"));
 
 // SQL Server database configuration
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required");
+var useSqlite = builder.Environment.IsEnvironment("Test");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString, sql =>
+if (useSqlite)
+{
+    if (string.IsNullOrWhiteSpace(connectionString) ||
+        connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase))
     {
-        sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
-        sql.CommandTimeout(30);
-    }));
+        connectionString = builder.Configuration["Test:SqliteConnectionString"]
+            ?? "Data Source=SelfMxTestDb;Mode=Memory;Cache=Shared";
+    }
+}
+else if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required");
+}
 
-builder.Services.AddDbContext<AuditDbContext>(options =>
-    options.UseSqlServer(connectionString, sql =>
-    {
-        sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
-        sql.CommandTimeout(30);
-    }));
+if (useSqlite)
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlite(connectionString));
+
+    builder.Services.AddDbContext<AuditDbContext>(options =>
+        options.UseSqlite(connectionString));
+}
+else
+{
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlServer(connectionString, sql =>
+        {
+            sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
+            sql.CommandTimeout(30);
+        }));
+
+    builder.Services.AddDbContext<AuditDbContext>(options =>
+        options.UseSqlServer(connectionString, sql =>
+        {
+            sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
+            sql.CommandTimeout(30);
+        }));
+}
+
+var enableHangfire = !builder.Environment.IsEnvironment("Test");
 
 // Hangfire with SQL Server and Console logging
-builder.Services.AddHangfire(config => config
-    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-    .UseSimpleAssemblyNameTypeSerializer()
-    .UseRecommendedSerializerSettings()
-    .UseSqlServerStorage(connectionString, new SqlServerStorageOptions
-    {
-        CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
-        SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
-        QueuePollInterval = TimeSpan.Zero,
-        UseRecommendedIsolationLevel = true,
-        DisableGlobalLocks = true
-    })
-    .UseConsole());
-
-builder.Services.AddHangfireServer(options =>
+if (enableHangfire)
 {
-    options.WorkerCount = Math.Min(Environment.ProcessorCount * 2, 20); // Cap at 20 workers
-    options.Queues = ["default"];
-});
+    builder.Services.AddHangfire(config => config
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UseSqlServerStorage(connectionString, new SqlServerStorageOptions
+        {
+            CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
+            SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
+            QueuePollInterval = TimeSpan.Zero,
+            UseRecommendedIsolationLevel = true,
+            DisableGlobalLocks = true
+        })
+        .UseConsole());
+
+    builder.Services.AddHangfireServer(options =>
+    {
+        options.WorkerCount = Math.Min(Environment.ProcessorCount * 2, 20); // Cap at 20 workers
+        options.Queues = ["default"];
+    });
+}
+else
+{
+    builder.Services.AddSingleton<IBackgroundJobClient, NoopBackgroundJobClient>();
+}
 
 // Dual Authentication: Cookie (admin UI) + API Key (programmatic)
 builder.Services.AddAuthentication(options =>
@@ -166,7 +200,9 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = async (context, ct) =>
     {
         context.HttpContext.Response.ContentType = "application/json";
-        await context.HttpContext.Response.WriteAsJsonAsync(ApiError.RateLimited.ToResponse(), ct);
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            ApiError.RateLimited.ToResendResponse(StatusCodes.Status429TooManyRequests),
+            ct);
     };
 
     options.AddFixedWindowLimiter("login", opt =>
@@ -211,7 +247,8 @@ app.UseExceptionHandler(errorApp =>
     {
         context.Response.StatusCode = 500;
         context.Response.ContentType = "application/json";
-        await context.Response.WriteAsJsonAsync(ApiError.InternalError.ToResponse());
+        await context.Response.WriteAsJsonAsync(
+            ApiError.InternalError.ToResendResponse(StatusCodes.Status500InternalServerError));
     });
 });
 
@@ -237,11 +274,23 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Serve static files from wwwroot (React frontend)
-app.UseStaticFiles();
+// Serve the React UI from /ui to avoid collisions with API routes on the same domain.
+// Default files enables /ui/ to serve index.html.
+app.UseDefaultFiles(new DefaultFilesOptions
+{
+    RequestPath = "/ui"
+});
+app.UseStaticFiles(new StaticFileOptions
+{
+    RequestPath = "/ui"
+});
 
 // Health endpoint (no auth)
 app.MapHealthChecks("/health");
+
+// Root should just bounce to the UI entrypoint.
+app.MapGet("/", () => Results.Redirect("/ui", permanent: false));
+app.MapGet("/ui", () => Results.Redirect("/ui/", permanent: false));
 
 // System status endpoint - checks AWS, database connectivity (no auth, needed before login)
 app.MapGet("/system/status", async (
@@ -382,34 +431,40 @@ adminOnly.MapApiKeyEndpoints();
 adminOnly.MapAuditEndpoints();
 
 // Hangfire dashboard - admin only, available in all environments
-app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
+if (enableHangfire)
 {
-    Authorization = [new HangfireAdminAuthorizationFilter()]
-});
+    app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
+    {
+        Authorization = [new HangfireAdminAuthorizationFilter()]
+    });
+}
 
-// Schedule recurring domain verification job (every 5 minutes)
-var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
-recurringJobManager.AddOrUpdate<VerifyDomainsJob>(
-    "verify-domains",
-    job => job.ExecuteAsync(null),
-    "*/5 * * * *");
+if (enableHangfire)
+{
+    // Schedule recurring domain verification job (every 5 minutes)
+    var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+    recurringJobManager.AddOrUpdate<VerifyDomainsJob>(
+        "verify-domains",
+        job => job.ExecuteAsync(null),
+        "*/5 * * * *");
 
-// Schedule sent email cleanup job (daily at 3 AM UTC)
-recurringJobManager.AddOrUpdate<CleanupSentEmailsJob>(
-    "cleanup-sent-emails",
-    job => job.ExecuteAsync(CancellationToken.None, null),
-    "0 3 * * *",
-    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+    // Schedule sent email cleanup job (daily at 3 AM UTC)
+    recurringJobManager.AddOrUpdate<CleanupSentEmailsJob>(
+        "cleanup-sent-emails",
+        job => job.ExecuteAsync(CancellationToken.None, null),
+        "0 3 * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
 
-// Schedule revoked API keys cleanup job (daily at 4 AM UTC)
-recurringJobManager.AddOrUpdate<CleanupRevokedApiKeysJob>(
-    "cleanup-revoked-api-keys",
-    job => job.ExecuteAsync(null),
-    "0 4 * * *",
-    new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+    // Schedule revoked API keys cleanup job (daily at 4 AM UTC)
+    recurringJobManager.AddOrUpdate<CleanupRevokedApiKeysJob>(
+        "cleanup-revoked-api-keys",
+        job => job.ExecuteAsync(null),
+        "0 4 * * *",
+        new RecurringJobOptions { TimeZone = TimeZoneInfo.Utc });
+}
 
-// SPA fallback - serve index.html for client-side routing
-app.MapFallbackToFile("index.html");
+// SPA fallback - serve the UI index only for /ui client-side routing.
+app.MapFallbackToFile("/ui/{*path:nonfile}", "index.html");
 
 // Startup banner and diagnostics
 var version = typeof(Program).Assembly.GetName().Version;

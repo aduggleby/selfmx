@@ -1,7 +1,10 @@
+using System.Net;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using SelfMX.Api.Contracts.Responses;
 using SelfMX.Api.Services;
 using SelfMX.Api.Settings;
 
@@ -125,5 +128,64 @@ public class ApiKeyAuthHandler : AuthenticationHandler<AuthenticationSchemeOptio
         _logger.LogWarning("Auth failed: invalid key, IP={Ip}, Path={Path}",
             ipAddress, Request.Path);
         return AuthenticateResult.Fail("Invalid API key");
+    }
+
+    protected override Task HandleChallengeAsync(AuthenticationProperties properties)
+    {
+        var hasAuthHeader = Request.Headers.TryGetValue(ApiKeyHeader, out var authHeader);
+        var headerValue = hasAuthHeader ? authHeader.ToString() : string.Empty;
+
+        if (!hasAuthHeader)
+        {
+            return WriteResendError(
+                StatusCodes.Status401Unauthorized,
+                "missing_api_key",
+                "Missing API key",
+                "missing_api_key");
+        }
+
+        if (!headerValue.StartsWith(BearerPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return WriteResendError(
+                StatusCodes.Status401Unauthorized,
+                "invalid_api_key",
+                "Invalid API key",
+                "unauthorized");
+        }
+
+        return WriteResendError(
+            StatusCodes.Status401Unauthorized,
+            "invalid_api_key",
+            "Invalid API key",
+            "unauthorized");
+    }
+
+    protected override Task HandleForbiddenAsync(AuthenticationProperties properties)
+    {
+        return WriteResendError(
+            StatusCodes.Status403Forbidden,
+            "invalid_access",
+            "Access denied to this resource",
+            "forbidden");
+    }
+
+    private Task WriteResendError(int statusCode, string name, string message, string code)
+    {
+        Response.StatusCode = statusCode;
+        Response.ContentType = "application/json";
+
+        var payload = new
+        {
+            statusCode,
+            name,
+            message,
+            error = new
+            {
+                code,
+                message
+            }
+        };
+
+        return Response.WriteAsJsonAsync(payload);
     }
 }

@@ -62,9 +62,12 @@ public class AppDbContext : DbContext
             entity.Property(e => e.DomainId).HasMaxLength(36).IsRequired();
             entity.Property(e => e.ApiKeyId).HasMaxLength(36);
 
-            // Large text - explicit nvarchar(max)
-            entity.Property(e => e.HtmlBody).HasColumnType("nvarchar(max)");
-            entity.Property(e => e.TextBody).HasColumnType("nvarchar(max)");
+            if (Database.IsSqlServer())
+            {
+                // Large text - explicit nvarchar(max) for SQL Server
+                entity.Property(e => e.HtmlBody).HasColumnType("nvarchar(max)");
+                entity.Property(e => e.TextBody).HasColumnType("nvarchar(max)");
+            }
 
             // Indexes for cleanup job and queries
             entity.HasIndex(e => e.SentAt);

@@ -63,7 +63,8 @@ public class RateLimitMiddleware
             context.Response.Headers["Retry-After"] = retryAfterSeconds.ToString();
             context.Response.ContentType = "application/json";
 
-            await context.Response.WriteAsJsonAsync(ApiError.RateLimited.ToResponse());
+            await context.Response.WriteAsJsonAsync(
+                ApiError.RateLimited.ToResendResponse(StatusCodes.Status429TooManyRequests));
             return;
         }
 

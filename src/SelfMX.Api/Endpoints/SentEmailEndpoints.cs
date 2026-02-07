@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using SelfMX.Api.Contracts.Responses;
@@ -47,7 +48,7 @@ public static class SentEmailEndpoints
         if (!string.IsNullOrEmpty(domainId))
         {
             if (!isAdmin && !allowedDomains.Contains(domainId))
-                return TypedResults.BadRequest(ApiError.Unauthorized.ToResponse());
+                return TypedResults.BadRequest(ApiError.Unauthorized.ToResendResponse(StatusCodes.Status400BadRequest));
 
             query = query.Where(e => e.DomainId == domainId);
         }
@@ -151,7 +152,7 @@ public static class SentEmailEndpoints
             .FirstOrDefaultAsync(ct);
 
         if (email is null)
-            return TypedResults.NotFound(ApiError.NotFound.ToResponse());
+            return TypedResults.NotFound(ApiError.NotFound.ToResendResponse(StatusCodes.Status404NotFound));
 
         // Authorization check
         if (!apiKeyService.CanAccessDomain(user, email.DomainId))
