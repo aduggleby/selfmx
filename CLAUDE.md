@@ -39,6 +39,7 @@ npm run build                      # TypeScript check + Vite build
 npm run lint                       # ESLint
 npm run test                       # Playwright E2E tests (headless)
 npm run test:headed                # Playwright with browser UI
+npx playwright test --config playwright.backend.config.ts  # Backend E2E tests (builds UI + runs .NET API)
 ```
 
 ### Full Stack Development

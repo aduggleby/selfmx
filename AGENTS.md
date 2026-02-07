@@ -29,6 +29,7 @@
 ## Testing Guidelines
 - Backend tests: xUnit in `tests/SelfMX.Api.Tests/` with filenames like `*Tests.cs` or `*.Tests.cs`.
 - Frontend E2E: Playwright specs in `client/e2e/*.spec.ts`.
+- Backend E2E: Playwright specs in `client/e2e-backend/*.spec.ts` (run with `npx playwright test --config playwright.backend.config.ts` from `client/`).
 - Run targeted tests with `dotnet test --filter "FullyQualifiedName~DomainService"`.
 
 ## Commit & Pull Request Guidelines
