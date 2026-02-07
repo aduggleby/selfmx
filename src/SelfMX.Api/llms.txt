@@ -60,6 +60,12 @@ Some endpoints (notably /admin/login on failure) may return a bare 401 without J
 Endpoint Index
 ==============
 
+Discovery
+---------
+- GET /llms.txt
+  - Auth: none
+  - Purpose: this document.
+
 UI and Static Assets
 --------------------
 - GET /                      -> 302 redirect to /ui/
@@ -331,4 +337,3 @@ Security Notes for LLM Agents
 - Never place tokens in query parameters; use the Authorization header.
 - Treat ApiKeyCreatedResponse.key as a secret; it is shown once on creation.
 - Use GET /tokens/me to validate a token and discover allowedDomainIds before attempting domain-scoped operations.
-

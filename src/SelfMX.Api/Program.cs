@@ -289,6 +289,15 @@ app.UseStaticFiles(new StaticFileOptions
 // Health endpoint (no auth)
 app.MapHealthChecks("/health");
 
+// Public LLM-oriented API reference
+app.MapGet("/llms.txt", (IWebHostEnvironment env) =>
+{
+    var path = Path.Combine(env.ContentRootPath, "llms.txt");
+    return File.Exists(path)
+        ? Results.File(path, contentType: "text/plain; charset=utf-8")
+        : Results.NotFound();
+});
+
 // Root should just bounce to the UI entrypoint.
 app.MapMethods("/", ["GET", "HEAD"], () => Results.Redirect("/ui/", permanent: false));
 
