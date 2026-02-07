@@ -9,6 +9,7 @@
 - Root build artifacts: `build.csando`, `ando-pre.csando`, `Dockerfile`, `SelfMX.slnx`, `mise.toml`.
 
 ## Build, Test, and Development Commands
+- NEVER publish/deploy/release SelfMX or its artifacts. You may build and run tests only.
 - `mise install` installs the pinned .NET 9 toolchain.
 - `docker compose -f docker-compose.dev.yml up -d` starts the local SQL Server on port `17402`.
 - `dotnet run --project src/SelfMX.Api` runs the API on port `17400`.

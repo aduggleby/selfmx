@@ -289,8 +289,7 @@ app.UseStaticFiles(new StaticFileOptions
 app.MapHealthChecks("/health");
 
 // Root should just bounce to the UI entrypoint.
-app.MapGet("/", () => Results.Redirect("/ui", permanent: false));
-app.MapGet("/ui", () => Results.Redirect("/ui/", permanent: false));
+app.MapGet("/", () => Results.Redirect("/ui/", permanent: false));
 
 // System status endpoint - checks AWS, database connectivity (no auth, needed before login)
 app.MapGet("/system/status", async (

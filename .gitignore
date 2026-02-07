@@ -39,6 +39,7 @@ Thumbs.db
 
 # Build outputs
 publish/
+src/SelfMX.Api/wwwroot/
 
 # Ando build system
 .ando/
