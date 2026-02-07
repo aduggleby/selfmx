@@ -144,6 +144,7 @@ client/src/
 
 | Endpoint | Auth | Description |
 |----------|------|-------------|
+| `GET /llms.txt` | No | LLM-oriented API reference (plain text) |
 | `GET /health` | No | Health check |
 | `GET /` | No | Redirects to `/ui/` |
 | `GET /system/status` | No | System config validation (AWS, DB connectivity) |

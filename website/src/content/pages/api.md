@@ -23,6 +23,7 @@ API keys are created in the admin UI and use the Resend format: `re_` followed b
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
+| `/llms.txt` | GET | No | LLM-oriented API reference |
 | `/health` | GET | No | Health check |
 | `/system/status` | GET | No | System status check |
 | `/system/version` | GET | No | Version and build info |
