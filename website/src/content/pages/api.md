@@ -28,6 +28,9 @@ API keys are created in the admin UI and use the Resend format: `re_` followed b
 | `/system/version` | GET | No | Version and build info |
 | `/system/logs` | GET | Admin | Application logs |
 | `/emails` | POST | API Key | Send email |
+| `/emails/{id}` | GET | API Key | Get sent email |
+| `/emails` | GET | API Key | List sent emails |
+| `/emails/batch` | POST | API Key | Send batch emails |
 | `/domains` | GET | API Key | List domains |
 | `/domains` | POST | API Key | Create domain |
 | `/domains/{id}` | GET | API Key | Get domain |
@@ -108,6 +111,138 @@ curl -X POST https://mail.yourdomain.com/emails \
     "html": "<h1>Welcome!</h1><p>Your first email from SelfMX.</p>"
   }'
 ```
+
+## Get Email
+
+Retrieve a previously sent email by ID. Returns Resend-compatible fields.
+
+**GET** `/emails/{id}`
+
+### Response
+
+```json
+{
+  "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "from": "hello@yourdomain.com",
+  "to": ["recipient@example.com"],
+  "cc": ["cc@example.com"],
+  "bcc": ["bcc@example.com"],
+  "reply_to": ["reply@yourdomain.com"],
+  "subject": "Hello from SelfMX",
+  "html": "<p>HTML content</p>",
+  "text": "Plain text content",
+  "created_at": "2024-01-15T10:30:00Z",
+  "last_event": null
+}
+```
+
+### Notes
+
+- Returns `404` if the email ID does not exist
+- Returns `403` if the API key does not have access to the domain used to send the email
+- Fields `cc`, `bcc`, `reply_to`, `text`, `html`, `scheduled_at`, and `last_event` are omitted from the response when null
+
+## List Emails
+
+List sent emails with cursor-based pagination.
+
+**GET** `/emails`
+
+### Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `before` | string | - | Cursor: email ID to paginate before |
+| `after` | string | - | Cursor: email ID to paginate after |
+| `limit` | integer | 20 | Items per page (1-100) |
+
+### Response
+
+```json
+{
+  "data": [
+    {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "from": "hello@yourdomain.com",
+      "to": ["recipient@example.com"],
+      "subject": "Hello from SelfMX",
+      "created_at": "2024-01-15T10:30:00Z",
+      "last_event": null
+    }
+  ],
+  "has_more": true
+}
+```
+
+### Notes
+
+- Non-admin API keys only see emails sent from their authorized domains
+- Admin keys see all sent emails
+
+## Send Batch Emails
+
+Send multiple emails in a single request.
+
+**POST** `/emails/batch`
+
+### Request
+
+An array of email objects (same schema as Send Email):
+
+```json
+[
+  {
+    "from": "hello@yourdomain.com",
+    "to": ["alice@example.com"],
+    "subject": "Hello Alice",
+    "html": "<p>Hi Alice</p>"
+  },
+  {
+    "from": "hello@yourdomain.com",
+    "to": ["bob@example.com"],
+    "subject": "Hello Bob",
+    "html": "<p>Hi Bob</p>"
+  }
+]
+```
+
+### Headers
+
+| Header | Values | Default | Description |
+|--------|--------|---------|-------------|
+| `x-batch-validation` | `strict`, `permissive` | `strict` | Validation mode |
+
+- **strict** (default): All emails are validated before any are sent. If any email fails validation, no emails are sent.
+- **permissive**: Emails are sent individually. Failed emails are reported in the `errors` array but don't prevent other emails from being sent.
+
+### Response (strict mode)
+
+```json
+{
+  "data": [
+    { "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
+    { "id": "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy" }
+  ]
+}
+```
+
+### Response (permissive mode)
+
+```json
+{
+  "data": [
+    { "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" }
+  ],
+  "errors": [
+    { "index": 1, "message": "Domain not verified: other.com" }
+  ]
+}
+```
+
+### Notes
+
+- In strict mode, validation errors return `400` or `422` with a single error response
+- In permissive mode, the response always returns `200` with both `data` and optional `errors` arrays
 
 ## List Domains
 
@@ -535,24 +670,42 @@ Get audit logs. Requires admin authentication.
 
 ## Error Responses
 
-All errors return a consistent JSON format:
+All errors return a Resend-compatible JSON format:
 
 ```json
 {
-  "statusCode": 400,
-  "message": "Domain not verified",
-  "name": "validation_error"
+  "statusCode": 422,
+  "name": "validation_error",
+  "message": "Domain not verified: example.com",
+  "error": {
+    "code": "domain_not_verified",
+    "message": "Domain not verified: example.com"
+  }
 }
 ```
 
-### Common Error Codes
+### Error Names
+
+| Name | Description |
+|------|-------------|
+| `missing_api_key` | No API key provided |
+| `invalid_api_key` | API key is invalid or revoked |
+| `invalid_access` | Key doesn't have access to the requested resource |
+| `validation_error` | Request validation failed (missing fields, unverified domain) |
+| `not_found` | Resource doesn't exist |
+| `missing_required_field` | Required request fields are missing |
+| `rate_limit_exceeded` | Too many requests |
+| `internal_server_error` | Server error |
+
+### HTTP Status Codes
 
 | Code | Description |
 |------|-------------|
-| `400` | Bad Request - Invalid input |
+| `400` | Bad Request - Invalid input or missing fields |
 | `401` | Unauthorized - Invalid or missing API key |
 | `403` | Forbidden - Key doesn't have access to domain |
 | `404` | Not Found - Resource doesn't exist |
+| `422` | Unprocessable Entity - Domain not verified |
 | `429` | Too Many Requests - Rate limit exceeded |
 | `500` | Internal Server Error |
 

@@ -6,6 +6,17 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.48] - 2026-02-07
+
+### Added
+- **Get Email endpoint** (`GET /emails/{id}`) - Retrieve a sent email by ID with Resend-compatible response format
+- **List Emails endpoint** (`GET /emails`) - List sent emails with cursor-based pagination (`before`, `after`, `limit` parameters)
+- **Batch Send endpoint** (`POST /emails/batch`) - Send multiple emails in a single request with strict or permissive validation modes via `x-batch-validation` header
+
+### Changed
+- **Admin UI moved to `/ui/`** - The admin dashboard is now served under `/ui/` instead of the root path. The root `/` redirects to `/ui/`. This avoids collisions between UI routes and API routes when hosted on the same domain.
+- **Resend-compatible error responses** - All API errors now return a structured format with `statusCode`, `name`, `message`, and `error` fields, matching the Resend API error format for better SDK compatibility
+
 ## [0.9.47] - 2026-02-06
 
 ### Improved
@@ -243,7 +254,7 @@ All notable changes to SelfMX are documented here.
 Planned features for upcoming releases:
 
 - [ ] Email scheduling (send later)
-- [ ] Batch sending API
+- [x] Batch sending API
 - [ ] Email analytics dashboard
 - [ ] DKIM key rotation
 - [ ] Bounce management automation
