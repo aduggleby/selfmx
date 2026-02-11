@@ -29,37 +29,32 @@ function SentEmailRowSkeleton() {
 
 function sanitizeEmailHtml(html: string): string {
   return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: [
-      'p', 'br', 'span', 'div', 'a', 'b', 'i', 'u', 'strong', 'em',
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li',
-      'table', 'thead', 'tbody', 'tr', 'td', 'th',
-      'img', 'hr', 'blockquote', 'pre', 'code',
-    ],
+    USE_PROFILES: { html: true },
+    ADD_TAGS: ['style', 'head', 'meta', 'body', 'html'],
     ALLOWED_ATTR: [
-      'href', 'src', 'alt', 'title', 'style', 'class',
+      'href', 'src', 'alt', 'title', 'style', 'class', 'target', 'rel',
       'width', 'height', 'border', 'cellpadding', 'cellspacing',
       'align', 'valign', 'bgcolor', 'color',
     ],
     ALLOW_DATA_ATTR: false,
-    ADD_ATTR: ['target'],
-    FORBID_TAGS: ['script', 'style', 'iframe', 'form', 'input', 'object', 'embed'],
+    FORBID_TAGS: ['script', 'iframe', 'form', 'input', 'object', 'embed'],
     FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
   });
 }
 
 function EmailHtmlPreview({ html }: { html: string }) {
   const sanitizedHtml = sanitizeEmailHtml(html);
+  const hasDocumentWrapper = /<\s*(html|body)\b/i.test(sanitizedHtml);
 
-  const fullHtml = `
+  const fullHtml = hasDocumentWrapper ? sanitizedHtml : `
     <!DOCTYPE html>
     <html>
       <head>
         <meta http-equiv="Content-Security-Policy"
-              content="default-src 'none'; img-src https: data:; style-src 'unsafe-inline';">
+              content="default-src 'none'; img-src https: data: cid:; style-src 'unsafe-inline'; font-src https: data:; media-src https: data:;">
         <style>
-          body { font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.5; margin: 16px; }
+          body { margin: 0; }
           img { max-width: 100%; height: auto; }
-          a { color: #0066cc; }
         </style>
       </head>
       <body dir="auto">${sanitizedHtml}</body>
@@ -68,10 +63,11 @@ function EmailHtmlPreview({ html }: { html: string }) {
 
   return (
     <iframe
-      sandbox="allow-same-origin"
+      sandbox=""
       srcDoc={fullHtml}
       className="w-full h-96 border rounded-md bg-white"
       title="Email HTML preview"
+      referrerPolicy="no-referrer"
     />
   );
 }
