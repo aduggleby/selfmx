@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Mail, X, ChevronDown } from 'lucide-react';
 import DOMPurify from 'dompurify';
@@ -33,7 +33,8 @@ function sanitizeEmailHtml(html: string): string {
     ADD_TAGS: ['style', 'head', 'meta', 'body', 'html'],
     ALLOWED_ATTR: [
       'href', 'src', 'alt', 'title', 'style', 'class', 'target', 'rel',
-      'width', 'height', 'border', 'cellpadding', 'cellspacing',
+      'width', 'height', 'border', 'cellpadding', 'cellspacing', 'media',
+      'type', 'integrity', 'crossorigin', 'referrerpolicy',
       'align', 'valign', 'bgcolor', 'color',
     ],
     ALLOW_DATA_ATTR: false,
@@ -42,28 +43,129 @@ function sanitizeEmailHtml(html: string): string {
   });
 }
 
-function EmailHtmlPreview({ html }: { html: string }) {
-  const sanitizedHtml = sanitizeEmailHtml(html);
-  const hasDocumentWrapper = /<\s*(html|body)\b/i.test(sanitizedHtml);
+const EMAIL_PREVIEW_CSP = [
+  "default-src 'none'",
+  "img-src http: https: data: cid:",
+  "style-src 'unsafe-inline' http: https: data:",
+  "font-src http: https: data:",
+  "media-src http: https: data:",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join('; ');
 
-  const fullHtml = hasDocumentWrapper ? sanitizedHtml : `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta http-equiv="Content-Security-Policy"
-              content="default-src 'none'; img-src https: data: cid:; style-src 'unsafe-inline'; font-src https: data:; media-src https: data:;">
-        <style>
-          body { margin: 0; }
-          img { max-width: 100%; height: auto; }
-        </style>
-      </head>
-      <body dir="auto">${sanitizedHtml}</body>
-    </html>
-  `;
+const EMAIL_CLIENT_BASE_STYLES = `
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+    color: #000000;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  table {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+  td, th {
+    vertical-align: top;
+  }
+  img {
+    border: 0;
+    max-width: 100%;
+    height: auto;
+    -ms-interpolation-mode: bicubic;
+  }
+  p {
+    margin: 0 0 1em 0;
+  }
+  a {
+    color: #1155cc;
+    text-decoration: underline;
+    cursor: not-allowed;
+  }
+  pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+  }
+`;
+
+function EmailHtmlPreview({ html }: { html: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const linkGuardCleanupRef = useRef<null | (() => void)>(null);
+
+  const fullHtml = useMemo(() => {
+    const sanitizedHtml = sanitizeEmailHtml(html);
+    const parsed = new DOMParser().parseFromString(sanitizedHtml, 'text/html');
+
+    const existingCsp = parsed.head.querySelector('meta[http-equiv="Content-Security-Policy"]');
+    if (existingCsp) {
+      existingCsp.remove();
+    }
+
+    const cspMeta = parsed.createElement('meta');
+    cspMeta.httpEquiv = 'Content-Security-Policy';
+    cspMeta.content = EMAIL_PREVIEW_CSP;
+    parsed.head.prepend(cspMeta);
+
+    const previewStyles = parsed.createElement('style');
+    previewStyles.setAttribute('data-selfmx-preview-style', 'true');
+    previewStyles.textContent = EMAIL_CLIENT_BASE_STYLES;
+    parsed.head.append(previewStyles);
+
+    if (!parsed.body.hasAttribute('dir')) {
+      parsed.body.setAttribute('dir', 'auto');
+    }
+
+    return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
+  }, [html]);
+
+  const handleIframeLoad = useCallback(() => {
+    linkGuardCleanupRef.current?.();
+
+    const iframe = iframeRef.current;
+    const doc = iframe?.contentDocument;
+    if (!doc) {
+      return;
+    }
+
+    const onClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const link = target.closest('a[href]');
+      if (!link) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      window.alert('Links are disabled in email preview.');
+    };
+
+    doc.addEventListener('click', onClick, true);
+    linkGuardCleanupRef.current = () => {
+      doc.removeEventListener('click', onClick, true);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      linkGuardCleanupRef.current?.();
+    };
+  }, []);
 
   return (
     <iframe
-      sandbox=""
+      ref={iframeRef}
+      onLoad={handleIframeLoad}
+      sandbox="allow-same-origin"
       srcDoc={fullHtml}
       className="w-full h-96 border rounded-md bg-white"
       title="Email HTML preview"
