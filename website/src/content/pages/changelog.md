@@ -6,6 +6,11 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [0.9.53] - 2026-02-11
+
+### Fixed
+- Improve email HTML preview rendering and security
+
 ## [0.9.52] - 2026-02-07
 
 ### Changed
