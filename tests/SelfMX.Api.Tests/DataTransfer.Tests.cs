@@ -134,7 +134,8 @@ public class DataTransferTests : IAsyncLifetime
         var body = """
             {"formatVersion":1,"sourceVersion":"x","sourceDatabase":"x","exportedAt":"2026-01-01T00:00:00Z",
              "domains":[{"id":"d1","name":"a.example","status":"Verified","createdAt":"2026-01-01T00:00:00Z"}],
-             "apiKeys":[],"apiKeyDomains":[{"apiKeyId":"missing","domainId":"d1"}],"revokedApiKeys":[],"auditLogs":[]}
+             "apiKeys":[],"apiKeyDomains":[{"apiKeyId":"missing","domainId":"d1"}],"revokedApiKeys":[],
+             "auditLogs":[{"id":"audit-x","timestamp":"2026-01-01T00:00:00Z","action":"a","actorType":"admin","resourceType":"domain","statusCode":200}]}
             """;
 
         var response = await target.PostAsync("/admin/import", Gzip(Encoding.UTF8.GetBytes(body)));
@@ -142,6 +143,7 @@ public class DataTransferTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         using var scope = _target.Services.CreateScope();
         (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Domains.AnyAsync()).Should().BeFalse();
+        (await scope.ServiceProvider.GetRequiredService<AuditDbContext>().AuditLogs.AnyAsync(l => l.Id == "audit-x")).Should().BeFalse();
     }
 
     [Fact]

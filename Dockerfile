@@ -69,7 +69,8 @@ ENV ASPNETCORE_URLS=http://+:17400 \
     ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    DOTNET_EnableDiagnostics=0
+    DOTNET_EnableDiagnostics=0 \
+    App__DataProtectionKeysPath=/var/lib/selfmx/keys
 
 # Switch to non-root user
 USER app

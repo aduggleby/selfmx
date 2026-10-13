@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace SelfMX.Api.Data;
@@ -95,38 +96,60 @@ public static class DatabaseRegistration
             db.GetType().Name, initialMigration);
 
         await upgradeLegacySchema();
-        await EnsureModelColumnsExistAsync(db, ct);
+        await CompleteLegacySchemaAsync(db, logger, ct);
         await db.Database.ExecuteSqlRawAsync(history.GetCreateIfNotExistsScript(), ct);
         await db.Database.ExecuteSqlRawAsync(
             history.GetInsertScript(new HistoryRow(initialMigration, ProductInfo.GetVersion())), ct);
     }
 
     /// <summary>
-    /// Refuses to adopt a schema that lacks tables or columns of the initial migration
-    /// (e.g. a database from a release whose changes SchemaUpdater never covered).
-    /// Nothing has been recorded at this point, so the previous release still works.
+    /// Brings a legacy schema up to the initial migration before it is recorded as applied:
+    /// tables that are missing entirely are created from the model (SchemaUpdater never created
+    /// e.g. SentEmails for databases from before sent-email storage). A table that exists but
+    /// lacks columns is refused, because recording the baseline would hide the gap.
     /// </summary>
-    private static async Task EnsureModelColumnsExistAsync(DbContext db, CancellationToken ct)
+    private static async Task CompleteLegacySchemaAsync(DbContext db, ILogger logger, CancellationToken ct)
     {
         var expected = db.Model.GetEntityTypes()
-            .Select(e => (Table: e.GetTableName(), Entity: e))
-            .Where(x => x.Table is not null)
-            .SelectMany(x => x.Entity.GetProperties().Select(p =>
-                $"{x.Table}.{p.GetColumnName(StoreObjectIdentifier.Table(x.Table!, x.Entity.GetSchema()))}"))
-            .ToHashSet();
+            .Where(e => e.GetTableName() is not null)
+            .GroupBy(e => e.GetTableName()!)
+            .ToDictionary(
+                g => g.Key,
+                g => g.SelectMany(e => e.GetProperties().Select(p =>
+                    p.GetColumnName(StoreObjectIdentifier.Table(g.Key, e.GetSchema()))!)).ToHashSet());
 
         var actual = (await db.Database
                 .SqlQuery<string>($"SELECT CONCAT(table_name, '.', column_name) AS \"Value\" FROM information_schema.columns")
                 .ToListAsync(ct))
             .ToHashSet();
+        var actualTables = actual.Select(c => c[..c.IndexOf('.')]).ToHashSet();
 
-        var missing = expected.Except(actual).Order().ToArray();
-        if (missing.Length > 0)
+        var missingTables = expected.Keys.Where(t => !actualTables.Contains(t)).ToHashSet();
+        var missingColumns = expected
+            .Where(t => !missingTables.Contains(t.Key))
+            .SelectMany(t => t.Value.Where(c => !actual.Contains($"{t.Key}.{c}")).Select(c => $"{t.Key}.{c}"))
+            .Order()
+            .ToArray();
+
+        if (missingColumns.Length > 0)
         {
             throw new InvalidOperationException(
-                $"Cannot adopt the existing {db.GetType().Name} schema; missing columns: {string.Join(", ", missing)}. " +
-                "Nothing was changed. Fix the schema manually or restore a backup before upgrading.");
+                $"Cannot adopt the existing {db.GetType().Name} schema; missing columns: {string.Join(", ", missingColumns)}. " +
+                "No migration history was recorded. Fix the schema manually or restore a backup before upgrading.");
         }
+
+        if (missingTables.Count == 0)
+            return;
+
+        logger.LogWarning("Creating tables missing from the legacy schema: {Tables}", string.Join(", ", missingTables.Order()));
+        var operations = db.GetService<IMigrationsModelDiffer>()
+            .GetDifferences(null, db.GetService<IDesignTimeModel>().Model.GetRelationalModel())
+            .Where(op => op is CreateTableOperation create && missingTables.Contains(create.Name)
+                      || op is CreateIndexOperation index && missingTables.Contains(index.Table))
+            .ToList();
+
+        foreach (var command in db.GetService<IMigrationsSqlGenerator>().Generate(operations, db.Model))
+            await db.Database.ExecuteSqlRawAsync(command.CommandText, ct);
     }
 
     private static async Task<bool> TableExistsAsync(DbContext db, string table, CancellationToken ct)

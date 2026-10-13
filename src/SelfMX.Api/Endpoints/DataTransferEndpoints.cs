@@ -24,16 +24,34 @@ public static class DataTransferEndpoints
         ClaimsPrincipal user,
         CancellationToken ct)
     {
-        auditService.Log(new AuditEntry(
-            Action: "data.export",
-            ActorType: user.FindFirst("ActorType")?.Value ?? "admin",
-            ActorId: user.FindFirst("KeyPrefix")?.Value,
-            ResourceType: "instance",
-            ResourceId: null,
-            StatusCode: 200));
-
         var fileName = $"selfmx-export-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json.gz";
-        return TypedResults.Stream(stream => dataTransfer.WriteExportAsync(stream, ct), "application/gzip", fileName);
+        return TypedResults.Stream(async stream =>
+        {
+            // Audited after the file is written, so a failed download is not recorded as a success
+            var status = StatusCodes.Status200OK;
+            string? error = null;
+            try
+            {
+                await dataTransfer.WriteExportAsync(stream, ct);
+            }
+            catch (Exception ex)
+            {
+                status = StatusCodes.Status500InternalServerError;
+                error = ex.Message;
+                throw;
+            }
+            finally
+            {
+                auditService.Log(new AuditEntry(
+                    Action: "data.export",
+                    ActorType: user.FindFirst("ActorType")?.Value ?? "admin",
+                    ActorId: user.FindFirst("KeyPrefix")?.Value,
+                    ResourceType: "instance",
+                    ResourceId: null,
+                    StatusCode: status,
+                    ErrorMessage: error));
+            }
+        }, "application/gzip", fileName);
     }
 
     private static async Task<IResult> Import(

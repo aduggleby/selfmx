@@ -3,7 +3,9 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
+using SelfMX.Api.Contracts;
 using SelfMX.Api.Data;
+using SelfMX.Api.Services;
 using SelfMX.Api.Entities;
 using Xunit;
 
@@ -104,10 +106,11 @@ public class DatabaseMigrationIntegrationTests
     }
 
     [SkippableFact]
-    public async Task SqlServer_LegacyDatabaseMissingTables_IsRefusedAndLeftUntouched()
+    public async Task SqlServer_LegacyDatabaseWithoutSentEmails_GetsTheTableCreated()
     {
         Skip.If(string.IsNullOrEmpty(SqlServerServer), "SELFMX_TEST_SQLSERVER not set");
         await using var legacy = await TestDatabase.CreateSqlServerAsync(SqlServerServer!);
+        await using var fresh = await TestDatabase.CreateSqlServerAsync(SqlServerServer!);
         await CreateLegacySqlServerSchemaAsync(legacy.ConnectionString);
         await using (var app = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(legacy.ConnectionString).Options))
         {
@@ -115,12 +118,87 @@ public class DatabaseMigrationIntegrationTests
             await app.Database.ExecuteSqlRawAsync("DROP TABLE [SentEmails]");
         }
 
+        await MigrateAsync(DatabaseProvider.SqlServer, legacy.ConnectionString);
+        await MigrateAsync(DatabaseProvider.SqlServer, fresh.ConnectionString);
+
+        (await SqlServerSchemaAsync(legacy.ConnectionString))
+            .Should().Contain(row => row.StartsWith("col SentEmails."))
+            .And.Equal(await SqlServerSchemaAsync(fresh.ConnectionString));
+    }
+
+    [SkippableFact]
+    public async Task SqlServer_LegacyDatabaseMissingColumns_IsRefusedWithoutRecordingHistory()
+    {
+        Skip.If(string.IsNullOrEmpty(SqlServerServer), "SELFMX_TEST_SQLSERVER not set");
+        await using var legacy = await TestDatabase.CreateSqlServerAsync(SqlServerServer!);
+        await CreateLegacySqlServerSchemaAsync(legacy.ConnectionString);
+        await using (var app = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlServer(legacy.ConnectionString).Options))
+        {
+            await app.Database.ExecuteSqlRawAsync("ALTER TABLE [Domains] DROP COLUMN [FailureReason]");
+        }
+
         var act = () => MigrateAsync(DatabaseProvider.SqlServer, legacy.ConnectionString);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*SentEmails.*");
-        var schema = await SqlServerSchemaAsync(legacy.ConnectionString);
-        schema.Should().NotContain(row => row.Contains("__EFMigrationsHistory"));
+        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Domains.FailureReason*");
+        (await SqlServerSchemaAsync(legacy.ConnectionString)).Should().NotContain(row => row.Contains("__EFMigrationsHistory"));
     }
+
+    [SkippableTheory]
+    [InlineData(DatabaseProvider.Postgres)]
+    [InlineData(DatabaseProvider.SqlServer)]
+    public async Task Import_OnRealDatabase_IsAtomicAndMergesAuditLogs(DatabaseProvider provider)
+    {
+        var server = provider == DatabaseProvider.Postgres ? PostgresServer : SqlServerServer;
+        Skip.If(string.IsNullOrEmpty(server), $"Connection string for {provider} not set");
+        await using var db = provider == DatabaseProvider.Postgres
+            ? await TestDatabase.CreatePostgresAsync(server!)
+            : await TestDatabase.CreateSqlServerAsync(server!);
+        await MigrateAsync(provider, db.ConnectionString);
+
+        // Dates without a zone (as from an old export) must still import into timestamptz
+        var unspecified = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Unspecified);
+        var audit = new AuditLogExport("a1", unspecified, "domain.create", "admin", null, "domain", "d1", null, null, 201, null, null);
+        DataExport Export(params ApiKeyDomainExport[] links) => new(
+            DataExport.CurrentFormatVersion, "test", "test", DateTime.UtcNow,
+            [new DomainExport("d1", "a.example", DomainStatus.Verified, unspecified, null, unspecified, null, null, null, null)],
+            [new ApiKeyExport("k1", "key", "hash", "salt", "re_abcdefgh", false, unspecified, null, null, null)],
+            links, [], [audit, audit]);
+
+        var rejected = () => ImportAsync(provider, db.ConnectionString, Export(new ApiKeyDomainExport("k1", "missing")));
+        await rejected.Should().ThrowAsync<DataImportException>();
+        await AssertCountsAsync(provider, db.ConnectionString, domains: 0, auditLogs: 0);
+
+        var result = await ImportAsync(provider, db.ConnectionString, Export(new ApiKeyDomainExport("k1", "d1")));
+
+        result.Should().BeEquivalentTo(new ImportResult(1, 1, 1, 0, AuditLogs: 1, AuditLogsSkipped: 1, PendingDomainsRequeued: 0));
+        await AssertCountsAsync(provider, db.ConnectionString, domains: 1, auditLogs: 1);
+    }
+
+    private static async Task<ImportResult> ImportAsync(DatabaseProvider provider, string connectionString, DataExport data)
+    {
+        await using var app = CreateAppDb(provider, connectionString);
+        await using var audit = CreateAuditDb(provider, connectionString);
+        var service = new DataTransferService(app, audit, new NoopBackgroundJobClient(), NullLogger<DataTransferService>.Instance);
+        return await service.ImportAsync(data);
+    }
+
+    private static async Task AssertCountsAsync(DatabaseProvider provider, string connectionString, int domains, int auditLogs)
+    {
+        await using var app = CreateAppDb(provider, connectionString);
+        await using var audit = CreateAuditDb(provider, connectionString);
+        (await app.Domains.CountAsync()).Should().Be(domains);
+        (await audit.AuditLogs.CountAsync()).Should().Be(auditLogs);
+    }
+
+    private static AppDbContext CreateAppDb(DatabaseProvider provider, string connectionString) =>
+        provider == DatabaseProvider.Postgres
+            ? new PostgresAppDbContext(Options<PostgresAppDbContext>(provider, connectionString, audit: false))
+            : new SqlServerAppDbContext(Options<SqlServerAppDbContext>(provider, connectionString, audit: false));
+
+    private static AuditDbContext CreateAuditDb(DatabaseProvider provider, string connectionString) =>
+        provider == DatabaseProvider.Postgres
+            ? new PostgresAuditDbContext(Options<PostgresAuditDbContext>(provider, connectionString, audit: true))
+            : new SqlServerAuditDbContext(Options<SqlServerAuditDbContext>(provider, connectionString, audit: true));
 
     /// <summary>
     /// Recreates a database as an older release left it: tables from EnsureCreated, AuditLogs
@@ -186,6 +264,13 @@ public class DatabaseMigrationIntegrationTests
         audit.AuditLogs.Add(new AuditLog { Id = "a1", Action = "domain.create", ActorType = "admin", ResourceType = "domain", Timestamp = createdAt });
         await audit.SaveChangesAsync();
         (await audit.AuditLogs.CountAsync()).Should().Be(1);
+
+        // Query-string dates (e.g. ?from=2026-10-13) bind with Kind=Unspecified; PostgreSQL rejects those
+        // unless they are marked as UTC, which the model-wide converter does for parameters too
+        var from = new DateTime(2026, 10, 13, 0, 0, 0, DateTimeKind.Unspecified);
+        var to = new DateTime(2026, 10, 14, 0, 0, 0, DateTimeKind.Unspecified);
+        (await audit.AuditLogs.CountAsync(l => l.Timestamp >= from && l.Timestamp <= to)).Should().Be(1);
+        (await audit.AuditLogs.SingleAsync()).Timestamp.Kind.Should().Be(DateTimeKind.Utc);
     }
 
     private static DbContextOptions<T> Options<T>(DatabaseProvider provider, string connectionString, bool audit) where T : DbContext =>

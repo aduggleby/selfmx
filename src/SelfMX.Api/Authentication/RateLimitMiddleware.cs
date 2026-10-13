@@ -22,8 +22,6 @@ public class RateLimitMiddleware
     {
         // Skip rate limiting for health checks
         if (context.Request.Path.StartsWithSegments("/health") ||
-            context.Request.Path.StartsWithSegments("/live") ||
-            context.Request.Path.StartsWithSegments("/ready") ||
             context.Request.Path == "/")
         {
             await _next(context);

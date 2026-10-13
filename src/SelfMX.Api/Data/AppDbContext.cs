@@ -20,6 +20,9 @@ public class AppDbContext : DbContext
     public DbSet<SentEmail> SentEmails => Set<SentEmail>();
     public DbSet<RevokedApiKey> RevokedApiKeys => Set<RevokedApiKey>();
 
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder) =>
+        UtcDateTimeValueConverter.Apply(configurationBuilder);
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Domain>(entity =>

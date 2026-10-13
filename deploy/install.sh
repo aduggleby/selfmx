@@ -124,6 +124,25 @@ read_env_value() {
     grep -m1 "^$1=" "${INSTALL_DIR}/.env" 2>/dev/null | cut -d= -f2- || true
 }
 
+# Loads KEY=VALUE lines from the existing .env without evaluating them as shell code.
+# Older installers wrote the admin hash ($6$...) unquoted, which breaks `source` under set -u.
+load_env_file() {
+    local line key value
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in ''|'#'*) continue ;; esac
+        key="${line%%=*}"
+        value="${line#*=}"
+        case "$value" in
+            \'*\') value="${value:1:${#value}-2}" ;;
+            \"*\") value="${value:1:${#value}-2}" ;;
+        esac
+        if [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+            printf -v "$key" '%s' "$value"
+            export "${key?}"
+        fi
+    done < "$1"
+}
+
 # ============================================
 # Detect Database Provider
 # ============================================
@@ -357,13 +376,13 @@ gather_configuration() {
 
     # Skip if updating and not reconfiguring
     if [ "$EXISTING_INSTALL" = "update" ]; then
-        source "${INSTALL_DIR}/.env"
+        load_env_file "${INSTALL_DIR}/.env"
         return
     fi
 
     # Load existing values if reconfiguring
     if [ "$EXISTING_INSTALL" = "reconfigure" ] && [ -f "${INSTALL_DIR}/.env" ]; then
-        source "${INSTALL_DIR}/.env"
+        load_env_file "${INSTALL_DIR}/.env"
     fi
 
     echo ""
@@ -522,6 +541,12 @@ gather_configuration() {
 # Generate Admin Password Hash
 # ============================================
 generate_admin_password_hash() {
+    # Updates keep the existing hash; only a newly entered password produces a new one
+    if [ -z "${SELFMX_PASSWORD:-}" ] && [ -n "${SELFMX_ADMIN_PASSWORD_HASH:-}" ]; then
+        info "Keeping existing admin password."
+        return
+    fi
+
     info "Generating admin password hash (SHA-512 crypt)..."
 
     # Generate SHA-512 crypt hash of admin password using openssl
@@ -802,7 +827,7 @@ setup_backup_scripts_sqlserver() {
 set -euo pipefail
 
 # SelfMX SQL Server Backup Script
-source /opt/selfmx/.env
+MSSQL_SA_PASSWORD=$(grep -m1 '^MSSQL_SA_PASSWORD=' /opt/selfmx/.env | cut -d= -f2-)
 
 BACKUP_FILE="selfmx_$(date +%Y%m%d_%H%M%S).bak"
 BACKUP_PATH="/var/opt/mssql/backup/${BACKUP_FILE}"
@@ -836,7 +861,7 @@ BACKUP_EOF
 set -euo pipefail
 
 # SelfMX SQL Server Restore Script
-source /opt/selfmx/.env
+MSSQL_SA_PASSWORD=$(grep -m1 '^MSSQL_SA_PASSWORD=' /opt/selfmx/.env | cut -d= -f2-)
 
 if [ $# -lt 1 ]; then
     echo "Usage: selfmx-restore <backup-file.bak>"

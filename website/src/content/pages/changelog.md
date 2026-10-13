@@ -6,6 +6,21 @@ toc: true
 
 All notable changes to SelfMX are documented here.
 
+## [Unreleased]
+
+### Added
+- PostgreSQL support; PostgreSQL is now the default database for new installations (SQL Server remains supported)
+- Admin export and import of domains, API keys, revoked keys and audit logs for moving between servers or databases
+- `/live` and `/ready` health probes, optional rolling file logs, persisted session keys and trusted proxy support
+
+### Changed
+- Upgraded to .NET 10; the database schema is now managed with EF Core migrations (existing SQL Server databases are adopted automatically on first start)
+- **Breaking:** the container now runs as the .NET `app` user (UID 1654) instead of UID 1001. Volumes mounted into the container with files owned by UID 1001 must be re-owned (`chown -R 1654:1654`)
+- Admin sessions are signed out once after upgrading (session keys now use a fixed application name)
+
+### Fixed
+- Installer updates no longer fail on existing installations, and keep the existing admin password and SQL Server database
+
 ## [0.9.54] - 2026-02-11
 
 ### Fixed

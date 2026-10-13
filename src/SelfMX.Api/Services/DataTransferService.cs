@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text.Json;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SelfMX.Api.Contracts;
 using SelfMX.Api.Data;
 using SelfMX.Api.Entities;
@@ -45,17 +46,17 @@ public class DataTransferService(
             db.Database.ProviderName ?? "unknown",
             DateTime.UtcNow,
             domains.Select(d => new DomainExport(
-                d.Id, d.Name, d.Status, Utc(d.CreatedAt), Utc(d.VerificationStartedAt), Utc(d.VerifiedAt),
-                d.FailureReason, d.SesIdentityArn, d.DnsRecordsJson, Utc(d.LastCheckedAt))).ToArray(),
+                d.Id, d.Name, d.Status, d.CreatedAt, d.VerificationStartedAt, d.VerifiedAt,
+                d.FailureReason, d.SesIdentityArn, d.DnsRecordsJson, d.LastCheckedAt)).ToArray(),
             apiKeys.Select(k => new ApiKeyExport(
-                k.Id, k.Name, k.KeyHash, k.KeySalt, k.KeyPrefix, k.IsAdmin, Utc(k.CreatedAt), Utc(k.RevokedAt),
-                Utc(k.LastUsedAt), k.LastUsedIp)).ToArray(),
+                k.Id, k.Name, k.KeyHash, k.KeySalt, k.KeyPrefix, k.IsAdmin, k.CreatedAt, k.RevokedAt,
+                k.LastUsedAt, k.LastUsedIp)).ToArray(),
             apiKeyDomains.Select(x => new ApiKeyDomainExport(x.ApiKeyId, x.DomainId)).ToArray(),
             revoked.Select(k => new RevokedApiKeyExport(
-                k.Id, k.Name, k.KeyPrefix, k.IsAdmin, Utc(k.CreatedAt), Utc(k.RevokedAt), Utc(k.ArchivedAt),
-                k.LastUsedIp, Utc(k.LastUsedAt), k.AllowedDomainIds)).ToArray(),
+                k.Id, k.Name, k.KeyPrefix, k.IsAdmin, k.CreatedAt, k.RevokedAt, k.ArchivedAt,
+                k.LastUsedIp, k.LastUsedAt, k.AllowedDomainIds)).ToArray(),
             auditLogs.Select(l => new AuditLogExport(
-                l.Id, Utc(l.Timestamp), l.Action, l.ActorType, l.ActorId, l.ResourceType, l.ResourceId,
+                l.Id, l.Timestamp, l.Action, l.ActorType, l.ActorId, l.ResourceType, l.ResourceId,
                 l.IpAddress, l.UserAgent, l.StatusCode, l.ErrorMessage, l.Details)).ToArray());
     }
 
@@ -119,40 +120,49 @@ public class DataTransferService(
         Require(auditLogs.All(l => l is { Id: not null, Action: not null, ActorType: not null, ResourceType: not null }),
             "audit log fields");
 
-        var (auditImported, auditSkipped) = await ImportAuditLogsAsync(auditLogs, ct);
+        var auditImported = 0;
+        var auditSkipped = 0;
 
+        // One transaction for both contexts (same database): the audit context joins the app
+        // context's connection, so a rejected import leaves nothing behind.
         var strategy = db.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
             db.ChangeTracker.Clear();
+            auditDb.ChangeTracker.Clear();
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            auditDb.Database.SetDbConnection(db.Database.GetDbConnection());
+            await auditDb.Database.UseTransactionAsync(transaction.GetDbTransaction(), ct);
 
             db.Domains.AddRange(domains.Select(d => new Domain
             {
-                Id = d.Id, Name = d.Name.ToLowerInvariant(), Status = d.Status, CreatedAt = Utc(d.CreatedAt),
-                VerificationStartedAt = Utc(d.VerificationStartedAt), VerifiedAt = Utc(d.VerifiedAt),
+                Id = d.Id, Name = d.Name.ToLowerInvariant(), Status = d.Status, CreatedAt = d.CreatedAt,
+                VerificationStartedAt = d.VerificationStartedAt, VerifiedAt = d.VerifiedAt,
                 FailureReason = d.FailureReason, SesIdentityArn = d.SesIdentityArn,
-                DnsRecordsJson = d.DnsRecordsJson, LastCheckedAt = Utc(d.LastCheckedAt)
+                DnsRecordsJson = d.DnsRecordsJson, LastCheckedAt = d.LastCheckedAt
             }));
             db.ApiKeys.AddRange(apiKeys.Select(k => new ApiKey
             {
                 Id = k.Id, Name = k.Name, KeyHash = k.KeyHash, KeySalt = k.KeySalt, KeyPrefix = k.KeyPrefix,
-                IsAdmin = k.IsAdmin, CreatedAt = Utc(k.CreatedAt), RevokedAt = Utc(k.RevokedAt),
-                LastUsedAt = Utc(k.LastUsedAt), LastUsedIp = k.LastUsedIp
+                IsAdmin = k.IsAdmin, CreatedAt = k.CreatedAt, RevokedAt = k.RevokedAt,
+                LastUsedAt = k.LastUsedAt, LastUsedIp = k.LastUsedIp
             }));
-            await SaveAsync(ct);
+            await SaveAsync(db, ct);
 
             db.ApiKeyDomains.AddRange(apiKeyDomains.Select(x => new ApiKeyDomain { ApiKeyId = x.ApiKeyId, DomainId = x.DomainId }));
             db.RevokedApiKeys.AddRange(revoked.Select(k => new RevokedApiKey
             {
-                Id = k.Id, Name = k.Name, KeyPrefix = k.KeyPrefix, IsAdmin = k.IsAdmin, CreatedAt = Utc(k.CreatedAt),
-                RevokedAt = Utc(k.RevokedAt), ArchivedAt = Utc(k.ArchivedAt), LastUsedIp = k.LastUsedIp,
-                LastUsedAt = Utc(k.LastUsedAt), AllowedDomainIds = k.AllowedDomainIds
+                Id = k.Id, Name = k.Name, KeyPrefix = k.KeyPrefix, IsAdmin = k.IsAdmin, CreatedAt = k.CreatedAt,
+                RevokedAt = k.RevokedAt, ArchivedAt = k.ArchivedAt, LastUsedIp = k.LastUsedIp,
+                LastUsedAt = k.LastUsedAt, AllowedDomainIds = k.AllowedDomainIds
             }));
-            await SaveAsync(ct);
+            await SaveAsync(db, ct);
+
+            (auditImported, auditSkipped) = await ImportAuditLogsAsync(auditLogs, ct);
 
             await transaction.CommitAsync(ct);
         });
+        auditDb.ChangeTracker.Clear();
         db.ChangeTracker.Clear();
 
         // Domains whose SES setup never finished on the source get their setup job here
@@ -168,21 +178,23 @@ public class DataTransferService(
             auditImported, auditSkipped, pending.Length);
     }
 
+    // Merges audit logs: ids already present (e.g. the admin login on the new instance) or
+    // repeated within the file are skipped.
     private async Task<(int Imported, int Skipped)> ImportAuditLogsAsync(AuditLogExport[] logs, CancellationToken ct)
     {
         var existing = (await auditDb.AuditLogs.Select(l => l.Id).ToListAsync(ct)).ToHashSet();
-        var toImport = logs.Where(l => !existing.Contains(l.Id)).ToArray();
+        var toImport = logs.Where(l => existing.Add(l.Id)).ToArray();
 
         foreach (var batch in toImport.Chunk(BatchSize))
         {
             auditDb.AuditLogs.AddRange(batch.Select(l => new AuditLog
             {
-                Id = l.Id, Timestamp = Utc(l.Timestamp), Action = l.Action, ActorType = l.ActorType,
+                Id = l.Id, Timestamp = l.Timestamp, Action = l.Action, ActorType = l.ActorType,
                 ActorId = l.ActorId, ResourceType = l.ResourceType, ResourceId = l.ResourceId,
                 IpAddress = l.IpAddress, UserAgent = l.UserAgent, StatusCode = l.StatusCode,
                 ErrorMessage = l.ErrorMessage, Details = l.Details
             }));
-            await auditDb.SaveChangesAsync(ct);
+            await SaveAsync(auditDb, ct);
             auditDb.ChangeTracker.Clear();
         }
 
@@ -195,11 +207,11 @@ public class DataTransferService(
             throw new DataImportException($"The import file is missing required {what}.");
     }
 
-    private async Task SaveAsync(CancellationToken ct)
+    private static async Task SaveAsync(DbContext context, CancellationToken ct)
     {
         try
         {
-            await db.SaveChangesAsync(ct);
+            await context.SaveChangesAsync(ct);
         }
         catch (DbUpdateException ex)
         {
@@ -213,11 +225,4 @@ public class DataTransferService(
         var version = typeof(DataTransferService).Assembly.GetName().Version;
         return version is null ? "unknown" : $"{version.Major}.{version.Minor}.{version.Build}";
     }
-
-    // Stored values are UTC by convention; SQL Server returns them as Unspecified
-    // and PostgreSQL rejects anything that is not UTC.
-    private static DateTime Utc(DateTime value) =>
-        value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
-
-    private static DateTime? Utc(DateTime? value) => value is null ? null : Utc(value.Value);
 }
