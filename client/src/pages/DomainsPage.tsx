@@ -1,39 +1,122 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDomains, useCreateDomain } from '@/hooks/useDomains';
-import { DomainCard } from '@/components/DomainCard';
+import { DomainStatusBadge } from '@/components/DomainStatusBadge';
+import { SortableHeader } from '@/components/SortableHeader';
+import { formatDateTime } from '@/lib/date';
+import { byText, compareNullable, nextSort, type SortState } from '@/lib/sort';
+import type { Domain } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
-function DomainCardSkeleton() {
+type DomainSortKey = 'name' | 'status' | 'createdAt' | 'verifiedAt' | 'lastCheckedAt';
+
+// The list endpoint returns at most 100 per page; load them all so sorting covers every domain
+const ALL_DOMAINS_LIMIT = 100;
+
+function sortDomains(domains: Domain[], sort: SortState<DomainSortKey>): Domain[] {
+  const dir = sort.dir === 'asc' ? 1 : -1;
+  const compare = (a: Domain, b: Domain): number => {
+    switch (sort.key) {
+      case 'name':
+        return byText(a.name, b.name) * dir;
+      case 'status':
+        return byText(a.status, b.status) * dir;
+      case 'createdAt':
+        return byText(a.createdAt, b.createdAt) * dir; // ISO 8601 UTC sorts as text
+      default:
+        return compareNullable(a[sort.key], b[sort.key], byText, dir);
+    }
+  };
+  return [...domains].sort((a, b) => compare(a, b) || byText(a.name, b.name));
+}
+
+function DomainTableHeader({
+  sort,
+  onSort,
+}: {
+  sort?: SortState<DomainSortKey>;
+  onSort?: (key: DomainSortKey) => void;
+}) {
   return (
-    <Card>
-      <div className="p-5 pb-3">
-        <div className="flex items-center justify-between gap-3">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-5 w-16 rounded" />
-        </div>
-        <Skeleton className="mt-2 h-3 w-40" />
-      </div>
-      <div className="px-5 pb-5">
-        <Skeleton className="h-7 w-16" />
-      </div>
-    </Card>
+    <thead>
+      <tr className="border-b text-left text-xs text-muted-foreground">
+        <SortableHeader label="Domain" sortKey="name" sort={sort} onSort={onSort} />
+        <SortableHeader label="Status" sortKey="status" sort={sort} onSort={onSort} />
+        <SortableHeader label="Added" sortKey="createdAt" sort={sort} onSort={onSort} />
+        <SortableHeader label="Verified" sortKey="verifiedAt" sort={sort} onSort={onSort} />
+        <SortableHeader label="Last checked" sortKey="lastCheckedAt" sort={sort} onSort={onSort} />
+        <th className="py-2 px-2 font-medium">Notes</th>
+        <th className="py-2 px-2 font-medium"></th>
+      </tr>
+    </thead>
+  );
+}
+
+function DomainRow({ domain }: { domain: Domain }) {
+  const note =
+    domain.failureReason ?? (domain.status === 'verifying' ? 'Verifying DNS records...' : null);
+  return (
+    <tr className="border-b last:border-0">
+      <td className="py-3 px-2">
+        <Link to={`/domains/${domain.id}`} className="font-mono text-sm font-medium hover:text-primary transition-colors">
+          {domain.name}
+        </Link>
+      </td>
+      <td className="py-3 px-2">
+        <DomainStatusBadge status={domain.status} />
+      </td>
+      <td className="py-3 px-2 text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(domain.createdAt)}</td>
+      <td className="py-3 px-2 text-xs text-muted-foreground whitespace-nowrap">
+        {domain.verifiedAt ? formatDateTime(domain.verifiedAt) : '—'}
+      </td>
+      <td className="py-3 px-2 text-xs text-muted-foreground whitespace-nowrap">
+        {domain.lastCheckedAt ? formatDateTime(domain.lastCheckedAt) : '—'}
+      </td>
+      <td
+        className={`py-3 px-2 text-xs max-w-md truncate ${domain.failureReason ? 'text-[var(--status-failed-text)]' : 'text-muted-foreground'}`}
+        title={note ?? undefined}
+      >
+        {note ?? ''}
+      </td>
+      <td className="py-3 px-2 text-right">
+        <Link
+          to={`/domains/${domain.id}`}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Details
+          <ChevronRight className="h-3 w-3" />
+        </Link>
+      </td>
+    </tr>
+  );
+}
+
+function DomainRowSkeleton() {
+  return (
+    <tr className="border-b">
+      <td className="py-3 px-2"><Skeleton className="h-4 w-40" /></td>
+      <td className="py-3 px-2"><Skeleton className="h-5 w-16 rounded" /></td>
+      <td className="py-3 px-2"><Skeleton className="h-4 w-32" /></td>
+      <td className="py-3 px-2"><Skeleton className="h-4 w-32" /></td>
+      <td className="py-3 px-2"><Skeleton className="h-4 w-32" /></td>
+      <td className="py-3 px-2"><Skeleton className="h-4 w-24" /></td>
+      <td className="py-3 px-2"><Skeleton className="ml-auto h-4 w-12" /></td>
+    </tr>
   );
 }
 
 export function DomainsPage() {
   const navigate = useNavigate();
   const [newDomain, setNewDomain] = useState('');
-  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<SortState<DomainSortKey>>({ key: 'name', dir: 'asc' });
   const [showAddModal, setShowAddModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const limit = 10;
-
-  const { data, isLoading, error } = useDomains(page, limit);
+  const { data, isLoading, error } = useDomains(1, ALL_DOMAINS_LIMIT);
   const createMutation = useCreateDomain();
   const domains = data?.data ?? [];
   const totalDomains = data?.total ?? 0;
@@ -62,7 +145,7 @@ export function DomainsPage() {
     }
   };
 
-  const totalPages = data ? Math.ceil(data.total / limit) : 0;
+  const handleSort = (key: DomainSortKey) => setSort((current) => nextSort(current, key, ['name', 'status']));
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
@@ -94,11 +177,18 @@ export function DomainsPage() {
       )}
 
       {isLoading && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <DomainCardSkeleton key={i} />
-          ))}
-        </div>
+        <Card>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <DomainTableHeader />
+              <tbody>
+                {[...Array(4)].map((_, i) => (
+                  <DomainRowSkeleton key={i} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
 
       {error && !showInitialError && (
@@ -118,37 +208,23 @@ export function DomainsPage() {
             </Button>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-            {data.data.map((domain) => (
-              <DomainCard
-                key={domain.id}
-                domain={domain}
-              />
-            ))}
-          </div>
-
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                Previous
-              </Button>
-              <span className="px-2 text-sm text-muted-foreground">
-                {page} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-              >
-                Next
-              </Button>
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <DomainTableHeader sort={sort} onSort={handleSort} />
+                <tbody>
+                  {sortDomains(domains, sort).map((domain) => (
+                    <DomainRow key={domain.id} domain={domain} />
+                  ))}
+                </tbody>
+              </table>
             </div>
+          </Card>
+
+          {totalDomains > domains.length && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Showing the first {domains.length} of {totalDomains} domains.
+            </p>
           )}
         </>
       )}

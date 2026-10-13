@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Key, Plus, Trash2, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, Archive, Pencil, X, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Key, Plus, Trash2, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, Archive, Pencil, X } from 'lucide-react';
 import { useApiKeys, useApiKeyStats, useCreateApiKey, useDeleteApiKey, useRenameApiKey, useRevokedApiKeys } from '@/hooks/useApiKeys';
 import { useDomains } from '@/hooks/useDomains';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ApiKey, ApiKeyCreated, ApiKeyStats, Domain, RevokedApiKey } from '@/lib/schemas';
 import { formatDateTime } from '@/lib/date';
+import { byNumber, byText, compareNullable, nextSort, type SortState as SortStateOf } from '@/lib/sort';
+import { SortableHeader } from '@/components/SortableHeader';
 
 interface CreateApiKeyModalProps {
   domains: Domain[];
@@ -285,7 +287,7 @@ const STAT_WINDOWS = [
 
 type StatKey = (typeof STAT_WINDOWS)[number]['key'];
 type SortKey = 'name' | 'keyPrefix' | 'access' | 'createdAt' | 'lastUsedAt' | StatKey;
-type SortState = { key: SortKey; dir: 'asc' | 'desc' };
+type SortState = SortStateOf<SortKey>;
 
 const STAT_UNAVAILABLE =
   'Not available: stats are loading or failed, or the window is longer than the sent-email retention.';
@@ -303,15 +305,6 @@ function accessLabel(apiKey: ApiKey, domains: Domain[]): string {
     .sort()
     .join(', ');
 }
-
-// Missing values (never used, unknown stats) always sort last
-function compareNullable<T>(a: T | null, b: T | null, compare: (x: T, y: T) => number, dir: 1 | -1): number {
-  if (a === null || b === null) return a === b ? 0 : a === null ? 1 : -1;
-  return compare(a, b) * dir;
-}
-
-const byText = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
-const byNumber = (a: number, b: number) => a - b;
 
 function sortApiKeys(
   keys: ApiKey[],
@@ -344,45 +337,6 @@ function sortApiKeys(
   };
   // Name breaks ties so equal values keep a stable, readable order
   return [...keys].sort((a, b) => compare(a, b) || byText(a.name, b.name));
-}
-
-function SortableHeader({
-  label,
-  sortKey,
-  sort,
-  onSort,
-  title,
-  align = 'left',
-}: {
-  label: string;
-  sortKey: SortKey;
-  sort?: SortState;
-  onSort?: (key: SortKey) => void;
-  title?: string;
-  align?: 'left' | 'right';
-}) {
-  const active = sort?.key === sortKey;
-  const Icon = !active ? ArrowUpDown : sort.dir === 'asc' ? ArrowUp : ArrowDown;
-  return (
-    <th
-      className={`py-2 px-2 font-medium ${align === 'right' ? 'text-right' : ''}`}
-      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
-      title={title}
-    >
-      {onSort ? (
-        <button
-          type="button"
-          onClick={() => onSort(sortKey)}
-          className={`inline-flex items-center gap-1 hover:text-foreground ${active ? 'text-foreground' : ''}`}
-        >
-          {label}
-          <Icon className={`h-3 w-3 ${active ? '' : 'opacity-40'}`} />
-        </button>
-      ) : (
-        label
-      )}
-    </th>
-  );
 }
 
 function ApiKeyTableHeader({ sort, onSort }: { sort?: SortState; onSort?: (key: SortKey) => void }) {
@@ -676,13 +630,7 @@ export function ApiKeysPage() {
   const { data: statsData, isSuccess: statsAvailable } = useApiKeyStats();
   const statsByKey = useMemo(() => new Map((statsData ?? []).map((s) => [s.apiKeyId, s])), [statsData]);
 
-  // Text columns start A→Z; dates and counts start with the newest/highest
-  const handleSort = (key: SortKey) =>
-    setSort((current) =>
-      current.key === key
-        ? { key, dir: current.dir === 'asc' ? 'desc' : 'asc' }
-        : { key, dir: ['name', 'keyPrefix', 'access'].includes(key) ? 'asc' : 'desc' },
-    );
+  const handleSort = (key: SortKey) => setSort((current) => nextSort(current, key, ['name', 'keyPrefix', 'access']));
 
   const handleRename = async (id: string, name: string) => {
     try {

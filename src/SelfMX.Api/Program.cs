@@ -13,6 +13,7 @@ using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SelfMX.Api.Authentication;
@@ -288,10 +289,7 @@ app.UseDefaultFiles(new DefaultFilesOptions
 {
     RequestPath = "/ui"
 });
-app.UseStaticFiles(new StaticFileOptions
-{
-    RequestPath = "/ui"
-});
+app.UseStaticFiles(UiStaticFiles.Options);
 
 // Health endpoint (no auth)
 app.MapHealthChecks("/health");
@@ -486,7 +484,7 @@ if (enableHangfire)
 }
 
 // SPA fallback - serve the UI index only for /ui client-side routing.
-app.MapFallbackToFile("/ui/{*path:nonfile}", "index.html");
+app.MapFallbackToFile("/ui/{*path:nonfile}", "index.html", UiStaticFiles.FallbackOptions);
 
 // Startup banner and diagnostics
 var version = typeof(Program).Assembly.GetName().Version;
@@ -600,5 +598,27 @@ public class HangfireAdminAuthorizationFilter : IDashboardAuthorizationFilter
         // Check if user is authenticated via cookie with admin ActorType
         return user.Identity?.IsAuthenticated == true
                && user.FindFirst("ActorType")?.Value == "admin";
+    }
+}
+
+/// <summary>
+/// Static UI files under /ui. index.html must be revalidated on every load so a deploy is picked up
+/// immediately; the content-hashed files in /ui/assets never change and can be cached for a year.
+/// </summary>
+public static class UiStaticFiles
+{
+    /// <summary>Static file middleware for /ui (assets and direct file requests).</summary>
+    public static readonly StaticFileOptions Options = new() { RequestPath = "/ui", OnPrepareResponse = SetCacheHeaders };
+
+    /// <summary>SPA fallback: serves wwwroot/index.html for /ui/ and client routes, so no RequestPath.</summary>
+    public static readonly StaticFileOptions FallbackOptions = new() { OnPrepareResponse = SetCacheHeaders };
+
+    private static void SetCacheHeaders(StaticFileResponseContext ctx)
+    {
+        var headers = ctx.Context.Response.Headers;
+        if (ctx.File.Name.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+            headers.CacheControl = "no-cache";
+        else if (ctx.Context.Request.Path.StartsWithSegments("/ui/assets"))
+            headers.CacheControl = "public, max-age=31536000, immutable";
     }
 }

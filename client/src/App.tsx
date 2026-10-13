@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache, useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { ThemeProvider } from './components/theme-provider';
 import { ThemeToggle } from './components/ui/theme-toggle';
 import { Toaster } from './components/ui/toaster';
@@ -53,7 +54,7 @@ const queryClient = new QueryClient({
         if ((error as Error & { status?: number }).status === 403) return false;
         return failureCount < 2;
       },
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true, // stale data refreshes when returning to the tab
     },
     mutations: {
       retry: false,
@@ -75,6 +76,24 @@ async function fetchSystemVersion(): Promise<SystemVersion> {
     throw new Error('Failed to fetch system version');
   }
   return response.json();
+}
+
+// Reloads the page once the server reports a different build than the one this page loaded with
+function useReloadOnNewVersion(versionInfo: SystemVersion | undefined) {
+  const loadedBuild = useRef<string | null>(null);
+  useEffect(() => {
+    if (!versionInfo) return;
+    const build = `${versionInfo.version}|${versionInfo.buildDate}`;
+    if (loadedBuild.current === null) {
+      loadedBuild.current = build;
+      return;
+    }
+    if (build !== loadedBuild.current) {
+      toast.info(`SelfMX ${versionInfo.version} is available, reloading…`);
+      const timer = setTimeout(() => window.location.reload(), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [versionInfo]);
 }
 
 function LoadingScreen() {
@@ -143,13 +162,16 @@ function AuthenticatedApp() {
     retry: false,
   });
 
-  // Fetch version info
+  // Fetch version info; re-checked so an open page picks up a new deployment
   const { data: versionInfo } = useQuery({
     queryKey: ['system-version'],
     queryFn: fetchSystemVersion,
-    staleTime: Infinity, // Version doesn't change during session
+    staleTime: 0,
+    refetchInterval: 60 * 1000,
+    refetchOnWindowFocus: true,
     retry: false,
   });
+  useReloadOnNewVersion(versionInfo);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);

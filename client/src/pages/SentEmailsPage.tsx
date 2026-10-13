@@ -383,17 +383,18 @@ function FiltersBar({ filters, domains, onFilterChange, onClear }: FiltersBarPro
   const verifiedDomains = domains.filter((d) => d.status === 'verified');
   const hasFilters = hasActiveFilters(filters);
 
+  // `days` calendar days including today, in local time: Today = since midnight,
+  // Last 7 days = today plus the 6 previous days. No upper bound, so new sends are included.
   const datePresets = [
-    { label: 'Today', days: 0 },
-    { label: '7 days', days: 7 },
-    { label: '30 days', days: 30 },
+    { label: 'Today', days: 1 },
+    { label: 'Last 7 days', days: 7 },
+    { label: 'Last 30 days', days: 30 },
   ];
 
-  // From local midnight `days` ago until now (no upper bound, so today's sends are included)
   const presetStart = (days: number) => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
-    start.setDate(start.getDate() - days);
+    start.setDate(start.getDate() - (days - 1));
     return start.toISOString();
   };
   const activePreset = datePresets.find((p) => filters.from === presetStart(p.days) && !filters.to)?.label;
@@ -442,6 +443,13 @@ function FiltersBar({ filters, domains, onFilterChange, onClear }: FiltersBarPro
           </Button>
         ))}
       </div>
+
+      {(filters.from || filters.to) && (
+        <span className="self-center text-xs text-muted-foreground" aria-live="polite">
+          {filters.from ? `Since ${formatDateTime(filters.from)}` : 'Any time'}
+          {filters.to ? ` until ${formatDateTime(filters.to)}` : ' until now'}
+        </span>
+      )}
 
       {hasFilters && (
         <Button

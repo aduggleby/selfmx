@@ -27,7 +27,8 @@ export function useSentEmails(filters: SentEmailFilters = {}) {
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage: CursorPagedSentEmails) =>
       lastPage.hasMore ? lastPage.nextCursor : undefined,
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000, // new sends show up without reloading
   });
 }
 
