@@ -31,6 +31,17 @@ public class DatabaseProviderResolverTests
     }
 
     [Fact]
+    public void PostgresConnectionString_DisablesGssProbeUnlessConfigured()
+    {
+        DatabaseProviderResolver.NormalizeConnectionString(DatabaseProvider.Postgres, "Host=db;Database=selfmx")
+            .Should().Contain("GSS Encryption Mode=Disable");
+        DatabaseProviderResolver.NormalizeConnectionString(DatabaseProvider.Postgres, "Host=db;Gss Encryption Mode=Require")
+            .Should().Contain("GSS Encryption Mode=Require");
+        DatabaseProviderResolver.NormalizeConnectionString(DatabaseProvider.SqlServer, "Server=db")
+            .Should().Be("Server=db");
+    }
+
+    [Fact]
     public void UnknownProvider_Throws()
     {
         var act = () => DatabaseProviderResolver.Resolve("oracle", "Host=x");

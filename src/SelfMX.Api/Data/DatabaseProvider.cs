@@ -39,4 +39,20 @@ public static class DatabaseProviderResolver
 
         return DatabaseProvider.Postgres;
     }
+
+    /// <summary>
+    /// Disables Npgsql's GSS (Kerberos) encryption probe unless configured explicitly. The probe
+    /// loads libgssapi, which the Alpine image lacks (logged as an error) and which crashes the
+    /// process on musl when installed.
+    /// </summary>
+    public static string NormalizeConnectionString(DatabaseProvider provider, string connectionString)
+    {
+        if (provider != DatabaseProvider.Postgres)
+            return connectionString;
+
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+        if (!connectionString.Contains("gss", StringComparison.OrdinalIgnoreCase))
+            builder.GssEncryptionMode = Npgsql.GssEncryptionMode.Disable;
+        return builder.ConnectionString;
+    }
 }

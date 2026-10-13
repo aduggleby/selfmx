@@ -71,6 +71,7 @@ if (useSqlite)
 }
 else
 {
+    connectionString = DatabaseProviderResolver.NormalizeConnectionString(databaseProvider, connectionString);
     builder.Services.AddSelfMxDatabase(databaseProvider, connectionString);
 }
 
