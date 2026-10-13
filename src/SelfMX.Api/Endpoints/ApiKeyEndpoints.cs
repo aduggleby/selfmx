@@ -18,7 +18,9 @@ public static class ApiKeyEndpoints
         keys.MapGet("/", ListApiKeys);
         keys.MapPost("/", CreateApiKey);
         keys.MapGet("/revoked", ListRevokedApiKeys);
+        keys.MapGet("/stats", GetApiKeyStats);
         keys.MapGet("/{id}", GetApiKey);
+        keys.MapPatch("/{id}", RenameApiKey);
         keys.MapDelete("/{id}", RevokeApiKey);
 
         return group;
@@ -103,6 +105,66 @@ public static class ApiKeyEndpoints
         return TypedResults.Ok(ApiKeyResponse.FromEntity(key));
     }
 
+    /// <summary>
+    /// Emails sent per API key in the last 24 hours, 7, 30 and 90 days, from the sent-email store.
+    /// One grouped query over the (ApiKeyId, SentAt) index; keys without sends are omitted.
+    /// </summary>
+    private static async Task<Ok<ApiKeyStatsResponse[]>> GetApiKeyStats(AppDbContext db, CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var since24h = now.AddHours(-24);
+        var since7d = now.AddDays(-7);
+        var since30d = now.AddDays(-30);
+        var since90d = now.AddDays(-90);
+
+        var stats = await db.SentEmails
+            .AsNoTracking()
+            .Where(e => e.ApiKeyId != null && e.SentAt >= since90d)
+            .GroupBy(e => e.ApiKeyId!)
+            .Select(g => new ApiKeyStatsResponse(
+                g.Key,
+                g.Count(e => e.SentAt >= since24h),
+                g.Count(e => e.SentAt >= since7d),
+                g.Count(e => e.SentAt >= since30d),
+                g.Count()))
+            .ToArrayAsync(ct);
+
+        return TypedResults.Ok(stats);
+    }
+
+    private static async Task<Results<Ok<ApiKeyResponse>, BadRequest<object>, NotFound<object>>> RenameApiKey(
+        string id,
+        RenameApiKeyRequest request,
+        AppDbContext db,
+        AuditService auditService,
+        ClaimsPrincipal user,
+        CancellationToken ct = default)
+    {
+        var name = request.Name?.Trim();
+        if (string.IsNullOrEmpty(name) || name.Length > 100)
+            return TypedResults.BadRequest(new ApiError("validation_error", "Name must be 1-100 characters").ToResendResponse(StatusCodes.Status400BadRequest));
+
+        var key = await db.ApiKeys.Include(k => k.AllowedDomains).FirstOrDefaultAsync(k => k.Id == id, ct);
+        if (key is null)
+            return TypedResults.NotFound(ApiError.NotFound.ToResendResponse(StatusCodes.Status404NotFound));
+
+        var oldName = key.Name;
+        key.Name = name;
+        await db.SaveChangesAsync(ct);
+
+        auditService.Log(new AuditEntry(
+            Action: "api_key.rename",
+            ActorType: user.FindFirst("ActorType")?.Value ?? "admin",
+            ActorId: user.FindFirst("KeyPrefix")?.Value,
+            ResourceType: "api_key",
+            ResourceId: id,
+            StatusCode: 200,
+            Details: new { OldName = oldName, NewName = name }
+        ));
+
+        return TypedResults.Ok(ApiKeyResponse.FromEntity(key));
+    }
+
     private static async Task<Results<Ok, NotFound<object>>> RevokeApiKey(
         string id,
         ApiKeyService apiKeyService,
@@ -130,6 +192,10 @@ public static class ApiKeyEndpoints
 }
 
 public record CreateApiKeyRequest(string Name, string[]? DomainIds, bool IsAdmin = false);
+
+public record RenameApiKeyRequest(string? Name);
+
+public record ApiKeyStatsResponse(string ApiKeyId, int Last24h, int Last7d, int Last30d, int Last90d);
 
 public record ApiKeyResponse(
     string Id,

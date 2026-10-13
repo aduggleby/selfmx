@@ -313,8 +313,17 @@ All /api-keys and /audit-logs endpoints require AdminOnly (ActorType=admin).
     - limit (int, default 20)
   - Response: PaginatedResponse<RevokedApiKeyResponse>
 
+- GET /api-keys/stats
+  - Emails sent per API key (from stored sent emails) in rolling windows
+  - Response: [{ apiKeyId, last24h, last7d, last30d, last90d }]; keys without sends in the last 90 days are omitted
+
 - GET /api-keys/{id}
   - Response: ApiKeyResponse or 404
+
+- PATCH /api-keys/{id}
+  - Body (JSON): { "name": string (1-100 chars, trimmed) }
+  - Effect: renames the key (the key value itself does not change)
+  - Response: ApiKeyResponse, 400 (invalid name) or 404
 
 - DELETE /api-keys/{id}
   - Effect: revokes the API key

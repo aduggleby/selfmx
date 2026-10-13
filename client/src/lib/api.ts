@@ -4,6 +4,8 @@ import {
   PaginatedDomainsSchema,
   SendEmailResponseSchema,
   PaginatedApiKeysSchema,
+  ApiKeySchema,
+  ApiKeyStatsListSchema,
   PaginatedRevokedApiKeysSchema,
   ApiKeyCreatedSchema,
   CursorPagedSentEmailsSchema,
@@ -14,6 +16,8 @@ import {
   type PaginatedDomains,
   type SendEmailResponse,
   type PaginatedApiKeys,
+  type ApiKey,
+  type ApiKeyStats,
   type PaginatedRevokedApiKeys,
   type ApiKeyCreated,
   type CursorPagedSentEmails,
@@ -284,6 +288,17 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(request),
     });
+  }
+
+  async renameApiKey(id: string, name: string): Promise<ApiKey> {
+    return this.request(`/api-keys/${id}`, ApiKeySchema, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async getApiKeyStats(): Promise<ApiKeyStats[]> {
+    return this.request('/api-keys/stats', ApiKeyStatsListSchema);
   }
 
   async deleteApiKey(id: string): Promise<void> {

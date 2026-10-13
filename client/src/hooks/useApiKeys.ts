@@ -10,7 +10,27 @@ export const apiKeyKeys = {
   detail: (id: string) => [...apiKeyKeys.details(), id] as const,
   revokedLists: () => [...apiKeyKeys.all, 'revoked'] as const,
   revokedList: (page: number, limit: number) => [...apiKeyKeys.revokedLists(), { page, limit }] as const,
+  stats: () => [...apiKeyKeys.all, 'stats'] as const,
 };
+
+export function useApiKeyStats() {
+  return useQuery({
+    queryKey: apiKeyKeys.stats(),
+    queryFn: () => api.getApiKeyStats(),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useRenameApiKey() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) => api.renameApiKey(id, name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: apiKeyKeys.lists() });
+    },
+  });
+}
 
 export function useApiKeys(page = 1, limit = 20) {
   return useQuery({

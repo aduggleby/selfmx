@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { DomainStatusBadge } from './DomainStatusBadge';
 import { cn } from '@/lib/utils';
 import type { Domain } from '@/lib/schemas';
+import { formatDateTime } from '@/lib/date';
 
 interface DomainCardProps {
   domain: Domain;
@@ -28,11 +29,11 @@ export function DomainCard({ domain }: DomainCardProps) {
           <DomainStatusBadge status={domain.status} />
         </div>
         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-          <span>Added {new Date(domain.createdAt).toLocaleDateString()}</span>
+          <span>Added {formatDateTime(domain.createdAt)}</span>
           {domain.verifiedAt && (
             <>
               <span>·</span>
-              <span>Verified {new Date(domain.verifiedAt).toLocaleDateString()}</span>
+              <span>Verified {formatDateTime(domain.verifiedAt)}</span>
             </>
           )}
         </div>

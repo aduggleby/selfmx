@@ -81,6 +81,7 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.SentAt);
             entity.HasIndex(e => e.MessageId).IsUnique();
             entity.HasIndex(e => new { e.DomainId, e.SentAt });
+            entity.HasIndex(e => new { e.ApiKeyId, e.SentAt }); // per-key send stats
 
             // Foreign key to Domain (no cascade - keep history)
             entity.HasOne(e => e.Domain)

@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { SentEmailListItem, SentEmailDetail, Domain } from '@/lib/schemas';
+import { formatDateTime } from '@/lib/date';
 
 interface SentEmailDetailModalProps {
   email: SentEmailDetail;
@@ -177,9 +178,7 @@ function EmailHtmlPreview({ html }: { html: string }) {
 function SentEmailDetailModal({ email, onClose }: SentEmailDetailModalProps) {
   const [activeTab, setActiveTab] = useState<'html' | 'text'>(email.htmlBody ? 'html' : 'text');
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString();
-  };
+  const formatDate = (dateStr: string) => formatDateTime(dateStr);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -284,16 +283,7 @@ function SentEmailRow({
   email: SentEmailListItem;
   onClick: () => void;
 }) {
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-
-    if (isToday) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    return date.toLocaleDateString();
-  };
+  const formatDate = (dateStr: string) => formatDateTime(dateStr);
 
   const formatRecipients = (to: string[]) => {
     if (to.length === 1) return to[0];

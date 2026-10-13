@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Key, Plus, Trash2, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, Archive } from 'lucide-react';
-import { useApiKeys, useCreateApiKey, useDeleteApiKey, useRevokedApiKeys } from '@/hooks/useApiKeys';
+import { Key, Plus, Trash2, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, Archive, Pencil, X } from 'lucide-react';
+import { useApiKeys, useApiKeyStats, useCreateApiKey, useDeleteApiKey, useRenameApiKey, useRevokedApiKeys } from '@/hooks/useApiKeys';
 import { useDomains } from '@/hooks/useDomains';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { ApiKey, ApiKeyCreated, Domain, RevokedApiKey } from '@/lib/schemas';
+import type { ApiKey, ApiKeyCreated, ApiKeyStats, Domain, RevokedApiKey } from '@/lib/schemas';
+import { formatDateTime } from '@/lib/date';
 
 interface CreateApiKeyModalProps {
   domains: Domain[];
@@ -36,6 +37,7 @@ function ApiKeyRowSkeleton() {
       <td className="py-3 px-2"><Skeleton className="h-5 w-16" /></td>
       <td className="py-3 px-2"><Skeleton className="h-4 w-20" /></td>
       <td className="py-3 px-2"><Skeleton className="h-4 w-20" /></td>
+      <td className="py-3 px-2"><Skeleton className="h-4 w-24" /></td>
       <td className="py-3 px-2"><Skeleton className="h-8 w-16" /></td>
     </tr>
   );
@@ -264,19 +266,60 @@ function formatRelativeDate(dateStr: string | null): string {
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays} days ago`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-  return date.toLocaleDateString();
+  return formatDateTime(date);
+}
+
+// Relative label with the exact local time on hover
+function RelativeDate({ value }: { value: string | null }) {
+  return <span title={value ? formatDateTime(value) : undefined}>{formatRelativeDate(value)}</span>;
+}
+
+function SentStats({ stats }: { stats?: ApiKeyStats }) {
+  const values = [stats?.last24h ?? 0, stats?.last7d ?? 0, stats?.last30d ?? 0, stats?.last90d ?? 0];
+  return (
+    <span className="font-mono tabular-nums" title="Emails sent in the last 24 hours / 7 / 30 / 90 days">
+      {values.join(' / ')}
+    </span>
+  );
 }
 
 function ApiKeyRow({
   apiKey,
   domains,
+  stats,
   onDelete,
+  onRename,
 }: {
   apiKey: ApiKey;
   domains: Domain[];
+  stats?: ApiKeyStats;
   onDelete: () => void;
+  onRename: (name: string) => Promise<void>;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(apiKey.name);
+  const [saving, setSaving] = useState(false);
   const isRevoked = !!apiKey.revokedAt;
+
+  const startEditing = () => {
+    setName(apiKey.name);
+    setEditing(true);
+  };
+
+  const save = async () => {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === apiKey.name) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onRename(trimmed);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
   const domainNames = apiKey.domainIds
     .map((id) => domains.find((d) => d.id === id)?.name)
     .filter(Boolean);
@@ -284,7 +327,47 @@ function ApiKeyRow({
   return (
     <tr className={`border-b ${isRevoked ? 'opacity-50' : ''}`}>
       <td className="py-3 px-2">
-        <span className={isRevoked ? 'line-through' : ''}>{apiKey.name}</span>
+        {editing ? (
+          <form
+            className="flex items-center gap-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void save();
+            }}
+          >
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
+              maxLength={100}
+              autoFocus
+              disabled={saving}
+              aria-label="API key name"
+              className="h-8 w-44"
+            />
+            <Button type="submit" variant="ghost" size="sm" disabled={saving || !name.trim()} aria-label="Save name">
+              <Check className="h-3.5 w-3.5" />
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)} disabled={saving} aria-label="Cancel rename">
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </form>
+        ) : (
+          <span className="group inline-flex items-center gap-1">
+            <span className={isRevoked ? 'line-through' : ''}>{apiKey.name}</span>
+            {!isRevoked && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={startEditing}
+                aria-label={`Rename ${apiKey.name}`}
+                className="h-7 px-1.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+            )}
+          </span>
+        )}
       </td>
       <td className="py-3 px-2 font-mono text-xs text-muted-foreground">
         {apiKey.keyPrefix}...
@@ -309,10 +392,13 @@ function ApiKeyRow({
         )}
       </td>
       <td className="py-3 px-2 text-xs text-muted-foreground">
-        {formatRelativeDate(apiKey.createdAt)}
+        <RelativeDate value={apiKey.createdAt} />
       </td>
       <td className="py-3 px-2 text-xs text-muted-foreground">
-        {formatRelativeDate(apiKey.lastUsedAt)}
+        <RelativeDate value={apiKey.lastUsedAt} />
+      </td>
+      <td className="py-3 px-2 text-xs text-muted-foreground">
+        <SentStats stats={stats} />
       </td>
       <td className="py-3 px-2">
         {!isRevoked && (
@@ -365,10 +451,10 @@ function RevokedKeyRow({
         )}
       </td>
       <td className="py-3 px-2 text-xs text-muted-foreground">
-        {formatRelativeDate(apiKey.revokedAt)}
+        <RelativeDate value={apiKey.revokedAt} />
       </td>
       <td className="py-3 px-2 text-xs text-muted-foreground">
-        {formatRelativeDate(apiKey.lastUsedAt)}
+        <RelativeDate value={apiKey.lastUsedAt} />
       </td>
     </tr>
   );
@@ -409,10 +495,10 @@ function ArchivedApiKeyRow({
         )}
       </td>
       <td className="py-3 px-2 text-xs text-muted-foreground">
-        {formatRelativeDate(archivedKey.revokedAt)}
+        <RelativeDate value={archivedKey.revokedAt} />
       </td>
       <td className="py-3 px-2 text-xs text-muted-foreground">
-        {formatRelativeDate(archivedKey.archivedAt)}
+        <RelativeDate value={archivedKey.archivedAt} />
       </td>
     </tr>
   );
@@ -446,6 +532,19 @@ export function ApiKeysPage() {
   const { data: domainsData } = useDomains(1, 100); // Get all domains for selection
   const createMutation = useCreateApiKey();
   const deleteMutation = useDeleteApiKey();
+  const renameMutation = useRenameApiKey();
+  const { data: statsData } = useApiKeyStats();
+  const statsByKey = new Map((statsData ?? []).map((s) => [s.apiKeyId, s]));
+
+  const handleRename = async (id: string, name: string) => {
+    try {
+      await renameMutation.mutateAsync({ id, name });
+      toast.success('API key renamed');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to rename API key');
+      throw err;
+    }
+  };
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createdKey, setCreatedKey] = useState<ApiKeyCreated | null>(null);
@@ -504,6 +603,7 @@ export function ApiKeysPage() {
                   <th className="py-2 px-2 font-medium">Access</th>
                   <th className="py-2 px-2 font-medium">Created</th>
                   <th className="py-2 px-2 font-medium">Last Used</th>
+                  <th className="py-2 px-2 font-medium" title="Emails sent in the last 24 hours / 7 / 30 / 90 days">Sent 24h / 7d / 30d / 90d</th>
                   <th className="py-2 px-2 font-medium"></th>
                 </tr>
               </thead>
@@ -552,6 +652,7 @@ export function ApiKeysPage() {
                     <th className="py-2 px-2 font-medium">Access</th>
                     <th className="py-2 px-2 font-medium">Created</th>
                     <th className="py-2 px-2 font-medium">Last Used</th>
+                    <th className="py-2 px-2 font-medium" title="Emails sent in the last 24 hours / 7 / 30 / 90 days">Sent 24h / 7d / 30d / 90d</th>
                     <th className="py-2 px-2 font-medium"></th>
                   </tr>
                 </thead>
@@ -561,7 +662,9 @@ export function ApiKeysPage() {
                       key={apiKey.id}
                       apiKey={apiKey}
                       domains={domains}
+                      stats={statsByKey.get(apiKey.id)}
                       onDelete={() => setKeyToDelete(apiKey)}
+                      onRename={(name) => handleRename(apiKey.id, name)}
                     />
                   ))}
                 </tbody>

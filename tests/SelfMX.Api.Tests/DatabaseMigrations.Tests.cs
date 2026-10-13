@@ -88,7 +88,8 @@ public class DatabaseMigrationIntegrationTests
             var domain = await app.Domains.SingleAsync();
             domain.Name.Should().Be("legacy.example");
             domain.Status.Should().Be(DomainStatus.Verified);
-            (await app.Database.GetAppliedMigrationsAsync()).Should().ContainSingle();
+            // Adopted at the initial migration, then every later migration applied normally
+            (await app.Database.GetAppliedMigrationsAsync()).Should().Equal(app.Database.GetMigrations());
         }
         await using (var audit = new SqlServerAuditDbContext(Options<SqlServerAuditDbContext>(DatabaseProvider.SqlServer, legacy.ConnectionString, audit: true)))
         {
@@ -211,6 +212,8 @@ public class DatabaseMigrationIntegrationTests
         {
             await app.Database.EnsureCreatedAsync();
             await app.Database.ExecuteSqlRawAsync("ALTER TABLE [Domains] DROP COLUMN [LastCheckedAt]; DROP TABLE [RevokedApiKeys];");
+            // EnsureCreated uses the current model; remove what later migrations add, as legacy databases never had it
+            await app.Database.ExecuteSqlRawAsync("DROP INDEX [IX_SentEmails_ApiKeyId_SentAt] ON [SentEmails];");
             await app.Database.ExecuteSqlRawAsync(
                 "INSERT INTO [Domains] ([Id], [Name], [Status], [CreatedAt]) VALUES ('d1', 'legacy.example', 'Verified', SYSUTCDATETIME())");
         }

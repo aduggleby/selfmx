@@ -10,6 +10,7 @@ import { SendTestEmailForm } from '@/components/SendTestEmailForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatDateTime } from '@/lib/date';
 
 interface DeleteConfirmModalProps {
   domainName: string;
@@ -63,7 +64,7 @@ function VerificationStatus({ lastCheckedAt, nextCheckAt }: VerificationStatusPr
       </p>
       {lastCheckedAt && (
         <p className="mt-0.5 text-xs opacity-75">
-          Last checked: {new Date(lastCheckedAt).toLocaleTimeString()}
+          Last checked: {formatDateTime(lastCheckedAt)}
         </p>
       )}
     </div>
@@ -213,11 +214,11 @@ export function DomainDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span>Added {new Date(domain.createdAt).toLocaleDateString()}</span>
+            <span>Added {formatDateTime(domain.createdAt)}</span>
             {domain.verifiedAt && (
               <>
                 <span>·</span>
-                <span>Verified {new Date(domain.verifiedAt).toLocaleDateString()}</span>
+                <span>Verified {formatDateTime(domain.verifiedAt)}</span>
               </>
             )}
           </div>

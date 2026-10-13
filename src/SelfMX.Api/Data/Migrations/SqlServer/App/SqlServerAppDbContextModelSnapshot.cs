@@ -238,6 +238,8 @@ namespace SelfMX.Api.Data.Migrations.SqlServer.App
 
                     b.HasIndex("SentAt");
 
+                    b.HasIndex("ApiKeyId", "SentAt");
+
                     b.HasIndex("DomainId", "SentAt");
 
                     b.ToTable("SentEmails");

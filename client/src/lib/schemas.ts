@@ -65,6 +65,17 @@ export const ApiKeySchema = z.object({
 });
 export type ApiKey = z.infer<typeof ApiKeySchema>;
 
+// Emails sent per API key; keys without sends in the last 90 days are omitted
+export const ApiKeyStatsSchema = z.object({
+  apiKeyId: z.string(),
+  last24h: z.number(),
+  last7d: z.number(),
+  last30d: z.number(),
+  last90d: z.number(),
+});
+export type ApiKeyStats = z.infer<typeof ApiKeyStatsSchema>;
+export const ApiKeyStatsListSchema = z.array(ApiKeyStatsSchema);
+
 export const ApiKeyCreatedSchema = z.object({
   id: z.string(),
   name: z.string(),
