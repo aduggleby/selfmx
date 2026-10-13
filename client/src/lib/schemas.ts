@@ -142,3 +142,15 @@ export const CursorPagedSentEmailsSchema = z.object({
   hasMore: z.boolean(),
 });
 export type CursorPagedSentEmails = z.infer<typeof CursorPagedSentEmailsSchema>;
+
+// Data export/import
+export const ImportResultSchema = z.object({
+  domains: z.number().int(),
+  apiKeys: z.number().int(),
+  apiKeyDomains: z.number().int(),
+  revokedApiKeys: z.number().int(),
+  auditLogs: z.number().int(),
+  auditLogsSkipped: z.number().int(),
+  pendingDomainsRequeued: z.number().int(),
+});
+export type ImportResult = z.infer<typeof ImportResultSchema>;

@@ -217,6 +217,8 @@ client/src/
 | `POST /api-keys` | Admin | Create API key |
 | `GET /api-keys/revoked` | Admin | List archived API keys |
 | `GET /audit-logs` | Admin | Audit logs (paginated) |
+| `GET /admin/export` | Admin | Download gzipped export (domains, API keys, revoked keys, audit logs) |
+| `POST /admin/import` | Admin | Import an export into an instance without domains/API keys |
 | `GET /hangfire` | Admin | Hangfire job dashboard |
 
 Auth: Bearer token with API key, or Cookie auth for admin UI.

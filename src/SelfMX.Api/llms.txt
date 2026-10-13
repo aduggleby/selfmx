@@ -332,6 +332,26 @@ Audit Logs (admin-only)
     - to (string? ISO date-time, optional)
   - Response: PaginatedResponse<AuditLogResponse>
 
+Data Export / Import (admin-only)
+---------------------------------
+Moves an instance's configuration to another SelfMX installation (any database provider).
+Included: domains, API keys (hashes, so existing keys keep working), API key domain scopes,
+revoked keys, audit logs. Not included: sent emails, Hangfire state.
+
+- GET /admin/export
+  - Response (200): gzip-compressed JSON file (Content-Type: application/gzip,
+    Content-Disposition: attachment; filename=selfmx-export-YYYYMMDD-HHmmss.json.gz)
+  - The file contains API key hashes and salts; treat it as a secret.
+
+- POST /admin/import
+  - Body: the raw export file (Content-Type: application/gzip; plain JSON is also accepted), max 256 MB
+  - Requires a target without domains or API keys: sign in with the admin password (cookie session),
+    not with an API key. Existing audit log entries are kept; imported ones with an existing id are skipped.
+  - Domains still Pending get their SES setup job queued again.
+  - Response (200): { domains, apiKeys, apiKeyDomains, revokedApiKeys, auditLogs, auditLogsSkipped, pendingDomainsRequeued }
+  - 400: invalid file, unsupported formatVersion or inconsistent data (nothing imported)
+  - 409: the instance already has domains or API keys
+
 Security Notes for LLM Agents
 -----------------------------
 - Never place tokens in query parameters; use the Authorization header.

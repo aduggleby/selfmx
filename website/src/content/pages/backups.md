@@ -99,3 +99,7 @@ If restoring to a new AWS account or after significant time:
 1. Domains may show as "Verifying" while SelfMX re-checks with AWS SES
 2. If DNS records are still in place, verification should complete automatically
 3. If verification fails, delete and re-add the domain
+
+## Moving to Another Server
+
+To move SelfMX to a new server or from SQL Server to PostgreSQL, use the built-in export and import. See [Moving to Another Server](/migrate).

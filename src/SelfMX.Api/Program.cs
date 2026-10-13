@@ -186,6 +186,7 @@ builder.Services.AddScoped<DomainService>();
 builder.Services.AddScoped<ISesService, SesService>();
 builder.Services.AddSingleton<IDnsVerificationService, DnsVerificationService>();
 builder.Services.AddScoped<ApiKeyService>();
+builder.Services.AddScoped<DataTransferService>();
 builder.Services.AddSingleton<AuditService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditService>());
 builder.Services.AddHttpContextAccessor();
@@ -439,6 +440,7 @@ var adminOnly = app.MapGroup("")
     .RequireRateLimiting("api");
 adminOnly.MapApiKeyEndpoints();
 adminOnly.MapAuditEndpoints();
+adminOnly.MapDataTransferEndpoints();
 
 // Hangfire dashboard - admin only, available in all environments
 if (enableHangfire)

@@ -8,6 +8,8 @@ import {
   ApiKeyCreatedSchema,
   CursorPagedSentEmailsSchema,
   SentEmailDetailSchema,
+  ImportResultSchema,
+  type ImportResult,
   type Domain,
   type PaginatedDomains,
   type SendEmailResponse,
@@ -44,6 +46,7 @@ class ApiClient {
   ): Promise<T> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string> | undefined),
     };
 
     if (this.apiKey) {
@@ -73,7 +76,7 @@ class ApiClient {
       let message = `Request failed with status ${response.status} from ${apiHost}.`;
       try {
         const errorBody = await response.json();
-        message = errorBody?.error?.message || message;
+        message = errorBody?.message || errorBody?.error?.message || message;
       } catch {
         // Ignore JSON parse errors and keep fallback message.
       }
@@ -349,6 +352,52 @@ class ApiClient {
 
   async getSentEmail(id: string): Promise<SentEmailDetail> {
     return this.request(`/sent-emails/${id}`, SentEmailDetailSchema);
+  }
+
+  // Data export/import methods
+  async exportData(): Promise<{ blob: Blob; filename: string }> {
+    const apiHost = getApiHost('/admin/export');
+    let response: Response;
+    try {
+      response = await fetch(getApiUrl('/admin/export'), { credentials: 'include' });
+    } catch {
+      throw new Error(
+        `API unreachable at ${apiHost}. Check that the server and port are running.`
+      );
+    }
+    if (!response.ok) throw await this.toError(response, 'Export failed', apiHost);
+
+    const disposition = response.headers.get('Content-Disposition') ?? '';
+    const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+    return {
+      blob: await response.blob(),
+      filename: match ? decodeURIComponent(match[1]) : 'selfmx-export.json.gz',
+    };
+  }
+
+  async importData(file: File): Promise<ImportResult> {
+    const isJson = file.name.toLowerCase().endsWith('.json');
+    return this.request('/admin/import', ImportResultSchema, {
+      method: 'POST',
+      body: file,
+      headers: { 'Content-Type': isJson ? 'application/json' : 'application/gzip' },
+    });
+  }
+
+  private async toError(response: Response, prefix: string, apiHost: string) {
+    if (response.status === 401) {
+      window.dispatchEvent(new Event('selfmx:unauthorized'));
+    }
+    let message = `${prefix} with status ${response.status} from ${apiHost}.`;
+    try {
+      const errorBody = await response.json();
+      message = errorBody?.message || errorBody?.error?.message || message;
+    } catch {
+      // Ignore JSON parse errors and keep fallback message.
+    }
+    const err = new Error(message) as Error & { status: number };
+    err.status = response.status;
+    return err;
   }
 }
 
