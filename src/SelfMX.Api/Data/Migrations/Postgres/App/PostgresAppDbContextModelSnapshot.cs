@@ -236,11 +236,9 @@ namespace SelfMX.Api.Data.Migrations.Postgres.App
                     b.HasIndex("MessageId")
                         .IsUnique();
 
-                    b.HasIndex("SentAt");
-
-                    b.HasIndex("ApiKeyId", "SentAt");
-
                     b.HasIndex("DomainId", "SentAt");
+
+                    b.HasIndex("SentAt", "ApiKeyId");
 
                     b.ToTable("SentEmails");
                 });

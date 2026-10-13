@@ -274,10 +274,16 @@ function RelativeDate({ value }: { value: string | null }) {
   return <span title={value ? formatDateTime(value) : undefined}>{formatRelativeDate(value)}</span>;
 }
 
-function SentStats({ stats }: { stats?: ApiKeyStats }) {
-  const values = [stats?.last24h ?? 0, stats?.last7d ?? 0, stats?.last30d ?? 0, stats?.last90d ?? 0];
+// available = stats loaded; a missing entry then means no sends in the last 90 days.
+// "—" marks unknown values: not loaded yet, failed, or a window longer than the retention period.
+function SentStats({ stats, available }: { stats?: ApiKeyStats; available: boolean }) {
+  const show = (value: number | null | undefined) => (!available ? '—' : value === null ? '—' : String(value ?? 0));
+  const values = [stats?.last24h, stats?.last7d, stats?.last30d, stats?.last90d].map(show);
   return (
-    <span className="font-mono tabular-nums" title="Emails sent in the last 24 hours / 7 / 30 / 90 days">
+    <span
+      className="font-mono tabular-nums"
+      title="Emails sent in the last 24 hours / 7 / 30 / 90 days. — means not available (loading, error, or longer than the sent-email retention)."
+    >
       {values.join(' / ')}
     </span>
   );
@@ -287,12 +293,14 @@ function ApiKeyRow({
   apiKey,
   domains,
   stats,
+  statsAvailable,
   onDelete,
   onRename,
 }: {
   apiKey: ApiKey;
   domains: Domain[];
   stats?: ApiKeyStats;
+  statsAvailable: boolean;
   onDelete: () => void;
   onRename: (name: string) => Promise<void>;
 }) {
@@ -316,6 +324,8 @@ function ApiKeyRow({
     try {
       await onRename(trimmed);
       setEditing(false);
+    } catch {
+      // onRename already showed the error; stay in edit mode so the name can be corrected
     } finally {
       setSaving(false);
     }
@@ -333,6 +343,10 @@ function ApiKeyRow({
             onSubmit={(e) => {
               e.preventDefault();
               void save();
+            }}
+            onBlur={(e) => {
+              // Clicking away cancels; moving focus to Save/Cancel inside the form does not
+              if (!saving && !e.currentTarget.contains(e.relatedTarget as Node | null)) setEditing(false);
             }}
           >
             <Input
@@ -353,7 +367,7 @@ function ApiKeyRow({
             </Button>
           </form>
         ) : (
-          <span className="group inline-flex items-center gap-1">
+          <span className="inline-flex items-center gap-1">
             <span className={isRevoked ? 'line-through' : ''}>{apiKey.name}</span>
             {!isRevoked && (
               <Button
@@ -361,7 +375,7 @@ function ApiKeyRow({
                 size="sm"
                 onClick={startEditing}
                 aria-label={`Rename ${apiKey.name}`}
-                className="h-7 px-1.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                className="h-7 px-1.5 text-muted-foreground hover:text-foreground"
               >
                 <Pencil className="h-3 w-3" />
               </Button>
@@ -398,7 +412,7 @@ function ApiKeyRow({
         <RelativeDate value={apiKey.lastUsedAt} />
       </td>
       <td className="py-3 px-2 text-xs text-muted-foreground">
-        <SentStats stats={stats} />
+        <SentStats stats={stats} available={statsAvailable} />
       </td>
       <td className="py-3 px-2">
         {!isRevoked && (
@@ -533,7 +547,7 @@ export function ApiKeysPage() {
   const createMutation = useCreateApiKey();
   const deleteMutation = useDeleteApiKey();
   const renameMutation = useRenameApiKey();
-  const { data: statsData } = useApiKeyStats();
+  const { data: statsData, isSuccess: statsAvailable } = useApiKeyStats();
   const statsByKey = new Map((statsData ?? []).map((s) => [s.apiKeyId, s]));
 
   const handleRename = async (id: string, name: string) => {
@@ -663,6 +677,7 @@ export function ApiKeysPage() {
                       apiKey={apiKey}
                       domains={domains}
                       stats={statsByKey.get(apiKey.id)}
+                      statsAvailable={statsAvailable}
                       onDelete={() => setKeyToDelete(apiKey)}
                       onRename={(name) => handleRename(apiKey.id, name)}
                     />

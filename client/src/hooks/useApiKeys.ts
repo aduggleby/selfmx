@@ -26,9 +26,8 @@ export function useRenameApiKey() {
 
   return useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) => api.renameApiKey(id, name),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: apiKeyKeys.lists() });
-    },
+    // Returned so mutateAsync resolves after the list shows the new name
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: apiKeyKeys.lists() }),
   });
 }
 

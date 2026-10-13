@@ -5,7 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using SelfMX.Api.Contracts.Responses;
 using SelfMX.Api.Data;
 using SelfMX.Api.Entities;
+using Microsoft.Extensions.Options;
 using SelfMX.Api.Services;
+using SelfMX.Api.Settings;
 
 namespace SelfMX.Api.Endpoints;
 
@@ -105,32 +107,11 @@ public static class ApiKeyEndpoints
         return TypedResults.Ok(ApiKeyResponse.FromEntity(key));
     }
 
-    /// <summary>
-    /// Emails sent per API key in the last 24 hours, 7, 30 and 90 days, from the sent-email store.
-    /// One grouped query over the (ApiKeyId, SentAt) index; keys without sends are omitted.
-    /// </summary>
-    private static async Task<Ok<ApiKeyStatsResponse[]>> GetApiKeyStats(AppDbContext db, CancellationToken ct = default)
-    {
-        var now = DateTime.UtcNow;
-        var since24h = now.AddHours(-24);
-        var since7d = now.AddDays(-7);
-        var since30d = now.AddDays(-30);
-        var since90d = now.AddDays(-90);
-
-        var stats = await db.SentEmails
-            .AsNoTracking()
-            .Where(e => e.ApiKeyId != null && e.SentAt >= since90d)
-            .GroupBy(e => e.ApiKeyId!)
-            .Select(g => new ApiKeyStatsResponse(
-                g.Key,
-                g.Count(e => e.SentAt >= since24h),
-                g.Count(e => e.SentAt >= since7d),
-                g.Count(e => e.SentAt >= since30d),
-                g.Count()))
-            .ToArrayAsync(ct);
-
-        return TypedResults.Ok(stats);
-    }
+    private static async Task<Ok<ApiKeyStatsResponse[]>> GetApiKeyStats(
+        AppDbContext db,
+        IOptions<AppSettings> appSettings,
+        CancellationToken ct = default) =>
+        TypedResults.Ok(await ApiKeySendStats.GetAsync(db, appSettings.Value.SentEmailRetentionDays, DateTime.UtcNow, ct));
 
     private static async Task<Results<Ok<ApiKeyResponse>, BadRequest<object>, NotFound<object>>> RenameApiKey(
         string id,
@@ -194,8 +175,6 @@ public static class ApiKeyEndpoints
 public record CreateApiKeyRequest(string Name, string[]? DomainIds, bool IsAdmin = false);
 
 public record RenameApiKeyRequest(string? Name);
-
-public record ApiKeyStatsResponse(string ApiKeyId, int Last24h, int Last7d, int Last30d, int Last90d);
 
 public record ApiKeyResponse(
     string Id,

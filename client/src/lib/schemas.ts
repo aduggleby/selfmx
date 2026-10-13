@@ -65,13 +65,14 @@ export const ApiKeySchema = z.object({
 });
 export type ApiKey = z.infer<typeof ApiKeySchema>;
 
-// Emails sent per API key; keys without sends in the last 90 days are omitted
+// Emails sent per API key; keys without sends in the last 90 days are omitted.
+// A window is null when it is longer than the server's sent-email retention.
 export const ApiKeyStatsSchema = z.object({
   apiKeyId: z.string(),
   last24h: z.number(),
-  last7d: z.number(),
-  last30d: z.number(),
-  last90d: z.number(),
+  last7d: z.number().nullable(),
+  last30d: z.number().nullable(),
+  last90d: z.number().nullable(),
 });
 export type ApiKeyStats = z.infer<typeof ApiKeyStatsSchema>;
 export const ApiKeyStatsListSchema = z.array(ApiKeyStatsSchema);

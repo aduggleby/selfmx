@@ -175,6 +175,42 @@ public class DatabaseMigrationIntegrationTests
         await AssertCountsAsync(provider, db.ConnectionString, domains: 1, auditLogs: 1);
     }
 
+    [SkippableTheory]
+    [InlineData(DatabaseProvider.Postgres)]
+    [InlineData(DatabaseProvider.SqlServer)]
+    public async Task SendStats_OnRealDatabase_CountEachWindowAndRespectRetention(DatabaseProvider provider)
+    {
+        var server = provider == DatabaseProvider.Postgres ? PostgresServer : SqlServerServer;
+        Skip.If(string.IsNullOrEmpty(server), $"Connection string for {provider} not set");
+        await using var db = provider == DatabaseProvider.Postgres
+            ? await TestDatabase.CreatePostgresAsync(server!)
+            : await TestDatabase.CreateSqlServerAsync(server!);
+        await MigrateAsync(provider, db.ConnectionString);
+
+        var now = DateTime.UtcNow;
+        await using (var app = CreateAppDb(provider, db.ConnectionString))
+        {
+            app.Domains.Add(new Domain { Id = "d1", Name = "a.example", Status = DomainStatus.Verified });
+            SentEmail Sent(DateTime at, string? key) => new()
+            {
+                Id = Guid.NewGuid().ToString(), MessageId = Guid.NewGuid().ToString(), SentAt = at, FromAddress = "a@a.example",
+                ToAddresses = "[]", Subject = "s", DomainId = "d1", ApiKeyId = key
+            };
+            app.SentEmails.AddRange(
+                Sent(now.AddHours(-1), "k1"), Sent(now.AddHours(-30), "k1"), Sent(now.AddDays(-10), "k1"),
+                Sent(now.AddDays(-60), "k1"), Sent(now.AddDays(-100), "k1"), Sent(now.AddHours(-1), null));
+            await app.SaveChangesAsync();
+        }
+
+        await using (var app = CreateAppDb(provider, db.ConnectionString))
+        {
+            (await ApiKeySendStats.GetAsync(app, retentionDays: null, now))
+                .Should().Equal(new ApiKeyStatsResponse("k1", 1, 2, 3, 4));
+            (await ApiKeySendStats.GetAsync(app, retentionDays: 30, now))
+                .Should().Equal(new ApiKeyStatsResponse("k1", 1, 2, 3, null));
+        }
+    }
+
     private static async Task<ImportResult> ImportAsync(DatabaseProvider provider, string connectionString, DataExport data)
     {
         await using var app = CreateAppDb(provider, connectionString);
@@ -213,7 +249,8 @@ public class DatabaseMigrationIntegrationTests
             await app.Database.EnsureCreatedAsync();
             await app.Database.ExecuteSqlRawAsync("ALTER TABLE [Domains] DROP COLUMN [LastCheckedAt]; DROP TABLE [RevokedApiKeys];");
             // EnsureCreated uses the current model; remove what later migrations add, as legacy databases never had it
-            await app.Database.ExecuteSqlRawAsync("DROP INDEX [IX_SentEmails_ApiKeyId_SentAt] ON [SentEmails];");
+            await app.Database.ExecuteSqlRawAsync(
+                "DROP INDEX [IX_SentEmails_SentAt_ApiKeyId] ON [SentEmails]; CREATE INDEX [IX_SentEmails_SentAt] ON [SentEmails] ([SentAt]);");
             await app.Database.ExecuteSqlRawAsync(
                 "INSERT INTO [Domains] ([Id], [Name], [Status], [CreatedAt]) VALUES ('d1', 'legacy.example', 'Verified', SYSUTCDATETIME())");
         }

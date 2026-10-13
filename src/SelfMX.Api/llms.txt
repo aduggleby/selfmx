@@ -316,6 +316,7 @@ All /api-keys and /audit-logs endpoints require AdminOnly (ActorType=admin).
 - GET /api-keys/stats
   - Emails sent per API key (from stored sent emails) in rolling windows
   - Response: [{ apiKeyId, last24h, last7d, last30d, last90d }]; keys without sends in the last 90 days are omitted
+  - A window is null when it is longer than App:SentEmailRetentionDays (older sends are deleted, so it would undercount)
 
 - GET /api-keys/{id}
   - Response: ApiKeyResponse or 404

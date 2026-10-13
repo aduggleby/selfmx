@@ -12,8 +12,8 @@ using SelfMX.Api.Data;
 namespace SelfMX.Api.Data.Migrations.SqlServer.App
 {
     [DbContext(typeof(SqlServerAppDbContext))]
-    [Migration("20261013130617_AddSentEmailApiKeyIndex")]
-    partial class AddSentEmailApiKeyIndex
+    [Migration("20261013131529_SentEmailsSentAtApiKeyIndex")]
+    partial class SentEmailsSentAtApiKeyIndex
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -239,11 +239,9 @@ namespace SelfMX.Api.Data.Migrations.SqlServer.App
                     b.HasIndex("MessageId")
                         .IsUnique();
 
-                    b.HasIndex("SentAt");
-
-                    b.HasIndex("ApiKeyId", "SentAt");
-
                     b.HasIndex("DomainId", "SentAt");
+
+                    b.HasIndex("SentAt", "ApiKeyId");
 
                     b.ToTable("SentEmails");
                 });

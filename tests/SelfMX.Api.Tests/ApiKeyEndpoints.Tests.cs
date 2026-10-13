@@ -6,7 +6,6 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SelfMX.Api.Data;
-using SelfMX.Api.Endpoints;
 using SelfMX.Api.Entities;
 using SelfMX.Api.Services;
 using Xunit;

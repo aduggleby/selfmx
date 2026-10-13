@@ -78,10 +78,11 @@ public class AppDbContext : DbContext
             }
 
             // Indexes for cleanup job and queries
-            entity.HasIndex(e => e.SentAt);
+            // Leading SentAt serves date filters and retention cleanup; ApiKeyId makes the
+            // per-key stats query an index-only range scan over the last 90 days
+            entity.HasIndex(e => new { e.SentAt, e.ApiKeyId });
             entity.HasIndex(e => e.MessageId).IsUnique();
             entity.HasIndex(e => new { e.DomainId, e.SentAt });
-            entity.HasIndex(e => new { e.ApiKeyId, e.SentAt }); // per-key send stats
 
             // Foreign key to Domain (no cascade - keep history)
             entity.HasOne(e => e.Domain)
