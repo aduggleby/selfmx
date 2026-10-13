@@ -106,7 +106,7 @@ function DeleteConfirmModal({ domainName, isDeleting, onConfirm, onCancel }: Del
 
 function DomainDetailSkeleton() {
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-8">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
       <Skeleton className="h-4 w-28 mb-6" />
       <Card>
         <CardHeader>
@@ -150,7 +150,7 @@ export function DomainDetailPage() {
 
   if (error || !domain) {
     return (
-      <div className="container mx-auto max-w-4xl px-4 py-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
         <Link
           to="/"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
@@ -175,7 +175,7 @@ export function DomainDetailPage() {
   const hasDnsRecords = domain.dnsRecords && domain.dnsRecords.length > 0;
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-8">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
       <Link
         to="/"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"

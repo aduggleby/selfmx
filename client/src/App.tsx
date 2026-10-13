@@ -170,7 +170,7 @@ function AuthenticatedApp() {
           scrolled && 'shadow-[var(--shadow-elevation-low)]'
         )}
       >
-        <div className="container mx-auto max-w-4xl flex items-center justify-between py-3 px-4">
+        <div className="w-full flex items-center justify-between py-3 px-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <h1 className="font-display text-lg font-semibold">SelfMX</h1>
             {versionInfo && (

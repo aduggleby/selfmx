@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Key, Plus, Trash2, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, Archive, Pencil, X } from 'lucide-react';
+import { Key, Plus, Trash2, AlertTriangle, Copy, Check, ChevronDown, ChevronRight, Archive, Pencil, X, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { useApiKeys, useApiKeyStats, useCreateApiKey, useDeleteApiKey, useRenameApiKey, useRevokedApiKeys } from '@/hooks/useApiKeys';
 import { useDomains } from '@/hooks/useDomains';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,9 @@ function ApiKeyRowSkeleton() {
       <td className="py-3 px-2"><Skeleton className="h-5 w-16" /></td>
       <td className="py-3 px-2"><Skeleton className="h-4 w-20" /></td>
       <td className="py-3 px-2"><Skeleton className="h-4 w-20" /></td>
-      <td className="py-3 px-2"><Skeleton className="h-4 w-24" /></td>
+      {STAT_WINDOWS.map((w) => (
+        <td key={w.key} className="py-3 px-2"><Skeleton className="ml-auto h-4 w-8" /></td>
+      ))}
       <td className="py-3 px-2"><Skeleton className="h-8 w-16" /></td>
     </tr>
   );
@@ -274,18 +276,130 @@ function RelativeDate({ value }: { value: string | null }) {
   return <span title={value ? formatDateTime(value) : undefined}>{formatRelativeDate(value)}</span>;
 }
 
-// available = stats loaded; a missing entry then means no sends in the last 90 days.
-// "—" marks unknown values: not loaded yet, failed, or a window longer than the retention period.
-function SentStats({ stats, available }: { stats?: ApiKeyStats; available: boolean }) {
-  const show = (value: number | null | undefined) => (!available ? '—' : value === null ? '—' : String(value ?? 0));
-  const values = [stats?.last24h, stats?.last7d, stats?.last30d, stats?.last90d].map(show);
+const STAT_WINDOWS = [
+  { key: 'last24h', label: '24h', title: 'Emails sent in the last 24 hours' },
+  { key: 'last7d', label: '7d', title: 'Emails sent in the last 7 days' },
+  { key: 'last30d', label: '30d', title: 'Emails sent in the last 30 days' },
+  { key: 'last90d', label: '90d', title: 'Emails sent in the last 90 days' },
+] as const;
+
+type StatKey = (typeof STAT_WINDOWS)[number]['key'];
+type SortKey = 'name' | 'keyPrefix' | 'access' | 'createdAt' | 'lastUsedAt' | StatKey;
+type SortState = { key: SortKey; dir: 'asc' | 'desc' };
+
+const STAT_UNAVAILABLE =
+  'Not available: stats are loading or failed, or the window is longer than the sent-email retention.';
+
+// A missing entry with loaded stats means no sends in the last 90 days; null means unknown.
+function statValue(stats: ApiKeyStats | undefined, key: StatKey, available: boolean): number | null {
+  if (!available) return null;
+  return stats ? stats[key] : 0;
+}
+
+function accessLabel(apiKey: ApiKey, domains: Domain[]): string {
+  if (apiKey.isAdmin) return 'Admin';
+  return apiKey.domainIds
+    .map((id) => domains.find((d) => d.id === id)?.name ?? '')
+    .sort()
+    .join(', ');
+}
+
+// Missing values (never used, unknown stats) always sort last
+function compareNullable<T>(a: T | null, b: T | null, compare: (x: T, y: T) => number, dir: 1 | -1): number {
+  if (a === null || b === null) return a === b ? 0 : a === null ? 1 : -1;
+  return compare(a, b) * dir;
+}
+
+const byText = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
+const byNumber = (a: number, b: number) => a - b;
+
+function sortApiKeys(
+  keys: ApiKey[],
+  sort: SortState,
+  domains: Domain[],
+  statsByKey: Map<string, ApiKeyStats>,
+  statsAvailable: boolean,
+): ApiKey[] {
+  const dir = sort.dir === 'asc' ? 1 : -1;
+  const compare = (a: ApiKey, b: ApiKey): number => {
+    switch (sort.key) {
+      case 'name':
+        return byText(a.name, b.name) * dir;
+      case 'keyPrefix':
+        return byText(a.keyPrefix, b.keyPrefix) * dir;
+      case 'access':
+        return byText(accessLabel(a, domains), accessLabel(b, domains)) * dir;
+      case 'createdAt':
+        return byText(a.createdAt, b.createdAt) * dir; // ISO 8601 UTC sorts as text
+      case 'lastUsedAt':
+        return compareNullable(a.lastUsedAt, b.lastUsedAt, byText, dir);
+      default:
+        return compareNullable(
+          statValue(statsByKey.get(a.id), sort.key, statsAvailable),
+          statValue(statsByKey.get(b.id), sort.key, statsAvailable),
+          byNumber,
+          dir,
+        );
+    }
+  };
+  // Name breaks ties so equal values keep a stable, readable order
+  return [...keys].sort((a, b) => compare(a, b) || byText(a.name, b.name));
+}
+
+function SortableHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  title,
+  align = 'left',
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort?: SortState;
+  onSort?: (key: SortKey) => void;
+  title?: string;
+  align?: 'left' | 'right';
+}) {
+  const active = sort?.key === sortKey;
+  const Icon = !active ? ArrowUpDown : sort.dir === 'asc' ? ArrowUp : ArrowDown;
   return (
-    <span
-      className="font-mono tabular-nums"
-      title="Emails sent in the last 24 hours / 7 / 30 / 90 days. — means not available (loading, error, or longer than the sent-email retention)."
+    <th
+      className={`py-2 px-2 font-medium ${align === 'right' ? 'text-right' : ''}`}
+      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}
+      title={title}
     >
-      {values.join(' / ')}
-    </span>
+      {onSort ? (
+        <button
+          type="button"
+          onClick={() => onSort(sortKey)}
+          className={`inline-flex items-center gap-1 hover:text-foreground ${active ? 'text-foreground' : ''}`}
+        >
+          {label}
+          <Icon className={`h-3 w-3 ${active ? '' : 'opacity-40'}`} />
+        </button>
+      ) : (
+        label
+      )}
+    </th>
+  );
+}
+
+function ApiKeyTableHeader({ sort, onSort }: { sort?: SortState; onSort?: (key: SortKey) => void }) {
+  return (
+    <thead>
+      <tr className="border-b text-left text-xs text-muted-foreground">
+        <SortableHeader label="Name" sortKey="name" sort={sort} onSort={onSort} />
+        <SortableHeader label="Key" sortKey="keyPrefix" sort={sort} onSort={onSort} />
+        <SortableHeader label="Access" sortKey="access" sort={sort} onSort={onSort} />
+        <SortableHeader label="Created" sortKey="createdAt" sort={sort} onSort={onSort} />
+        <SortableHeader label="Last Used" sortKey="lastUsedAt" sort={sort} onSort={onSort} />
+        {STAT_WINDOWS.map((w) => (
+          <SortableHeader key={w.key} label={`Sent ${w.label}`} sortKey={w.key} sort={sort} onSort={onSort} title={w.title} align="right" />
+        ))}
+        <th className="py-2 px-2 font-medium"></th>
+      </tr>
+    </thead>
   );
 }
 
@@ -411,9 +525,18 @@ function ApiKeyRow({
       <td className="py-3 px-2 text-xs text-muted-foreground">
         <RelativeDate value={apiKey.lastUsedAt} />
       </td>
-      <td className="py-3 px-2 text-xs text-muted-foreground">
-        <SentStats stats={stats} available={statsAvailable} />
-      </td>
+      {STAT_WINDOWS.map((w) => {
+        const value = statValue(stats, w.key, statsAvailable);
+        return (
+          <td
+            key={w.key}
+            className="py-3 px-2 text-right font-mono text-xs tabular-nums text-muted-foreground"
+            title={value === null ? STAT_UNAVAILABLE : w.title}
+          >
+            {value ?? '—'}
+          </td>
+        );
+      })}
       <td className="py-3 px-2">
         {!isRevoked && (
           <Button
@@ -534,21 +657,32 @@ function EmptyApiKeys({ onCreateClick }: { onCreateClick: () => void }) {
   );
 }
 
+// API keys are few; load them all so sorting covers every key, not just one page
+const ALL_KEYS_LIMIT = 1000;
+
 export function ApiKeysPage() {
-  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState<SortState>({ key: 'name', dir: 'asc' });
   const [archivedPage, setArchivedPage] = useState(1);
   const [showRevokedKeys, setShowRevokedKeys] = useState(false);
   const [showArchivedKeys, setShowArchivedKeys] = useState(false);
   const limit = 20;
 
-  const { data, isLoading, error, refetch } = useApiKeys(page, limit);
+  const { data, isLoading, error, refetch } = useApiKeys(1, ALL_KEYS_LIMIT);
   const { data: archivedData, isLoading: archivedLoading } = useRevokedApiKeys(archivedPage, limit);
   const { data: domainsData } = useDomains(1, 100); // Get all domains for selection
   const createMutation = useCreateApiKey();
   const deleteMutation = useDeleteApiKey();
   const renameMutation = useRenameApiKey();
   const { data: statsData, isSuccess: statsAvailable } = useApiKeyStats();
-  const statsByKey = new Map((statsData ?? []).map((s) => [s.apiKeyId, s]));
+  const statsByKey = useMemo(() => new Map((statsData ?? []).map((s) => [s.apiKeyId, s])), [statsData]);
+
+  // Text columns start A→Z; dates and counts start with the newest/highest
+  const handleSort = (key: SortKey) =>
+    setSort((current) =>
+      current.key === key
+        ? { key, dir: current.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: ['name', 'keyPrefix', 'access'].includes(key) ? 'asc' : 'desc' },
+    );
 
   const handleRename = async (id: string, name: string) => {
     try {
@@ -569,11 +703,10 @@ export function ApiKeysPage() {
   const domains = domainsData?.data ?? [];
 
   // Split keys into active and revoked (not yet archived)
-  const activeKeys = allApiKeys.filter(k => !k.revokedAt);
+  const activeKeys = sortApiKeys(allApiKeys.filter(k => !k.revokedAt), sort, domains, statsByKey, statsAvailable);
   const revokedKeys = allApiKeys.filter(k => !!k.revokedAt);
 
   const totalArchivedKeys = archivedData?.total ?? 0;
-  const totalPages = data ? Math.ceil(data.total / limit) : 0;
   const totalArchivedPages = archivedData ? Math.ceil(archivedData.total / limit) : 0;
   const hasKeys = allApiKeys.length > 0;
   const hasRevokedKeys = revokedKeys.length > 0;
@@ -605,22 +738,12 @@ export function ApiKeysPage() {
   };
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-8">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
       {isLoading && (
         <Card>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="py-2 px-2 font-medium">Name</th>
-                  <th className="py-2 px-2 font-medium">Key</th>
-                  <th className="py-2 px-2 font-medium">Access</th>
-                  <th className="py-2 px-2 font-medium">Created</th>
-                  <th className="py-2 px-2 font-medium">Last Used</th>
-                  <th className="py-2 px-2 font-medium" title="Emails sent in the last 24 hours / 7 / 30 / 90 days">Sent 24h / 7d / 30d / 90d</th>
-                  <th className="py-2 px-2 font-medium"></th>
-                </tr>
-              </thead>
+              <ApiKeyTableHeader />
               <tbody>
                 {[...Array(5)].map((_, i) => (
                   <ApiKeyRowSkeleton key={i} />
@@ -659,17 +782,7 @@ export function ApiKeysPage() {
           <Card>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="py-2 px-2 font-medium">Name</th>
-                    <th className="py-2 px-2 font-medium">Key</th>
-                    <th className="py-2 px-2 font-medium">Access</th>
-                    <th className="py-2 px-2 font-medium">Created</th>
-                    <th className="py-2 px-2 font-medium">Last Used</th>
-                    <th className="py-2 px-2 font-medium" title="Emails sent in the last 24 hours / 7 / 30 / 90 days">Sent 24h / 7d / 30d / 90d</th>
-                    <th className="py-2 px-2 font-medium"></th>
-                  </tr>
-                </thead>
+                <ApiKeyTableHeader sort={sort} onSort={handleSort} />
                 <tbody>
                   {activeKeys.map((apiKey) => (
                     <ApiKeyRow
@@ -687,28 +800,10 @@ export function ApiKeysPage() {
             </div>
           </Card>
 
-          {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-              >
-                Previous
-              </Button>
-              <span className="px-2 text-sm text-muted-foreground">
-                {page} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-              >
-                Next
-              </Button>
-            </div>
+          {data && data.total > allApiKeys.length && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Showing the first {allApiKeys.length} of {data.total} keys.
+            </p>
           )}
 
           {/* Revoked Keys Section (not yet archived) */}

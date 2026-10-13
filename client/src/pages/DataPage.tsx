@@ -61,7 +61,7 @@ export function DataPage() {
   };
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-8 space-y-6">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       <h2 className="font-display text-xl font-semibold">Data</h2>
 
       <Card className="p-6">

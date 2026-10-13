@@ -65,7 +65,7 @@ export function DomainsPage() {
   const totalPages = data ? Math.ceil(data.total / limit) : 0;
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-8">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
       {!hasDomains && !isLoading && (
         <section className="mx-auto max-w-md">
           <div className="mb-6">
@@ -94,7 +94,7 @@ export function DomainsPage() {
       )}
 
       {isLoading && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {[...Array(4)].map((_, i) => (
             <DomainCardSkeleton key={i} />
           ))}
@@ -118,7 +118,7 @@ export function DomainsPage() {
             </Button>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {data.data.map((domain) => (
               <DomainCard
                 key={domain.id}
