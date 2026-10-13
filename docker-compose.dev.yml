@@ -11,6 +11,7 @@ services:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=Dev@Password123!
       - MSSQL_PID=Developer
+      - MSSQL_MEMORY_LIMIT_MB=2048
     ports:
       - "17402:1433"
     volumes:
