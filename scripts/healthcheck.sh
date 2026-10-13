@@ -4,7 +4,8 @@
 # Host header accepted by AllowedHosts, so host filtering does not reject the probe.
 
 PORT=$(echo "${ASPNETCORE_URLS:-http://+:17400}" | sed -E 's#^[^;]*:([0-9]+).*$#\1#')
-HOST=$(echo "${AllowedHosts:-*}" | cut -d';' -f1)
+# HEALTHCHECK_HOST overrides this when AllowedHosts comes from a settings file instead of the environment
+HOST=${HEALTHCHECK_HOST:-$(echo "${AllowedHosts:-*}" | cut -d';' -f1)}
 case "$HOST" in
     ""|"*") HOST=localhost ;;
     "*."*) HOST="health${HOST#\*}" ;;

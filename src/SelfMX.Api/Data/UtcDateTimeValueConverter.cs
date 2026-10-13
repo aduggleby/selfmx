@@ -13,8 +13,13 @@ public sealed class UtcDateTimeValueConverter() : ValueConverter<DateTime, DateT
     v => AsUtc(v),
     v => AsUtc(v))
 {
-    private static DateTime AsUtc(DateTime value) =>
-        value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+    // Unspecified values are UTC by convention; Local values (e.g. JSON with an offset) are converted
+    private static DateTime AsUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+    };
 
     public static void Apply(ModelConfigurationBuilder configurationBuilder)
     {

@@ -9,7 +9,8 @@ namespace SelfMX.Api.Settings;
 /// <summary>
 /// Hosting concerns for running behind a reverse proxy in a hardened container:
 /// rolling file logs, persisted DataProtection keys and trusted forwarded headers.
-/// All are opt-in via configuration, so existing installs behave as before.
+/// File logging and proxy trust are opt-in. The container image sets App__DataProtectionKeysPath to
+/// /var/lib/selfmx/keys; mount a volume there so admin sessions survive container recreation.
 /// </summary>
 public static class HostingSetup
 {

@@ -567,6 +567,10 @@ create_directories() {
     mkdir -p "$DATA_DIR/$DB_PROVIDER"
     mkdir -p "$DATA_DIR/backups"
     mkdir -p "$DATA_DIR/logs"
+    # Admin session keys; the app runs as UID 1654 (.NET "app" user)
+    mkdir -p "$DATA_DIR/keys"
+    chown -R 1654:1654 "$DATA_DIR/keys"
+    chmod 700 "$DATA_DIR/keys"
     mkdir -p "$DATA_DIR/caddy/data"
     mkdir -p "$DATA_DIR/caddy/config"
     mkdir -p /var/log/selfmx
@@ -748,6 +752,7 @@ COMPOSE_EOF
       - Cors__Origins__0=https://${SELFMX_DOMAIN}
     volumes:
       - /data/selfmx/logs:/app/logs
+      - /data/selfmx/keys:/var/lib/selfmx/keys
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:17400/health"]
       interval: 30s

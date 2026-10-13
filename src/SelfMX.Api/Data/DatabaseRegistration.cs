@@ -96,7 +96,7 @@ public static class DatabaseRegistration
             db.GetType().Name, initialMigration);
 
         await upgradeLegacySchema();
-        await CompleteLegacySchemaAsync(db, logger, ct);
+        await CompleteLegacySchemaAsync(db, initialMigration, logger, ct);
         await db.Database.ExecuteSqlRawAsync(history.GetCreateIfNotExistsScript(), ct);
         await db.Database.ExecuteSqlRawAsync(
             history.GetInsertScript(new HistoryRow(initialMigration, ProductInfo.GetVersion())), ct);
@@ -108,9 +108,19 @@ public static class DatabaseRegistration
     /// e.g. SentEmails for databases from before sent-email storage). A table that exists but
     /// lacks columns is refused, because recording the baseline would hide the gap.
     /// </summary>
-    private static async Task CompleteLegacySchemaAsync(DbContext db, ILogger logger, CancellationToken ct)
+    private static async Task CompleteLegacySchemaAsync(DbContext db, string initialMigrationId, ILogger logger, CancellationToken ct)
     {
-        var expected = db.Model.GetEntityTypes()
+        // Compare against the initial migration's model, not the current one: only the initial
+        // migration is recorded here, and later migrations still run afterwards.
+        var migrationsAssembly = db.GetService<IMigrationsAssembly>();
+        var initialMigration = migrationsAssembly.CreateMigration(
+            migrationsAssembly.Migrations[initialMigrationId], db.Database.ProviderName!);
+        var targetModel = initialMigration.TargetModel is IMutableModel mutable
+            ? mutable.FinalizeModel()
+            : initialMigration.TargetModel!;
+        targetModel = db.GetService<IModelRuntimeInitializer>().Initialize(targetModel, designTime: true, validationLogger: null);
+
+        var expected = targetModel.GetEntityTypes()
             .Where(e => e.GetTableName() is not null)
             .GroupBy(e => e.GetTableName()!)
             .ToDictionary(
@@ -142,13 +152,12 @@ public static class DatabaseRegistration
             return;
 
         logger.LogWarning("Creating tables missing from the legacy schema: {Tables}", string.Join(", ", missingTables.Order()));
-        var operations = db.GetService<IMigrationsModelDiffer>()
-            .GetDifferences(null, db.GetService<IDesignTimeModel>().Model.GetRelationalModel())
+        var operations = initialMigration.UpOperations
             .Where(op => op is CreateTableOperation create && missingTables.Contains(create.Name)
                       || op is CreateIndexOperation index && missingTables.Contains(index.Table))
             .ToList();
 
-        foreach (var command in db.GetService<IMigrationsSqlGenerator>().Generate(operations, db.Model))
+        foreach (var command in db.GetService<IMigrationsSqlGenerator>().Generate(operations, targetModel))
             await db.Database.ExecuteSqlRawAsync(command.CommandText, ct);
     }
 

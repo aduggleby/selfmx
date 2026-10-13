@@ -89,8 +89,8 @@ public class DataTransferService(
     }
 
     /// <summary>
-    /// Imports into an instance without configuration. Audit logs are merged first (existing IDs
-    /// are skipped, so a failed import can be retried); the configuration follows in one transaction.
+    /// Imports into an instance without domains or API keys, in one transaction across both
+    /// contexts. Audit logs already present (e.g. the admin login on the new instance) are kept.
     /// </summary>
     public async Task<ImportResult> ImportAsync(DataExport data, CancellationToken ct = default)
     {
