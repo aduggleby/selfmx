@@ -20,7 +20,7 @@ This project uses ports in the range **17400-17499**:
 
 ## Build & Test Commands
 
-### Backend (.NET 9)
+### Backend (.NET 10)
 
 ```bash
 dotnet build SelfMX.slnx           # Build solution

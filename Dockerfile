@@ -19,7 +19,7 @@ RUN npm run build
 # ============================================
 # Stage 2: Build Backend
 # ============================================
-FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS backend-build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS backend-build
 
 WORKDIR /src
 
@@ -40,7 +40,7 @@ RUN dotnet publish src/SelfMX.Api/SelfMX.Api.csproj \
 # ============================================
 # Stage 3: Production Runtime
 # ============================================
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS production
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS production
 
 WORKDIR /app
 
