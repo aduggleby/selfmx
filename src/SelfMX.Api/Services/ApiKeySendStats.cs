@@ -6,13 +6,16 @@ using SelfMX.Api.Entities;
 namespace SelfMX.Api.Services;
 
 /// <summary>Emails sent by one API key. A window is null when it is longer than the sent-email retention.</summary>
-public record ApiKeyStatsResponse(string ApiKeyId, int Last24h, int? Last7d, int? Last30d, int? Last90d);
+/// Daily30d: sends per UTC day for the last 30 days, oldest first (today last); null when the
+/// retention is shorter than 30 days.
+public record ApiKeyStatsResponse(string ApiKeyId, int Last24h, int? Last7d, int? Last30d, int? Last90d, int[]? Daily30d);
 
 /// <summary>
 /// Emails sent from one domain (any key or the admin UI) and the active API keys scoped to it.
 /// A window is null when it is longer than the sent-email retention.
 /// </summary>
-public record DomainStatsResponse(string DomainId, int ActiveApiKeys, int Last24h, int? Last7d, int? Last30d, int? Last90d);
+public record DomainStatsResponse(
+    string DomainId, int ActiveApiKeys, int Last24h, int? Last7d, int? Last30d, int? Last90d, int[]? Daily30d);
 
 public static class ApiKeySendStats
 {
@@ -23,10 +26,13 @@ public static class ApiKeySendStats
     public static async Task<ApiKeyStatsResponse[]> GetAsync(
         AppDbContext db, int? retentionDays, DateTime nowUtc, CancellationToken ct = default)
     {
-        var counts = await CountAsync(db.SentEmails.Where(e => e.ApiKeyId != null), e => e.ApiKeyId!, nowUtc, ct);
+        var source = db.SentEmails.Where(e => e.ApiKeyId != null);
+        var counts = await CountAsync(source, e => e.ApiKeyId!, nowUtc, ct);
+        var daily = await DailyAsync(source.Select(e => new KeyedSend { Key = e.ApiKeyId!, SentAt = e.SentAt }), retentionDays, nowUtc, ct);
         return counts
             .Select(c => new ApiKeyStatsResponse(c.Key, c.Last24h,
-                Window(7, c.Last7d, retentionDays), Window(30, c.Last30d, retentionDays), Window(90, c.Last90d, retentionDays)))
+                Window(7, c.Last7d, retentionDays), Window(30, c.Last30d, retentionDays), Window(90, c.Last90d, retentionDays),
+                Series(daily, c.Key, retentionDays)))
             .ToArray();
     }
 
@@ -38,6 +44,7 @@ public static class ApiKeySendStats
         AppDbContext db, int? retentionDays, DateTime nowUtc, CancellationToken ct = default)
     {
         var counts = (await CountAsync(db.SentEmails, e => e.DomainId, nowUtc, ct)).ToDictionary(c => c.Key);
+        var daily = await DailyAsync(db.SentEmails.Select(e => new KeyedSend { Key = e.DomainId, SentAt = e.SentAt }), retentionDays, nowUtc, ct);
         var activeKeys = await db.ApiKeyDomains
             .Where(x => x.ApiKey.RevokedAt == null)
             .GroupBy(x => x.DomainId)
@@ -50,10 +57,48 @@ public static class ApiKeySendStats
                 counts.TryGetValue(id, out var c);
                 return new DomainStatsResponse(id, activeKeys.GetValueOrDefault(id), c?.Last24h ?? 0,
                     Window(7, c?.Last7d ?? 0, retentionDays), Window(30, c?.Last30d ?? 0, retentionDays),
-                    Window(90, c?.Last90d ?? 0, retentionDays));
+                    Window(90, c?.Last90d ?? 0, retentionDays), Series(daily, id, retentionDays));
             })
             .ToArray();
     }
+
+    private sealed class KeyedSend
+    {
+        public required string Key { get; init; }
+        public DateTime SentAt { get; init; }
+    }
+
+    private const int DailyDays = 30;
+
+    /// <summary>Sends per key per UTC calendar day over the last 30 days (today included), one grouped query.</summary>
+    private static async Task<Dictionary<string, int[]>?> DailyAsync(
+        IQueryable<KeyedSend> source, int? retentionDays, DateTime nowUtc, CancellationToken ct)
+    {
+        if (retentionDays is > 0 && retentionDays < DailyDays)
+            return null;
+
+        var firstDay = nowUtc.Date.AddDays(-(DailyDays - 1));
+        var rows = await source
+            .AsNoTracking()
+            .Where(x => x.SentAt >= firstDay)
+            .GroupBy(x => new { x.Key, Day = x.SentAt.Date })
+            .Select(g => new { g.Key.Key, g.Key.Day, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var result = new Dictionary<string, int[]>();
+        foreach (var row in rows)
+        {
+            var index = (int)(DateTime.SpecifyKind(row.Day, DateTimeKind.Utc) - firstDay).TotalDays;
+            if (index is < 0 or >= DailyDays) continue;
+            if (!result.TryGetValue(row.Key, out var series))
+                result[row.Key] = series = new int[DailyDays];
+            series[index] += row.Count;
+        }
+        return result;
+    }
+
+    private static int[]? Series(Dictionary<string, int[]>? daily, string key, int? retentionDays) =>
+        daily is null ? null : daily.TryGetValue(key, out var series) ? series : new int[DailyDays];
 
     private sealed record WindowCounts(string Key, int Last24h, int Last7d, int Last30d, int Last90d);
 

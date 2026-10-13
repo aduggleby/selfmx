@@ -187,7 +187,8 @@ public class DatabaseMigrationIntegrationTests
             : await TestDatabase.CreateSqlServerAsync(server!);
         await MigrateAsync(provider, db.ConnectionString);
 
-        var now = DateTime.UtcNow;
+        // Noon UTC keeps the seeded sends on fixed calendar days regardless of when the test runs
+        var now = DateTime.UtcNow.Date.AddHours(12);
         await using (var app = CreateAppDb(provider, db.ConnectionString))
         {
             app.Domains.Add(new Domain { Id = "d1", Name = "a.example", Status = DomainStatus.Verified });
@@ -211,18 +212,25 @@ public class DatabaseMigrationIntegrationTests
 
         await using (var app = CreateAppDb(provider, db.ConnectionString))
         {
+            // Daily series, oldest first: today (-1h) is the last day, yesterday (-30h) the one before,
+            // -10 days is index 19; -60 and -100 days are outside the 30 days
+            var keyDaily = new int[30];
+            keyDaily[29] = 1; keyDaily[28] = 1; keyDaily[19] = 1;
             (await ApiKeySendStats.GetAsync(app, retentionDays: null, now))
-                .Should().Equal(new ApiKeyStatsResponse("k1", 1, 2, 3, 4));
+                .Should().BeEquivalentTo(new[] { new ApiKeyStatsResponse("k1", 1, 2, 3, 4, keyDaily) });
             (await ApiKeySendStats.GetAsync(app, retentionDays: 30, now))
-                .Should().Equal(new ApiKeyStatsResponse("k1", 1, 2, 3, null));
+                .Should().BeEquivalentTo(new[] { new ApiKeyStatsResponse("k1", 1, 2, 3, null, keyDaily) });
+            (await ApiKeySendStats.GetAsync(app, retentionDays: 14, now))
+                .Should().ContainSingle().Which.Daily30d.Should().BeNull("a 14-day retention cannot fill 30 days");
 
             // Domain d1: the five keyed sends plus one admin-UI send; one active key (k2 is revoked).
             // Domain d2: no sends, still listed for its active key.
             (await ApiKeySendStats.GetForDomainsAsync(app, retentionDays: null, now))
                 .Should().BeEquivalentTo(new[]
                 {
-                    new DomainStatsResponse("d1", ActiveApiKeys: 1, Last24h: 2, Last7d: 3, Last30d: 4, Last90d: 5),
-                    new DomainStatsResponse("d2", ActiveApiKeys: 1, Last24h: 0, Last7d: 0, Last30d: 0, Last90d: 0)
+                    new DomainStatsResponse("d1", ActiveApiKeys: 1, Last24h: 2, Last7d: 3, Last30d: 4, Last90d: 5,
+                        Daily30d: keyDaily.Select((n, day) => day == 29 ? n + 1 : n).ToArray()), // + the admin-UI send today
+                    new DomainStatsResponse("d2", ActiveApiKeys: 1, Last24h: 0, Last7d: 0, Last30d: 0, Last90d: 0, Daily30d: new int[30])
                 });
         }
     }

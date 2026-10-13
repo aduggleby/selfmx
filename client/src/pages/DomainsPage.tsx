@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useDomains, useCreateDomain, useDomainStats } from '@/hooks/useDomains';
 import { DomainStatusBadge } from '@/components/DomainStatusBadge';
 import { SortableHeader } from '@/components/SortableHeader';
+import { Sparkline } from '@/components/Sparkline';
 import { formatDateTime } from '@/lib/date';
 import { byNumber, byText, compareNullable, nextSort, type SortState } from '@/lib/sort';
 import type { Domain, DomainStats } from '@/lib/schemas';
@@ -81,6 +82,7 @@ function DomainTableHeader({
           title="Non-revoked API keys scoped to this domain (admin keys can use every domain and are not counted)"
           align="right"
         />
+        <th className="py-2 px-2 font-medium" title="Emails sent per day over the last 30 days (UTC days)">Last 30 days</th>
         {STAT_WINDOWS.map((w) => (
           <SortableHeader key={w.key} label={`Sent ${w.label}`} sortKey={w.key} sort={sort} onSort={onSort} title={w.title} align="right" />
         ))}
@@ -117,6 +119,9 @@ function DomainRow({ domain, stats, statsAvailable }: { domain: Domain; stats?: 
       <td className={numberCell} title={activeKeys === null ? STAT_UNAVAILABLE : 'Non-revoked API keys scoped to this domain'}>
         {activeKeys ?? '—'}
       </td>
+      <td className="py-3 px-2">
+        <Sparkline values={statsAvailable ? (stats ? stats.daily30d : new Array(30).fill(0)) : null} />
+      </td>
       {STAT_WINDOWS.map((w) => {
         const value = statValue(stats, w.key, statsAvailable);
         return (
@@ -152,8 +157,10 @@ function DomainRowSkeleton() {
       <td className="py-3 px-2"><Skeleton className="h-4 w-32" /></td>
       <td className="py-3 px-2"><Skeleton className="h-4 w-32" /></td>
       <td className="py-3 px-2"><Skeleton className="h-4 w-32" /></td>
-      {[...Array(1 + STAT_WINDOWS.length)].map((_, i) => (
-        <td key={i} className="py-3 px-2"><Skeleton className="ml-auto h-4 w-8" /></td>
+      <td className="py-3 px-2"><Skeleton className="ml-auto h-4 w-8" /></td>
+      <td className="py-3 px-2"><Skeleton className="h-5 w-[119px]" /></td>
+      {STAT_WINDOWS.map((w) => (
+        <td key={w.key} className="py-3 px-2"><Skeleton className="ml-auto h-4 w-8" /></td>
       ))}
       <td className="py-3 px-2"><Skeleton className="h-4 w-24" /></td>
       <td className="py-3 px-2"><Skeleton className="ml-auto h-4 w-12" /></td>

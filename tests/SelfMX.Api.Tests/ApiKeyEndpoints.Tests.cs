@@ -88,7 +88,9 @@ public class ApiKeyEndpointsTests : IClassFixture<SelfMxTestFactory>
         var stats = await AdminClient(admin).GetFromJsonAsync<ApiKeyStatsResponse[]>("/api-keys/stats");
 
         stats.Should().ContainSingle(s => s.ApiKeyId == keyId)
-            .Which.Should().Be(new ApiKeyStatsResponse(keyId, Last24h: 1, Last7d: 2, Last30d: 3, Last90d: 4));
+            .Which.Should().BeEquivalentTo(
+                new ApiKeyStatsResponse(keyId, Last24h: 1, Last7d: 2, Last30d: 3, Last90d: 4, Daily30d: null),
+                o => o.Excluding(s => s.Daily30d)); // daily buckets are checked against real databases
     }
 
     private HttpClient AdminClient(string adminKey)

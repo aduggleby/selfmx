@@ -73,6 +73,8 @@ export const ApiKeyStatsSchema = z.object({
   last7d: z.number().nullable(),
   last30d: z.number().nullable(),
   last90d: z.number().nullable(),
+  // Sends per UTC day for the last 30 days, oldest first; null when retention is shorter
+  daily30d: z.array(z.number()).nullable(),
 });
 export type ApiKeyStats = z.infer<typeof ApiKeyStatsSchema>;
 export const ApiKeyStatsListSchema = z.array(ApiKeyStatsSchema);

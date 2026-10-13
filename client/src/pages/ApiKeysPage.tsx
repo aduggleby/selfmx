@@ -11,6 +11,7 @@ import type { ApiKey, ApiKeyCreated, ApiKeyStats, Domain, RevokedApiKey } from '
 import { formatDateTime } from '@/lib/date';
 import { byNumber, byText, compareNullable, nextSort, type SortState as SortStateOf } from '@/lib/sort';
 import { SortableHeader } from '@/components/SortableHeader';
+import { Sparkline } from '@/components/Sparkline';
 import { STAT_UNAVAILABLE, STAT_WINDOWS, statValue, type StatKey } from '@/lib/sendStats';
 
 interface CreateApiKeyModalProps {
@@ -40,6 +41,7 @@ function ApiKeyRowSkeleton() {
       <td className="py-3 px-2"><Skeleton className="h-5 w-16" /></td>
       <td className="py-3 px-2"><Skeleton className="h-4 w-20" /></td>
       <td className="py-3 px-2"><Skeleton className="h-4 w-20" /></td>
+      <td className="py-3 px-2"><Skeleton className="h-5 w-[119px]" /></td>
       {STAT_WINDOWS.map((w) => (
         <td key={w.key} className="py-3 px-2"><Skeleton className="ml-auto h-4 w-8" /></td>
       ))}
@@ -332,6 +334,7 @@ function ApiKeyTableHeader({ sort, onSort }: { sort?: SortState; onSort?: (key: 
         <SortableHeader label="Access" sortKey="access" sort={sort} onSort={onSort} />
         <SortableHeader label="Created" sortKey="createdAt" sort={sort} onSort={onSort} />
         <SortableHeader label="Last Used" sortKey="lastUsedAt" sort={sort} onSort={onSort} />
+        <th className="py-2 px-2 font-medium" title="Emails sent per day over the last 30 days (UTC days)">Last 30 days</th>
         {STAT_WINDOWS.map((w) => (
           <SortableHeader key={w.key} label={`Sent ${w.label}`} sortKey={w.key} sort={sort} onSort={onSort} title={w.title} align="right" />
         ))}
@@ -462,6 +465,9 @@ function ApiKeyRow({
       </td>
       <td className="py-3 px-2 text-xs text-muted-foreground">
         <RelativeDate value={apiKey.lastUsedAt} />
+      </td>
+      <td className="py-3 px-2">
+        <Sparkline values={statsAvailable ? (stats ? stats.daily30d : new Array(30).fill(0)) : null} />
       </td>
       {STAT_WINDOWS.map((w) => {
         const value = statValue(stats, w.key, statsAvailable);
