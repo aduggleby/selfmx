@@ -4,7 +4,8 @@ using Microsoft.Data.SqlClient;
 namespace SelfMX.Api.Data;
 
 /// <summary>
-/// Handles schema updates for SQL Server databases.
+/// Legacy schema upgrades for SQL Server databases created before EF migrations.
+/// Only used once, when such a database is adopted into the migration history.
 /// EnsureCreatedAsync only creates tables if they don't exist, but doesn't add new columns.
 /// This class detects and applies schema changes for SQL Server.
 /// </summary>

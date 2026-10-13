@@ -36,10 +36,10 @@ public class AuditService : IHostedService
             ResourceType = entry.ResourceType,
             ResourceId = entry.ResourceId,
             StatusCode = entry.StatusCode,
-            ErrorMessage = entry.ErrorMessage,
-            Details = entry.Details is not null ? JsonSerializer.Serialize(entry.Details) : null,
+            ErrorMessage = Truncate(entry.ErrorMessage, 500),
+            Details = Truncate(entry.Details is not null ? JsonSerializer.Serialize(entry.Details) : null, AuditLog.MaxDetailsLength),
             IpAddress = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString(),
-            UserAgent = _httpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString()
+            UserAgent = Truncate(_httpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString(), 500)
         };
 
         // TryWrite returns false if channel full - log warning but don't block
@@ -166,4 +166,8 @@ public class AuditService : IHostedService
 
         return (items, total);
     }
+
+    // Column limits are enforced by the database; truncate instead of failing the write
+    private static string? Truncate(string? value, int maxLength) =>
+        value is null || value.Length <= maxLength ? value : value[..maxLength];
 }

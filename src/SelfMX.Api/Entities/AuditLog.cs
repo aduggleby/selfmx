@@ -2,6 +2,8 @@ namespace SelfMX.Api.Entities;
 
 public class AuditLog
 {
+    public const int MaxDetailsLength = 4000;
+
     public required string Id { get; set; }
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public required string Action { get; set; }       // "email.send", "api_key.create", etc.

@@ -109,13 +109,16 @@ Why: Postgres is the prod1 standard (about 200–300 MB versus at least 2 GB for
 What: replace `EnsureCreated` + `SchemaUpdater` with real migrations.
 Why: two providers × hand-written DDL won't scale, and the baseline is needed for the TrueNAS upgrade.
 
-- Layout: separate migration projects `src/SelfMX.Migrations.Postgres` and
-  `src/SelfMX.Migrations.SqlServer`, wired with `MigrationsAssembly(...)` (the
-  EF "Migrations with Multiple Providers" pattern). Each has an
-  `IDesignTimeDbContextFactory` for both contexts.
-- Initial migration per provider and per context (`AppDbContext`, `AuditDbContext`)
-  that matches the current schema exactly, including `RevokedApiKeys`,
-  `LastCheckedAt`, and `AuditLogs.ResourceId(100)`.
+- Layout (**changed during implementation**): instead of separate migration projects, one provider
+  subclass per context (`PostgresAppDbContext`, `SqlServerAuditDbContext`, …) owns its migrations in
+  `src/SelfMX.Api/Data/Migrations/<Provider>/<App|Audit>`. EF binds migrations to the context type, so
+  the sets cannot mix, and there is no project-reference cycle. Each has an `IDesignTimeDbContextFactory`.
+- Initial migration per provider and per context that matches the current production schema exactly,
+  including `RevokedApiKeys`, `LastCheckedAt`, and `AuditLogs.ResourceId(100)`. The audit model was
+  aligned with the hand-written SQL Server DDL (`ActorId` 50, `Details` 4000, descending `Timestamp`
+  index); audit fields are truncated to their column limits on write.
+- Adoption guard: before recording the baseline, every model column must exist, otherwise startup
+  fails without changing anything (covers e.g. databases created before `SentEmails` existed).
 - **Baseline on startup (MSSQL only):** if `__EFMigrationsHistory` is missing
   but `Domains` exists, check that the live schema matches what the
   initial migration expects (run the existing `SchemaUpdater` steps one final
@@ -180,7 +183,9 @@ The following are deliberately left out. **Re-read the current prod1 docs and
 `DualConsultInfrastructure` before planning them**, because the platform is changing quickly:
 
 - Releasing, and upgrading TrueNAS (SQL Server, recent version) to the release
-  with export (the baseline in Phase B makes this safe).
+  with export. Before upgrading: take a `.bak`, and compare TrueNAS's `INFORMATION_SCHEMA.COLUMNS`
+  with a freshly migrated database (read-only). If adoption's guard refuses, nothing has changed
+  and the previous image still works.
 - `scripts/new-app.sh selfmx selfmx.dualconsult.net`, deploy, backups, restore drill.
 - Cutover: TrueNAS is reached through a **direct A record + port forward**. Lower the TTL,
   freeze key changes, export → import, repoint the A record to prod1, remove the port forward,

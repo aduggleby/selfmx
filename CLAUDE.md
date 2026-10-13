@@ -27,6 +27,11 @@ This project uses ports in the range **17400-17499**:
 dotnet build SelfMX.slnx           # Build solution
 dotnet test SelfMX.slnx            # Run all tests (XUnit)
 dotnet test --filter "FullyQualifiedName~DomainService"  # Run specific test class
+
+# Migration tests against real servers (skipped unless set; dev compose containers work)
+SELFMX_TEST_POSTGRES="Host=localhost;Port=17403;Username=selfmx;Password=Dev@Password123!" \
+SELFMX_TEST_SQLSERVER="Server=localhost,17402;User Id=sa;Password=Dev@Password123!;TrustServerCertificate=True" \
+  dotnet test --filter "FullyQualifiedName~DatabaseMigration"
 dotnet run --project src/SelfMX.Api  # Run API (port 17400)
 ```
 
@@ -93,7 +98,33 @@ src/SelfMX.Api/
 - Routes use `TypedResults` for compile-time response type safety
 - Domain verification state machine: Pending → Verifying → Verified/Failed
 - DNS records stored as JSON in Domain entity
-- PostgreSQL (default) or SQL Server - single connection string for all components; schema is created automatically at startup
+- PostgreSQL (default) or SQL Server - single connection string for all components; EF Core migrations are applied automatically at startup
+
+### Database Migrations
+
+Each provider has its own migration set, owned by a provider-specific subclass of each context
+(`Data/ProviderContexts.cs`): `PostgresAppDbContext`, `PostgresAuditDbContext`,
+`SqlServerAppDbContext`, `SqlServerAuditDbContext`. The app only uses `AppDbContext`/`AuditDbContext`.
+Both contexts share one database, so the audit context uses the history table `__EFMigrationsHistory_Audit`.
+
+After changing the model, add a migration for **all four** contexts (the `DatabaseMigrationModelTests` fail otherwise):
+
+```bash
+for pair in "PostgresAppDbContext Postgres/App" "PostgresAuditDbContext Postgres/Audit" \
+            "SqlServerAppDbContext SqlServer/App" "SqlServerAuditDbContext SqlServer/Audit"; do
+  set -- $pair
+  dotnet ef migrations add <Name> --project src/SelfMX.Api --context $1 \
+    --output-dir Data/Migrations/$2 --namespace SelfMX.Api.Data.Migrations.$(echo $2 | tr / .)
+done
+```
+
+EF may write the `*ModelSnapshot.cs` files under `src/SelfMX.Api/SelfMX/Api/...` (derived from the
+namespace); move them next to their migrations.
+
+SQL Server databases created before migrations existed are adopted at startup: `SchemaUpdater` brings
+them to the last pre-migration schema, a guard checks every model column exists, and the initial
+migration is recorded without touching data (`DatabaseRegistration.MigrateAsync`). Tests use SQLite with
+`EnsureCreated` and have no migrations.
 
 ### Database Configuration
 

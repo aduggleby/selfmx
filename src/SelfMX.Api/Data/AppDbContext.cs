@@ -9,6 +9,11 @@ public class AppDbContext : DbContext
     {
     }
 
+    // Used by the provider-specific subclasses that own the migrations
+    protected AppDbContext(DbContextOptions options) : base(options)
+    {
+    }
+
     public DbSet<Domain> Domains => Set<Domain>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<ApiKeyDomain> ApiKeyDomains => Set<ApiKeyDomain>();

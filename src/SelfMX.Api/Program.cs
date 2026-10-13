@@ -254,7 +254,7 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 
-// Auto-migrate on startup
+// Apply EF Core migrations on startup (adopts pre-migration databases first)
 if (!app.Environment.IsEnvironment("Test"))
 {
     using var scope = app.Services.CreateScope();
@@ -263,15 +263,10 @@ if (!app.Environment.IsEnvironment("Test"))
 
     startupLogger.LogInformation("Database provider: {Provider}", databaseProvider);
 
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await DatabaseRegistration.EnsureTablesAsync(db);
-    // Apply schema updates for SQL Server (table creation doesn't add new columns)
-    await SchemaUpdater.UpdateAppSchemaAsync(db, startupLogger);
-
-    var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
-    await DatabaseRegistration.EnsureTablesAsync(auditDb);
-    // Apply schema updates for audit database
-    await SchemaUpdater.UpdateAuditSchemaAsync(auditDb, startupLogger);
+    await DatabaseRegistration.MigrateAsync(
+        scope.ServiceProvider.GetRequiredService<AppDbContext>(),
+        scope.ServiceProvider.GetRequiredService<AuditDbContext>(),
+        startupLogger);
 }
 
 app.UseCors();
