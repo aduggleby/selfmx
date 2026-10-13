@@ -20,8 +20,12 @@ public class DomainService
     public async Task<Domain?> GetByIdAsync(string id, CancellationToken ct = default) =>
         await _db.Domains.FindAsync([id], ct);
 
-    public async Task<Domain?> GetByNameAsync(string name, CancellationToken ct = default) =>
-        await _db.Domains.FirstOrDefaultAsync(d => d.Name == name, ct);
+    // Names are stored lowercase; normalise here because PostgreSQL compares case-sensitively
+    public async Task<Domain?> GetByNameAsync(string name, CancellationToken ct = default)
+    {
+        var normalized = name.ToLowerInvariant();
+        return await _db.Domains.FirstOrDefaultAsync(d => d.Name == normalized, ct);
+    }
 
     public async Task<(Domain[] Items, int Total)> ListAsync(int page, int limit, CancellationToken ct = default)
     {

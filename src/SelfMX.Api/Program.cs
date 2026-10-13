@@ -8,6 +8,7 @@ using Amazon.SimpleEmailV2.Model;
 using Hangfire;
 using Hangfire.Console;
 using Hangfire.Dashboard;
+using Hangfire.PostgreSql;
 using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -42,18 +43,15 @@ builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("App"))
 builder.Services.Configure<AwsSettings>(builder.Configuration.GetSection("Aws"));
 builder.Services.Configure<CloudflareSettings>(builder.Configuration.GetSection("Cloudflare"));
 
-// SQL Server database configuration
+// Database configuration: PostgreSQL (default) or SQL Server; SQLite for the Test environment
 var useSqlite = builder.Environment.IsEnvironment("Test");
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-
+var databaseProvider = DatabaseProviderResolver.Resolve(builder.Configuration["Database:Provider"], connectionString);
 if (useSqlite)
 {
-    if (string.IsNullOrWhiteSpace(connectionString) ||
-        connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase))
-    {
-        connectionString = builder.Configuration["Test:SqliteConnectionString"]
-            ?? "Data Source=SelfMxTestDb;Mode=Memory;Cache=Shared";
-    }
+    // Tests always run on in-memory SQLite, never on the configured server database
+    connectionString = builder.Configuration["Test:SqliteConnectionString"]
+        ?? "Data Source=SelfMxTestDb;Mode=Memory;Cache=Shared";
 }
 else if (string.IsNullOrWhiteSpace(connectionString))
 {
@@ -70,43 +68,47 @@ if (useSqlite)
 }
 else
 {
-    builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlServer(connectionString, sql =>
-        {
-            sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
-            sql.CommandTimeout(30);
-        }));
-
-    builder.Services.AddDbContext<AuditDbContext>(options =>
-        options.UseSqlServer(connectionString, sql =>
-        {
-            sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(30), errorNumbersToAdd: null);
-            sql.CommandTimeout(30);
-        }));
+    builder.Services.AddSelfMxDatabase(databaseProvider, connectionString);
 }
 
 var enableHangfire = !builder.Environment.IsEnvironment("Test");
 
-// Hangfire with SQL Server and Console logging
+// Hangfire on the same database as the app, with Console logging
 if (enableHangfire)
 {
-    builder.Services.AddHangfire(config => config
-        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-        .UseSimpleAssemblyNameTypeSerializer()
-        .UseRecommendedSerializerSettings()
-        .UseSqlServerStorage(connectionString, new SqlServerStorageOptions
-        {
-            CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
-            SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
-            QueuePollInterval = TimeSpan.Zero,
-            UseRecommendedIsolationLevel = true,
-            DisableGlobalLocks = true
-        })
-        .UseConsole());
+    builder.Services.AddHangfire(config =>
+    {
+        config
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UseConsole();
 
+        if (databaseProvider == DatabaseProvider.Postgres)
+        {
+            config.UsePostgreSqlStorage(
+                pg => pg.UseNpgsqlConnection(connectionString),
+                new PostgreSqlStorageOptions { SchemaName = "hangfire" });
+        }
+        else
+        {
+            config.UseSqlServerStorage(connectionString, new SqlServerStorageOptions
+            {
+                CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
+                SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
+                QueuePollInterval = TimeSpan.Zero,
+                UseRecommendedIsolationLevel = true,
+                DisableGlobalLocks = true
+            });
+        }
+    });
+
+    var configuredWorkers = builder.Configuration.GetValue<int?>("App:HangfireWorkers");
     builder.Services.AddHangfireServer(options =>
     {
-        options.WorkerCount = Math.Min(Environment.ProcessorCount * 2, 20); // Cap at 20 workers
+        options.WorkerCount = configuredWorkers is > 0
+            ? configuredWorkers.Value
+            : Math.Min(Environment.ProcessorCount * 2, 20); // Default: 2 per core, capped at 20
         options.Queues = ["default"];
     });
 }
@@ -259,13 +261,15 @@ if (!app.Environment.IsEnvironment("Test"))
     var startupLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>()
         .CreateLogger("Startup");
 
+    startupLogger.LogInformation("Database provider: {Provider}", databaseProvider);
+
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.EnsureCreatedAsync();
-    // Apply schema updates for SQL Server (EnsureCreated doesn't add new columns)
+    await DatabaseRegistration.EnsureTablesAsync(db);
+    // Apply schema updates for SQL Server (table creation doesn't add new columns)
     await SchemaUpdater.UpdateAppSchemaAsync(db, startupLogger);
 
     var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
-    await auditDb.Database.EnsureCreatedAsync();
+    await DatabaseRegistration.EnsureTablesAsync(auditDb);
     // Apply schema updates for audit database
     await SchemaUpdater.UpdateAuditSchemaAsync(auditDb, startupLogger);
 }
@@ -358,6 +362,7 @@ app.MapGet("/system/status", async (
     {
         healthy = issues.Count == 0,
         issues = issues.ToArray(),
+        database = useSqlite ? "sqlite" : databaseProvider.ToString().ToLowerInvariant(),
         timestamp = DateTime.UtcNow
     });
 });

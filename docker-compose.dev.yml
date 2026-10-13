@@ -1,12 +1,29 @@
-# Development SQL Server for local SelfMX development
-# Usage: docker compose -f docker-compose.dev.yml up -d
-
-version: '3.8'
+# Development databases for local SelfMX development
+# PostgreSQL (default):  docker compose -f docker-compose.dev.yml up -d
+# SQL Server (optional): docker compose -f docker-compose.dev.yml --profile sqlserver up -d sqlserver
 
 services:
+  postgres:
+    image: postgres:17
+    container_name: selfmx-postgres-dev
+    environment:
+      - POSTGRES_USER=selfmx
+      - POSTGRES_PASSWORD=Dev@Password123!
+      - POSTGRES_DB=selfmx_dev
+    ports:
+      - "17403:5432"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U selfmx -d selfmx_dev
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: selfmx-sqlserver-dev
+    profiles: ["sqlserver"]
     environment:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=Dev@Password123!
@@ -24,4 +41,5 @@ services:
       start_period: 30s
 
 volumes:
+  postgres-dev-data:
   sqlserver-dev-data:

@@ -57,6 +57,17 @@ public class DomainServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GetByNameAsync_MatchesRegardlessOfCase()
+    {
+        var created = await _service.CreateAsync("example.com");
+
+        var found = await _service.GetByNameAsync("Example.COM");
+
+        found.Should().NotBeNull();
+        found!.Id.Should().Be(created.Id);
+    }
+
+    [Fact]
     public async Task GetByIdAsync_ReturnsExistingDomain()
     {
         var created = await _service.CreateAsync("example.com");
