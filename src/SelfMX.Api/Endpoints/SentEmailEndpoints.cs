@@ -29,6 +29,8 @@ public static class SentEmailEndpoints
         string? domainId = null,
         DateTime? from = null,
         DateTime? to = null,
+        string? fromAddress = null,
+        string? toAddress = null,
         string? cursor = null,
         int pageSize = 50,
         CancellationToken ct = default)
@@ -58,6 +60,18 @@ public static class SentEmailEndpoints
             query = query.Where(e => e.SentAt >= from.Value);
         if (to.HasValue)
             query = query.Where(e => e.SentAt <= to.Value);
+
+        // Address filters: case-insensitive "contains" (ToAddresses is a JSON array, so any recipient matches)
+        if (!string.IsNullOrWhiteSpace(fromAddress))
+        {
+            var term = fromAddress.Trim().ToLowerInvariant();
+            query = query.Where(e => e.FromAddress.ToLower().Contains(term));
+        }
+        if (!string.IsNullOrWhiteSpace(toAddress))
+        {
+            var term = toAddress.Trim().ToLowerInvariant();
+            query = query.Where(e => e.ToAddresses.ToLower().Contains(term));
+        }
 
         // Keyset pagination
         if (!string.IsNullOrEmpty(cursor))

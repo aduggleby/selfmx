@@ -337,9 +337,51 @@ interface FiltersBarProps {
   onClear: () => void;
 }
 
+function hasActiveFilters(filters: SentEmailFilters): boolean {
+  return !!(filters.domainId || filters.from || filters.to || filters.fromAddress || filters.toAddress);
+}
+
+// Applies the typed value after a short pause so each keystroke doesn't trigger a request
+function AddressFilterInput({
+  placeholder,
+  value,
+  onChange,
+}: {
+  placeholder: string;
+  value?: string;
+  onChange: (value: string | undefined) => void;
+}) {
+  const [text, setText] = useState(value ?? '');
+  const [syncedValue, setSyncedValue] = useState(value);
+
+  // Follow outside changes (e.g. "Clear") without an effect
+  if (value !== syncedValue) {
+    setSyncedValue(value);
+    setText(value ?? '');
+  }
+
+  useEffect(() => {
+    const trimmed = text.trim();
+    if (trimmed === (value ?? '')) return;
+    const timer = setTimeout(() => onChange(trimmed || undefined), 300);
+    return () => clearTimeout(timer);
+  }, [text, value, onChange]);
+
+  return (
+    <Input
+      type="text"
+      placeholder={placeholder}
+      aria-label={placeholder}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      className="h-9 w-48"
+    />
+  );
+}
+
 function FiltersBar({ filters, domains, onFilterChange, onClear }: FiltersBarProps) {
   const verifiedDomains = domains.filter((d) => d.status === 'verified');
-  const hasFilters = !!(filters.domainId || filters.from || filters.to);
+  const hasFilters = hasActiveFilters(filters);
 
   const datePresets = [
     { label: 'Today', days: 0 },
@@ -347,13 +389,14 @@ function FiltersBar({ filters, domains, onFilterChange, onClear }: FiltersBarPro
     { label: '30 days', days: 30 },
   ];
 
-  const handlePreset = (days: number) => {
-    const now = new Date();
-    const to = now.toISOString().split('T')[0];
-    const fromDate = new Date(now.getTime() - days * 86400000);
-    const from = fromDate.toISOString().split('T')[0];
-    onFilterChange({ from, to });
+  // From local midnight `days` ago until now (no upper bound, so today's sends are included)
+  const presetStart = (days: number) => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - days);
+    return start.toISOString();
   };
+  const activePreset = datePresets.find((p) => filters.from === presetStart(p.days) && !filters.to)?.label;
 
   return (
     <div className="flex flex-wrap gap-2 mb-4">
@@ -373,29 +416,26 @@ function FiltersBar({ filters, domains, onFilterChange, onClear }: FiltersBarPro
         <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
       </div>
 
-      <Input
-        type="text"
+      <AddressFilterInput
         placeholder="From address"
-        value={filters.from || ''}
-        onChange={(e) => onFilterChange({ from: e.target.value || undefined })}
-        className="h-9 w-40"
+        value={filters.fromAddress}
+        onChange={(fromAddress) => onFilterChange({ fromAddress })}
       />
 
-      <Input
-        type="text"
+      <AddressFilterInput
         placeholder="To address"
-        value={filters.to || ''}
-        onChange={(e) => onFilterChange({ to: e.target.value || undefined })}
-        className="h-9 w-40"
+        value={filters.toAddress}
+        onChange={(toAddress) => onFilterChange({ toAddress })}
       />
 
       <div className="flex gap-1" role="group" aria-label="Date presets">
         {datePresets.map(({ label, days }) => (
           <Button
             key={label}
-            variant="outline"
+            variant={activePreset === label ? 'default' : 'outline'}
             size="sm"
-            onClick={() => handlePreset(days)}
+            onClick={() => onFilterChange({ from: presetStart(days), to: undefined })}
+            aria-pressed={activePreset === label}
             className="h-9"
           >
             {label}
@@ -428,6 +468,8 @@ export function SentEmailsPage() {
     domainId: searchParams.get('domainId') || undefined,
     from: searchParams.get('from') || undefined,
     to: searchParams.get('to') || undefined,
+    fromAddress: searchParams.get('fromAddress') || undefined,
+    toAddress: searchParams.get('toAddress') || undefined,
     pageSize: 50,
   }), [searchParams]);
 
@@ -460,7 +502,7 @@ export function SentEmailsPage() {
   const emails = data?.pages.flatMap((page) => page.data) ?? [];
   const domains = domainsData?.data ?? [];
   const hasEmails = emails.length > 0;
-  const hasFiltersApplied = !!(filters.domainId || filters.from || filters.to);
+  const hasFiltersApplied = hasActiveFilters(filters);
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-8">

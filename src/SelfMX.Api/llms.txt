@@ -273,6 +273,8 @@ Sent Emails (SelfMX admin visibility; auth required; token-scoped)
     - domainId (string?, optional)
     - from (string? ISO date-time, optional)
     - to (string? ISO date-time, optional)
+    - fromAddress (string?, optional; sender contains, case-insensitive)
+    - toAddress (string?, optional; any recipient contains, case-insensitive)
     - cursor (string?, optional; opaque base64 cursor)
     - pageSize (int, default 50; clamp 1..100)
   - Authorization rules:

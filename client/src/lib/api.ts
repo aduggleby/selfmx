@@ -348,6 +348,8 @@ class ApiClient {
     domainId?: string;
     from?: string;
     to?: string;
+    fromAddress?: string;
+    toAddress?: string;
     cursor?: string;
     pageSize?: number;
   } = {}): Promise<CursorPagedSentEmails> {
@@ -355,6 +357,8 @@ class ApiClient {
     if (params.domainId) searchParams.set('domainId', params.domainId);
     if (params.from) searchParams.set('from', params.from);
     if (params.to) searchParams.set('to', params.to);
+    if (params.fromAddress) searchParams.set('fromAddress', params.fromAddress);
+    if (params.toAddress) searchParams.set('toAddress', params.toAddress);
     if (params.cursor) searchParams.set('cursor', params.cursor);
     if (params.pageSize) searchParams.set('pageSize', params.pageSize.toString());
 

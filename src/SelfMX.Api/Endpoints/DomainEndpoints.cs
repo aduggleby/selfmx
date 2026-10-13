@@ -1,14 +1,16 @@
 using System.Security.Claims;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Hangfire;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Logging;
 using SelfMX.Api.Contracts.Requests;
 using SelfMX.Api.Contracts.Responses;
+using SelfMX.Api.Data;
 using SelfMX.Api.Entities;
 using SelfMX.Api.Jobs;
 using SelfMX.Api.Services;
-using Microsoft.Extensions.Logging;
 
 namespace SelfMX.Api.Endpoints;
 
@@ -203,6 +205,8 @@ public static class DomainEndpoints
         ApiKeyService apiKeyService,
         AuditService auditService,
         ISesService sesService,
+        AppDbContext db,
+        ILoggerFactory loggerFactory,
         ClaimsPrincipal user,
         CancellationToken ct = default)
     {
@@ -322,6 +326,28 @@ public static class DomainEndpoints
             StatusCode: 200,
             Details: new { From = fromAddress, To = request.To, MessageId = messageId }
         ));
+
+        // Stored like any send so it appears under Sent Emails. Sends from the admin UI have no
+        // API key (no key stats); a send triggered with an API key is attributed to that key.
+        try
+        {
+            db.SentEmails.Add(new SentEmail
+            {
+                Id = Guid.NewGuid().ToString(),
+                MessageId = messageId,
+                FromAddress = fromAddress,
+                ToAddresses = JsonSerializer.Serialize(new[] { request.To }),
+                Subject = request.Subject,
+                TextBody = request.Text,
+                DomainId = domain.Id,
+                ApiKeyId = user.FindFirst("KeyId")?.Value
+            });
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            loggerFactory.CreateLogger("DomainEndpoints").LogError(ex, "Failed to store test email {MessageId}", messageId);
+        }
 
         return TypedResults.Ok(new SendEmailResponse(messageId));
     }

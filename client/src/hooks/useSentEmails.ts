@@ -4,8 +4,10 @@ import type { CursorPagedSentEmails } from '@/lib/schemas';
 
 export interface SentEmailFilters {
   domainId?: string;
-  from?: string;
-  to?: string;
+  from?: string; // ISO timestamp (sent at or after)
+  to?: string; // ISO timestamp (sent at or before)
+  fromAddress?: string; // sender contains (case-insensitive)
+  toAddress?: string; // any recipient contains (case-insensitive)
   pageSize?: number;
 }
 
