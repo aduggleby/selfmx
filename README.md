@@ -15,7 +15,7 @@ SelfMX provides a drop-in replacement for Resend's email API that you can self-h
 - Admin dashboard for key management and audit logs
 - Automatic SSL via Caddy
 - Daily backups with retention policies
-- SQL Server database for production reliability
+- PostgreSQL database by default (SQL Server supported as an alternative)
 
 ## Getting Started
 
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/aduggleby/selfmx/main/deploy/instal
 
 The installer will:
 1. Install Docker and dependencies
-2. Deploy SQL Server 2022 container
+2. Deploy PostgreSQL 17 container
 3. Prompt for configuration (domain, AWS credentials, admin password)
 4. Set up automatic SSL certificates
 5. Configure daily backups
@@ -35,7 +35,7 @@ The installer will:
 
 ### Prerequisites
 
-- Ubuntu 22.04+ server (4GB RAM minimum for SQL Server)
+- Ubuntu 22.04+ server (1GB RAM minimum; 4GB if you use SQL Server)
 - Domain name pointed to your server
 - AWS account with SES access
 - (Optional) Cloudflare account for automatic DNS management
@@ -102,7 +102,7 @@ selfmx/
 ├── deploy/                   # Deployment files
 │   ├── install.sh            # One-line installer
 │   └── docker-compose.yml    # Production compose file
-├── docker-compose.dev.yml    # Development SQL Server
+├── docker-compose.dev.yml    # Development database (PostgreSQL by default)
 ├── build.csando              # Ando build script
 ├── ando-pre.csando           # Pre-hook (cleanup, auth)
 ├── Dockerfile                # Multi-stage Docker build
@@ -119,8 +119,9 @@ git clone https://github.com/aduggleby/selfmx.git
 cd selfmx
 mise install              # Installs .NET 9
 
-# Start development SQL Server
+# Start development PostgreSQL
 docker compose -f docker-compose.dev.yml up -d
+# (or SQL Server: docker compose -f docker-compose.dev.yml --profile sqlserver up -d sqlserver)
 
 # Run backend (terminal 1)
 dotnet run --project src/SelfMX.Api
@@ -131,13 +132,14 @@ cd client && npm install && npm run dev
 
 - Backend: http://localhost:17400
 - Frontend: http://localhost:17401 (proxies API to backend)
-- SQL Server: localhost:17402 (sa / Dev@Password123!)
+- PostgreSQL: localhost:17403 (selfmx / Dev@Password123!, database selfmx_dev)
+- SQL Server (optional, `sqlserver` profile): localhost:17402 (sa / Dev@Password123!)
 
 ### Prerequisites
 
 - [mise](https://mise.jdx.dev/) - manages .NET version
 - Node.js 22+
-- Docker - for SQL Server and full builds
+- Docker - for the development database and full builds
 
 ### Ando Build System
 

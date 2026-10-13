@@ -27,22 +27,49 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  postgres:
+    image: postgres:17
+    container_name: selfmx-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=selfmx
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=selfmx
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - selfmx-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U selfmx -d selfmx"]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   selfmx:
     image: ghcr.io/aduggleby/selfmx:${SELFMX_VERSION:-latest}
     container_name: selfmx-app
     restart: unless-stopped
     expose:
       - "17400"
-    volumes:
-      - selfmx_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - selfmx-net
     environment:
-      # Database connections (includes audit.db per multi-tenant API keys plan)
-      - ConnectionStrings__DefaultConnection=Data Source=/app/data/selfmx.db
-      - ConnectionStrings__HangfireConnection=Data Source=/app/data/selfmx-hangfire.db
-      - ConnectionStrings__AuditConnection=Data Source=/app/data/audit.db
-      # Admin authentication (BCrypt hash for browser UI login)
+      # Database (PostgreSQL is the default; Hangfire and audit tables live in the same database)
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=selfmx;Username=selfmx;Password=${POSTGRES_PASSWORD}
+      - Database__Provider=Postgres
+      # To use SQL Server instead, remove the postgres service and use:
+      # - ConnectionStrings__DefaultConnection=Server=your-sql-host,1433;Database=SelfMX;User Id=selfmx;Password=...;TrustServerCertificate=True
+      # - Database__Provider=SqlServer
+      # Admin authentication (SHA-512 crypt hash for browser UI login)
       - App__AdminPasswordHash=${SELFMX_ADMIN_PASSWORD_HASH}
       - App__SessionExpirationDays=30
       # Rate limiting
@@ -86,4 +113,4 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
-  selfmx_data:
+  postgres_data:

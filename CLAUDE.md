@@ -16,7 +16,8 @@ This project uses ports in the range **17400-17499**:
 |---------|------|-------------|
 | Backend API | 17400 | .NET API server |
 | Frontend Dev | 17401 | Vite dev server |
-| SQL Server Dev | 17402 | Development database |
+| SQL Server Dev | 17402 | Optional development database (`sqlserver` compose profile) |
+| PostgreSQL Dev | 17403 | Default development database |
 
 ## Build & Test Commands
 
@@ -45,7 +46,7 @@ npx playwright test --config playwright.backend.config.ts  # Backend E2E tests (
 ### Full Stack Development
 
 Run both servers simultaneously:
-- Terminal 1: `docker compose -f docker-compose.dev.yml up -d` (start SQL Server)
+- Terminal 1: `docker compose -f docker-compose.dev.yml up -d` (start PostgreSQL; for SQL Server instead: `docker compose -f docker-compose.dev.yml --profile sqlserver up -d sqlserver`)
 - Terminal 2: `dotnet run --project src/SelfMX.Api`
 - Terminal 3: `cd client && npm run dev`
 
@@ -92,30 +93,50 @@ src/SelfMX.Api/
 - Routes use `TypedResults` for compile-time response type safety
 - Domain verification state machine: Pending → Verifying → Verified/Failed
 - DNS records stored as JSON in Domain entity
-- SQL Server only - single connection string for all components
+- PostgreSQL (default) or SQL Server - single connection string for all components; schema is created automatically at startup
 
 ### Database Configuration
 
-SelfMX uses SQL Server as the only supported database.
+SelfMX uses PostgreSQL by default; SQL Server is supported as an alternative.
 
-**Configuration:**
+**Provider selection:** set `Database:Provider` (env `Database__Provider`) to `Postgres` or `SqlServer`. If unset, it is inferred from the connection string: `Host=` selects Postgres, `Server=` or `Data Source=` selects SQL Server, anything else falls back to Postgres.
+
+**Configuration (PostgreSQL, default):**
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=17403;Database=selfmx_dev;Username=selfmx;Password=..."
+  },
+  "Database": { "Provider": "Postgres" }
+}
+```
+
+**Configuration (SQL Server):**
 ```json
 {
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost,17402;Database=SelfMX;User Id=sa;Password=...;TrustServerCertificate=True"
-  }
+  },
+  "Database": { "Provider": "SqlServer" }
 }
 ```
 
 **Features:**
 - Connection resilience with automatic retry (5 retries, 30s max delay)
-- Shared database for main + audit + Hangfire
-- Scaled Hangfire workers (ProcessorCount * 2, capped at 20)
-- Connection pooling (Max=200, Min=20)
+- Shared database for main + audit + Hangfire (Postgres: Hangfire uses schema `hangfire`)
+- Scaled Hangfire workers (ProcessorCount * 2, capped at 20; override with `App:HangfireWorkers`)
+- `GET /system/status` reports the active provider (`database: "postgres" | "sqlserver"`)
 
-**Development SQL Server:**
+**Development PostgreSQL:**
 ```bash
 docker compose -f docker-compose.dev.yml up -d
+# Credentials: selfmx / Dev@Password123!  (database: selfmx_dev)
+# Port: 17403
+```
+
+**Development SQL Server (optional):**
+```bash
+docker compose -f docker-compose.dev.yml --profile sqlserver up -d sqlserver
 # Credentials: sa / Dev@Password123!
 # Port: 17402
 ```
@@ -147,7 +168,7 @@ client/src/
 | `GET /llms.txt` | No | LLM-oriented API reference (plain text) |
 | `GET /health` | No | Health check |
 | `GET /` | No | Redirects to `/ui/` |
-| `GET /system/status` | No | System config validation (AWS, DB connectivity) |
+| `GET /system/status` | No | System config validation (AWS, DB connectivity, active DB provider) |
 | `GET /system/version` | No | API version and build info |
 | `GET /system/logs` | Admin | In-memory application logs for diagnostics |
 | `POST /domains` | Yes | Create domain |
@@ -164,7 +185,7 @@ client/src/
 | `GET /api-keys` | Admin | List API keys |
 | `POST /api-keys` | Admin | Create API key |
 | `GET /api-keys/revoked` | Admin | List archived API keys |
-| `GET /audit` | Admin | Audit logs (paginated) |
+| `GET /audit-logs` | Admin | Audit logs (paginated) |
 | `GET /hangfire` | Admin | Hangfire job dashboard |
 
 Auth: Bearer token with API key, or Cookie auth for admin UI.
@@ -177,7 +198,7 @@ Environment variables or `appsettings.json`:
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=...;Database=SelfMX;..."
+    "DefaultConnection": "Host=...;Database=selfmx;..."  // or "Server=...;Database=SelfMX;..." for SQL Server
   },
   "App": {
     "Fqdn": "mail.example.com",

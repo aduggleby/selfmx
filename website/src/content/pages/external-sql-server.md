@@ -6,7 +6,7 @@ toc: true
 
 ## Overview
 
-By default, SelfMX includes a containerized SQL Server 2022 instance. You can instead connect to an existing SQL Server for environments where you already have database infrastructure.
+SelfMX uses PostgreSQL by default (see [External PostgreSQL Setup](/external-postgres)). SQL Server is supported as an alternative: use it for environments where you already have SQL Server infrastructure, or when upgrading an install that was created on SQL Server.
 
 ## Create Database and User
 
@@ -43,11 +43,14 @@ Type `exit` to quit sqlcmd.
 
 ## Connection String
 
-Update your connection string to point to your SQL Server:
+Point SelfMX to your SQL Server and select the provider:
 
 ```bash
+Database__Provider=SqlServer
 ConnectionStrings__DefaultConnection=Server=your-server,1433;Database=SelfMX;User Id=selfmx;Password=YourSecurePassword123!;TrustServerCertificate=True
 ```
+
+`Database__Provider` is optional when the connection string starts with `Server=` or `Data Source=` (the provider is inferred), but setting it explicitly is recommended.
 
 ### Connection String Parameters
 

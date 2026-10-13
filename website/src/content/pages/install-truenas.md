@@ -6,7 +6,7 @@ toc: true
 
 ## Overview
 
-This guide walks you through installing SelfMX on TrueNAS SCALE using Docker Compose. SelfMX is a Resend-compatible email sending API (sending only) powered by AWS SES. It connects to an existing SQL Server instance running on your TrueNAS.
+This guide walks you through installing SelfMX on TrueNAS SCALE using Docker Compose. SelfMX is a Resend-compatible email sending API (sending only) powered by AWS SES. It connects to an existing PostgreSQL instance running on your TrueNAS (SQL Server is also supported).
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ Before starting, ensure you have:
 
 - **TrueNAS SCALE 24.10 or later** (earlier versions used Kubernetes)
 - **Apps pool configured** - a storage pool designated for application data
-- **SQL Server** - already running as a container on TrueNAS (install from the app catalog if needed)
+- **PostgreSQL** - already running as a container on TrueNAS (install from the app catalog if needed). SQL Server also works, see [External SQL Server Setup](/external-sql-server)
 - **AWS credentials** - Access Key ID, Secret Access Key, and Region for SES ([setup guide](/aws-setup))
 - **A domain name** pointing to your TrueNAS server (for HTTPS)
 
@@ -44,25 +44,13 @@ mkdir -p /mnt/YOUR_POOL/apps/selfmx/logs
 
 ## Step 1: Create Database and User
 
-See **[External SQL Server Setup](/external-sql-server)** for complete instructions on creating the SelfMX database and user.
+See **[External PostgreSQL Setup](/external-postgres)** for complete instructions on creating the SelfMX database and user.
 
 Quick reference:
 
 ```sql
-CREATE DATABASE SelfMX;
-GO
-
-CREATE LOGIN selfmx WITH PASSWORD = 'YourSelfMXPassword123!';
-GO
-
-USE SelfMX;
-GO
-
-CREATE USER selfmx FOR LOGIN selfmx;
-GO
-
-ALTER ROLE db_owner ADD MEMBER selfmx;
-GO
+CREATE ROLE selfmx WITH LOGIN PASSWORD 'YourSelfMXPassword123';
+CREATE DATABASE selfmx OWNER selfmx;
 ```
 
 ## Step 2: Generate Admin Password Hash
@@ -105,7 +93,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - App__Fqdn=YOUR_DOMAIN
       - 'App__AdminPasswordHash=$6$YOUR_SALT$YOUR_HASH'  # Single quotes prevent $ interpolation
-      - ConnectionStrings__DefaultConnection=Server=YOUR_TRUENAS_IP,1433;Database=SelfMX;User Id=selfmx;Password=YOUR_SELFMX_PASSWORD;TrustServerCertificate=true;Encrypt=True
+      - ConnectionStrings__DefaultConnection=Host=YOUR_TRUENAS_IP;Port=5432;Database=selfmx;Username=selfmx;Password=YOUR_SELFMX_PASSWORD
+      - Database__Provider=Postgres
       - Aws__Region=YOUR_AWS_REGION
       - Aws__AccessKeyId=YOUR_AWS_ACCESS_KEY_ID
       - Aws__SecretAccessKey=YOUR_AWS_SECRET_ACCESS_KEY
@@ -121,11 +110,20 @@ services:
 | `YOUR_DOMAIN` | Your SelfMX domain (e.g., `mail.example.com`) |
 | `$6$YOUR_SALT$YOUR_HASH` | The SHA-512 hash from Step 2 (keep the single quotes!) |
 | `YOUR_TRUENAS_IP` | Your TrueNAS host IP address (e.g., `192.168.1.100`) |
-| `YOUR_SELFMX_PASSWORD` | The password you set for the `selfmx` login in Step 1 |
+| `YOUR_SELFMX_PASSWORD` | The password you set for the `selfmx` role in Step 1 |
 | `YOUR_POOL` | Your TrueNAS pool name (e.g., `tank`, `data`) |
 | `YOUR_AWS_REGION` | AWS region (e.g., `us-east-1`) |
 | `YOUR_AWS_ACCESS_KEY_ID` | Your AWS access key |
 | `YOUR_AWS_SECRET_ACCESS_KEY` | Your AWS secret key |
+
+### Using SQL Server Instead
+
+Create the database as described in [External SQL Server Setup](/external-sql-server), then replace the connection string and provider:
+
+```yaml
+      - ConnectionStrings__DefaultConnection=Server=YOUR_TRUENAS_IP,1433;Database=SelfMX;User Id=selfmx;Password=YOUR_SELFMX_PASSWORD;TrustServerCertificate=true;Encrypt=True
+      - Database__Provider=SqlServer
+```
 
 ### Optional Settings
 
@@ -206,8 +204,8 @@ Check that:
 ### Database Connection Failed
 
 1. Verify the TrueNAS IP and port are correct
-2. Test the connection: `nc -zv YOUR_TRUENAS_IP 1433`
-3. Verify the `selfmx` login was created correctly
+2. Test the connection: `nc -zv YOUR_TRUENAS_IP 5432`
+3. Verify the `selfmx` role was created correctly
 4. Check the password matches what you set in Step 1
 
 ### Permission Denied on Mounted Volumes

@@ -9,6 +9,9 @@
 # Environment variables for non-interactive mode:
 #   SELFMX_DOMAIN, SELFMX_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
 #   AWS_REGION, HTTP_PORT, HTTPS_PORT, SELFMX_EMAIL
+#
+# Database: fresh installs use PostgreSQL 17 (containerized). Existing installs
+# that already run SQL Server keep using SQL Server (detected automatically).
 
 set -euo pipefail
 
@@ -98,12 +101,13 @@ main() {
     log "SelfMX Installation Started"
     log "=========================================="
 
+    detect_database_provider
     preflight_checks
     detect_existing_installation
     install_dependencies
     gather_configuration
     generate_admin_password_hash
-    generate_sa_password
+    generate_db_password
     create_directories
     generate_config_files
     setup_backup_system
@@ -114,14 +118,58 @@ main() {
 }
 
 # ============================================
-# Generate SQL Server SA Password
+# Read a value from the existing .env (without sourcing it)
 # ============================================
-generate_sa_password() {
-    info "Generating SQL Server SA password..."
-    # Simple, secure password generation
-    # Append A1! to guarantee complexity requirements (uppercase, number, special char)
-    MSSQL_SA_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)A1!"
-    success "SA password generated."
+read_env_value() {
+    grep -m1 "^$1=" "${INSTALL_DIR}/.env" 2>/dev/null | cut -d= -f2- || true
+}
+
+# ============================================
+# Detect Database Provider
+# ============================================
+# Fresh installs use PostgreSQL. An existing SQL Server install (SQL Server data
+# directory or MSSQL_SA_PASSWORD in the existing .env) keeps using SQL Server.
+detect_database_provider() {
+    if [ -f "${INSTALL_DIR}/.env" ] && grep -q '^POSTGRES_PASSWORD=' "${INSTALL_DIR}/.env"; then
+        DB_PROVIDER="postgres"
+    elif [ -d "${DATA_DIR}/sqlserver" ] || \
+         { [ -f "${INSTALL_DIR}/.env" ] && grep -q '^MSSQL_SA_PASSWORD=' "${INSTALL_DIR}/.env"; }; then
+        DB_PROVIDER="sqlserver"
+        info "Existing SQL Server installation detected: SQL Server stays in use."
+        info "To migrate to PostgreSQL later, use SelfMX's (upcoming) export/import feature."
+    else
+        DB_PROVIDER="postgres"
+    fi
+}
+
+# ============================================
+# Generate Database Password
+# ============================================
+# Reuses the password from an existing install: the database only reads its
+# password on first initialization, so regenerating it would lock SelfMX out.
+generate_db_password() {
+    if [ "$DB_PROVIDER" = "sqlserver" ]; then
+        MSSQL_SA_PASSWORD="${MSSQL_SA_PASSWORD:-$(read_env_value MSSQL_SA_PASSWORD)}"
+        if [ -n "$MSSQL_SA_PASSWORD" ]; then
+            info "Reusing existing SQL Server SA password."
+            return
+        fi
+        info "Generating SQL Server SA password..."
+        # Simple, secure password generation
+        # Append A1! to guarantee complexity requirements (uppercase, number, special char)
+        MSSQL_SA_PASSWORD="$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)A1!"
+        success "SA password generated."
+    else
+        POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(read_env_value POSTGRES_PASSWORD)}"
+        if [ -n "$POSTGRES_PASSWORD" ]; then
+            info "Reusing existing PostgreSQL password."
+            return
+        fi
+        info "Generating PostgreSQL password..."
+        # Alphanumeric only, so it is safe in connection strings and .env files
+        POSTGRES_PASSWORD="$(openssl rand -base64 36 | tr -d '/+=' | head -c 32)"
+        success "PostgreSQL password generated."
+    fi
 }
 
 # ============================================
@@ -154,20 +202,39 @@ preflight_checks() {
         fi
     fi
 
-    # Check available disk space (require at least 10GB for SQL Server)
     available_space=$(df / --output=avail -B1G | tail -1 | tr -d ' ')
-    if [ "$available_space" -lt 10 ]; then
-        fatal "Insufficient disk space. Required: 10GB, Available: ${available_space}GB"
-    fi
 
-    # Check available memory (require at least 4GB for SQL Server)
-    available_mem=$(free -g | awk '/^Mem:/{print $2}')
-    if [ "$available_mem" -lt 4 ]; then
-        warn "SQL Server requires at least 4GB RAM. Available: ${available_mem}GB"
-        warn "The installation may fail or SQL Server may not start properly."
-        read -r -p "Continue anyway? [y/N]: " continue_anyway
-        if [[ ! "$continue_anyway" =~ ^[Yy] ]]; then
-            fatal "Installation cancelled."
+    if [ "$DB_PROVIDER" = "sqlserver" ]; then
+        # Check available disk space (require at least 10GB for SQL Server)
+        if [ "$available_space" -lt 10 ]; then
+            fatal "Insufficient disk space. Required: 10GB, Available: ${available_space}GB"
+        fi
+
+        # Check available memory (require at least 4GB for SQL Server)
+        available_mem=$(free -g | awk '/^Mem:/{print $2}')
+        if [ "$available_mem" -lt 4 ]; then
+            warn "SQL Server requires at least 4GB RAM. Available: ${available_mem}GB"
+            warn "The installation may fail or SQL Server may not start properly."
+            read -r -p "Continue anyway? [y/N]: " continue_anyway
+            if [[ ! "$continue_anyway" =~ ^[Yy] ]]; then
+                fatal "Installation cancelled."
+            fi
+        fi
+    else
+        # Check available disk space (require at least 5GB for PostgreSQL)
+        if [ "$available_space" -lt 5 ]; then
+            fatal "Insufficient disk space. Required: 5GB, Available: ${available_space}GB"
+        fi
+
+        # Check available memory (recommend at least 1GB; free -m since small servers report 0 GB)
+        available_mem_mb=$(free -m | awk '/^Mem:/{print $2}')
+        if [ "$available_mem_mb" -lt 900 ]; then
+            warn "SelfMX recommends at least 1GB RAM. Available: ${available_mem_mb}MB"
+            warn "The installation may fail or services may not start properly."
+            read -r -p "Continue anyway? [y/N]: " continue_anyway
+            if [[ ! "$continue_anyway" =~ ^[Yy] ]]; then
+                fatal "Installation cancelled."
+            fi
         fi
     fi
 
@@ -432,7 +499,11 @@ gather_configuration() {
     echo "  Cloudflare:       ${CLOUDFLARE_API_TOKEN:+Configured}${CLOUDFLARE_API_TOKEN:-Not configured}"
     echo "  Ports:            HTTP=$HTTP_PORT, HTTPS=$HTTPS_PORT"
     echo "  Backup Time:      $BACKUP_TIME"
-    echo "  Database:         SQL Server 2022 (containerized)"
+    if [ "$DB_PROVIDER" = "sqlserver" ]; then
+        echo "  Database:         SQL Server 2022 (containerized, existing install)"
+    else
+        echo "  Database:         PostgreSQL 17 (containerized)"
+    fi
     echo ""
 
     if [ "${AUTO_CONFIRM:-}" = "1" ]; then
@@ -468,16 +539,22 @@ create_directories() {
     info "Creating directories..."
 
     mkdir -p "$INSTALL_DIR"
-    mkdir -p "$DATA_DIR/sqlserver"
+    mkdir -p "$DATA_DIR/$DB_PROVIDER"
     mkdir -p "$DATA_DIR/backups"
     mkdir -p "$DATA_DIR/logs"
     mkdir -p "$DATA_DIR/caddy/data"
     mkdir -p "$DATA_DIR/caddy/config"
     mkdir -p /var/log/selfmx
 
-    # SQL Server runs as UID 10001
-    chown -R 10001:0 "$DATA_DIR/sqlserver"
-    chmod -R 700 "$DATA_DIR/sqlserver"
+    if [ "$DB_PROVIDER" = "sqlserver" ]; then
+        # SQL Server runs as UID 10001
+        chown -R 10001:0 "$DATA_DIR/sqlserver"
+        chmod -R 700 "$DATA_DIR/sqlserver"
+    else
+        # The postgres image runs as UID 999
+        chown -R 999:999 "$DATA_DIR/postgres"
+        chmod -R 700 "$DATA_DIR/postgres"
+    fi
 
     # Set permissions
     chmod 750 "$INSTALL_DIR"
@@ -494,6 +571,15 @@ generate_config_files() {
     info "Generating configuration files..."
 
     # Generate .env file
+    local db_env_block
+    if [ "$DB_PROVIDER" = "sqlserver" ]; then
+        db_env_block="# SQL Server
+MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}"
+    else
+        db_env_block="# PostgreSQL
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+    fi
+
     cat > "${INSTALL_DIR}/.env" <<EOF
 # SelfMX Configuration
 # Generated: $(date -Iseconds)
@@ -506,10 +592,9 @@ SELFMX_VERSION=${SELFMX_VERSION}
 # Admin Authentication (SHA-512 crypt hash for browser UI login)
 # Generate with: openssl passwd -6 "YourPassword"
 # API keys are created via the admin UI after first login
-SELFMX_ADMIN_PASSWORD_HASH=${SELFMX_ADMIN_PASSWORD_HASH}
+SELFMX_ADMIN_PASSWORD_HASH='${SELFMX_ADMIN_PASSWORD_HASH}'
 
-# SQL Server
-MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+${db_env_block}
 
 # AWS Configuration
 AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -530,7 +615,7 @@ EOF
 
     chmod 640 "${INSTALL_DIR}/.env"
 
-    # Generate docker-compose.yml
+    # Generate docker-compose.yml (database service and app connection differ per provider)
     cat > "${INSTALL_DIR}/docker-compose.yml" <<'COMPOSE_EOF'
 version: "3.8"
 
@@ -539,6 +624,10 @@ networks:
     driver: bridge
 
 services:
+COMPOSE_EOF
+
+    if [ "$DB_PROVIDER" = "sqlserver" ]; then
+        cat >> "${INSTALL_DIR}/docker-compose.yml" <<'COMPOSE_EOF'
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: selfmx-sqlserver
@@ -572,6 +661,38 @@ services:
         hard: 65535
     shm_size: 1g
 
+COMPOSE_EOF
+        DB_SERVICE="sqlserver"
+        DB_APP_ENV='      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=SelfMX;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;MultipleActiveResultSets=true;Max Pool Size=200;Min Pool Size=20'
+    else
+        cat >> "${INSTALL_DIR}/docker-compose.yml" <<'COMPOSE_EOF'
+  postgres:
+    image: postgres:17
+    container_name: selfmx-postgres
+    hostname: postgres
+    restart: unless-stopped
+    networks:
+      - selfmx-net
+    environment:
+      - POSTGRES_USER=selfmx
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=selfmx
+    volumes:
+      - /data/selfmx/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U selfmx -d selfmx"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+COMPOSE_EOF
+        DB_SERVICE="postgres"
+        DB_APP_ENV='      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=selfmx;Username=selfmx;Password=${POSTGRES_PASSWORD}
+      - Database__Provider=Postgres'
+    fi
+
+    cat >> "${INSTALL_DIR}/docker-compose.yml" <<'COMPOSE_EOF'
   selfmx:
     image: ghcr.io/aduggleby/selfmx:${SELFMX_VERSION:-latest}
     container_name: selfmx-app
@@ -579,12 +700,15 @@ services:
     networks:
       - selfmx-net
     depends_on:
-      sqlserver:
-        condition: service_healthy
+COMPOSE_EOF
+    printf '      %s:\n        condition: service_healthy\n' "$DB_SERVICE" >> "${INSTALL_DIR}/docker-compose.yml"
+    cat >> "${INSTALL_DIR}/docker-compose.yml" <<'COMPOSE_EOF'
     expose:
-      - "5000"
+      - "17400"
     environment:
-      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=SelfMX;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;MultipleActiveResultSets=true;Max Pool Size=200;Min Pool Size=20
+COMPOSE_EOF
+    printf '%s\n' "$DB_APP_ENV" >> "${INSTALL_DIR}/docker-compose.yml"
+    cat >> "${INSTALL_DIR}/docker-compose.yml" <<'COMPOSE_EOF'
       - App__AdminPasswordHash=${SELFMX_ADMIN_PASSWORD_HASH}
       - App__SessionExpirationDays=30
       - App__MaxLoginAttemptsPerMinute=5
@@ -669,11 +793,9 @@ CADDY_EOF
 }
 
 # ============================================
-# Setup Backup System
+# Backup/Restore Scripts per Database Provider
 # ============================================
-setup_backup_system() {
-    info "Setting up backup system..."
-
+setup_backup_scripts_sqlserver() {
     # Create backup script
     cat > /usr/local/bin/selfmx-backup <<'BACKUP_EOF'
 #!/bin/bash
@@ -774,6 +896,120 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Health check timed out. Check logs
 RESTORE_EOF
 
     chmod +x /usr/local/bin/selfmx-restore
+}
+
+setup_backup_scripts_postgres() {
+    # Create backup script
+    cat > /usr/local/bin/selfmx-backup <<'BACKUP_EOF'
+#!/bin/bash
+set -euo pipefail
+
+# SelfMX PostgreSQL Backup Script
+BACKUP_DIR="/data/selfmx/backups"
+BACKUP_FILE="selfmx_$(date +%Y%m%d_%H%M%S).dump"
+BACKUP_PATH="${BACKUP_DIR}/${BACKUP_FILE}"
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting backup..."
+
+# Custom-format dump (compressed), streamed out of the container
+if ! docker exec selfmx-postgres pg_dump -U selfmx -d selfmx -Fc > "$BACKUP_PATH"; then
+    rm -f "$BACKUP_PATH"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: pg_dump failed"
+    exit 1
+fi
+
+# Verify backup integrity (archive must be readable)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Verifying backup integrity..."
+if ! docker exec -i selfmx-postgres pg_restore --list < "$BACKUP_PATH" > /dev/null; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: backup verification failed: ${BACKUP_FILE}"
+    exit 1
+fi
+
+# Cleanup old backups (7 day retention)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cleaning up old backups..."
+find "$BACKUP_DIR" -name "selfmx_*.dump" -mtime +7 -delete
+
+BACKUP_SIZE=$(du -h "$BACKUP_PATH" | cut -f1)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Backup complete: ${BACKUP_FILE} (${BACKUP_SIZE})"
+BACKUP_EOF
+
+    chmod +x /usr/local/bin/selfmx-backup
+
+    # Create restore script
+    cat > /usr/local/bin/selfmx-restore <<'RESTORE_EOF'
+#!/bin/bash
+set -euo pipefail
+
+# SelfMX PostgreSQL Restore Script
+
+if [ $# -lt 1 ]; then
+    echo "Usage: selfmx-restore <backup-file.dump>"
+    echo ""
+    echo "Available backups:"
+    ls -lh /data/selfmx/backups/*.dump 2>/dev/null || echo "  (none)"
+    exit 1
+fi
+
+BACKUP_FILE="$1"
+
+# If only filename provided, prepend backup directory
+if [[ ! "$BACKUP_FILE" == /* ]]; then
+    BACKUP_FILE="/data/selfmx/backups/${BACKUP_FILE}"
+fi
+
+if [ ! -f "$BACKUP_FILE" ]; then
+    echo "ERROR: Backup file not found: $BACKUP_FILE"
+    exit 1
+fi
+
+echo "WARNING: This will replace ALL data in the SelfMX database."
+echo "Backup file: $BACKUP_FILE"
+echo ""
+read -r -p "Type 'yes' to continue: " confirm
+if [ "$confirm" != "yes" ]; then
+    echo "Restore cancelled."
+    exit 0
+fi
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Stopping SelfMX application..."
+docker stop selfmx-app || true
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restoring database..."
+# --clean --if-exists drops existing objects first; warnings about missing objects are not fatal
+docker exec -i selfmx-postgres pg_restore -U selfmx -d selfmx \
+    --clean --if-exists --no-owner < "$BACKUP_FILE" || \
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] pg_restore reported warnings (see above); continuing."
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting SelfMX application..."
+docker start selfmx-app
+
+# Wait for health
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Waiting for application to be healthy..."
+for i in {1..30}; do
+    if docker exec selfmx-app wget -qO- http://127.0.0.1:17400/health &>/dev/null; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restore complete! Application is healthy."
+        exit 0
+    fi
+    sleep 2
+done
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: Health check timed out. Check logs with: docker logs selfmx-app"
+RESTORE_EOF
+
+    chmod +x /usr/local/bin/selfmx-restore
+}
+
+# ============================================
+# Setup Backup System
+# ============================================
+setup_backup_system() {
+    info "Setting up backup system..."
+
+    if [ "$DB_PROVIDER" = "sqlserver" ]; then
+        setup_backup_scripts_sqlserver
+    else
+        setup_backup_scripts_postgres
+    fi
 
     # Create systemd timer for backups
     cat > /etc/systemd/system/selfmx-backup.service <<EOF
@@ -867,30 +1103,50 @@ pull_and_start() {
 verify_installation() {
     info "Verifying installation..."
 
-    # Wait for SQL Server to be healthy first
-    info "Waiting for SQL Server to be healthy..."
-    local sql_retries=60
-    local i=0
+    if [ "$DB_PROVIDER" = "sqlserver" ]; then
+        # Wait for SQL Server to be healthy first
+        info "Waiting for SQL Server to be healthy..."
+        local sql_retries=60
+        local i=0
 
-    while [ $i -lt $sql_retries ]; do
-        if docker exec selfmx-sqlserver /opt/mssql-tools18/bin/sqlcmd \
-            -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -N \
-            -Q "SELECT 1" &>/dev/null; then
-            success "SQL Server is healthy!"
-            break
+        while [ $i -lt $sql_retries ]; do
+            if docker exec selfmx-sqlserver /opt/mssql-tools18/bin/sqlcmd \
+                -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -N \
+                -Q "SELECT 1" &>/dev/null; then
+                success "SQL Server is healthy!"
+                break
+            fi
+            i=$((i + 1))
+            sleep 2
+        done
+
+        if [ $i -eq $sql_retries ]; then
+            warn "SQL Server health check timed out. Check logs with: docker logs selfmx-sqlserver"
         fi
-        i=$((i + 1))
-        sleep 2
-    done
+    else
+        # Wait for PostgreSQL to be healthy first
+        info "Waiting for PostgreSQL to be healthy..."
+        local pg_retries=60
+        local i=0
 
-    if [ $i -eq $sql_retries ]; then
-        warn "SQL Server health check timed out. Check logs with: docker logs selfmx-sqlserver"
+        while [ $i -lt $pg_retries ]; do
+            if docker exec selfmx-postgres pg_isready -U selfmx -d selfmx &>/dev/null; then
+                success "PostgreSQL is healthy!"
+                break
+            fi
+            i=$((i + 1))
+            sleep 2
+        done
+
+        if [ $i -eq $pg_retries ]; then
+            warn "PostgreSQL health check timed out. Check logs with: docker logs selfmx-postgres"
+        fi
     fi
 
     # Wait for SelfMX to be healthy
     info "Waiting for SelfMX application to be healthy..."
     local retries=30
-    i=0
+    local i=0
 
     while [ $i -lt $retries ]; do
         if docker exec selfmx-app wget -qO- http://127.0.0.1:17400/health &>/dev/null; then
@@ -951,24 +1207,46 @@ display_completion_message() {
     echo "    View logs:        docker compose -f ${INSTALL_DIR}/docker-compose.yml logs -f"
     echo "    Restart:          systemctl restart selfmx"
     echo "    Manual backup:    selfmx-backup"
-    echo "    Restore backup:   selfmx-restore <backup-file.bak>"
-    echo ""
-    echo "  Backup location: ${DATA_DIR}/backups"
-    echo "    - Daily backups retained for 7 days"
-    echo "    - Backups include full SQL Server database"
-    echo ""
-    echo "  ----------------------------------------"
-    echo "  DATABASE:"
-    echo ""
-    echo "  SQL Server is running in a container with:"
-    echo "    - 4GB memory limit"
-    echo "    - Persistent storage at ${DATA_DIR}/sqlserver"
-    echo "    - Port 1433 (internal only, not exposed)"
-    echo ""
-    echo "  Connect via sqlcmd (for debugging):"
-    echo "    docker exec -it selfmx-sqlserver /opt/mssql-tools18/bin/sqlcmd \\"
-    echo "      -S localhost -U sa -P '\$MSSQL_SA_PASSWORD' -C -N"
-    echo ""
+    if [ "$DB_PROVIDER" = "sqlserver" ]; then
+        echo "    Restore backup:   selfmx-restore <backup-file.bak>"
+        echo ""
+        echo "  Backup location: ${DATA_DIR}/backups"
+        echo "    - Daily backups retained for 7 days"
+        echo "    - Backups include full SQL Server database"
+        echo ""
+        echo "  ----------------------------------------"
+        echo "  DATABASE:"
+        echo ""
+        echo "  SQL Server is running in a container with:"
+        echo "    - 4GB memory limit"
+        echo "    - Persistent storage at ${DATA_DIR}/sqlserver"
+        echo "    - Port 1433 (internal only, not exposed)"
+        echo ""
+        echo "  Connect via sqlcmd (for debugging):"
+        echo "    docker exec -it selfmx-sqlserver /opt/mssql-tools18/bin/sqlcmd \\"
+        echo "      -S localhost -U sa -P '\$MSSQL_SA_PASSWORD' -C -N"
+        echo ""
+        echo "  This is an existing SQL Server install, so SQL Server stays in use."
+        echo "  Migrating to PostgreSQL will be possible via SelfMX's (upcoming) export/import feature."
+        echo ""
+    else
+        echo "    Restore backup:   selfmx-restore <backup-file.dump>"
+        echo ""
+        echo "  Backup location: ${DATA_DIR}/backups"
+        echo "    - Daily backups retained for 7 days"
+        echo "    - Backups are full PostgreSQL dumps (pg_dump custom format)"
+        echo ""
+        echo "  ----------------------------------------"
+        echo "  DATABASE:"
+        echo ""
+        echo "  PostgreSQL 17 is running in a container with:"
+        echo "    - Persistent storage at ${DATA_DIR}/postgres"
+        echo "    - Port 5432 (internal only, not exposed)"
+        echo ""
+        echo "  Connect via psql (for debugging):"
+        echo "    docker exec -it selfmx-postgres psql -U selfmx -d selfmx"
+        echo ""
+    fi
     echo "  ----------------------------------------"
     echo "  To backup to another location (S3, rsync, etc.):"
     echo ""

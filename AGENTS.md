@@ -1,17 +1,17 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `src/SelfMX.Api/` contains the .NET 9 backend (minimal APIs, services, jobs, data, auth).
+- `src/SelfMX.Api/` contains the .NET 10 backend (minimal APIs, services, jobs, data, auth).
 - `tests/SelfMX.Api.Tests/` holds xUnit unit tests (C# files like `DomainService.Tests.cs`).
 - `client/` is the React 19 + Vite frontend; UI code in `client/src/` and E2E tests in `client/e2e/`.
 - `website/` hosts the Astro docs site.
-- `deploy/` includes installer and production compose files; `docker-compose.dev.yml` is for local SQL Server.
+- `deploy/` includes installer and production compose files; `docker-compose.dev.yml` is for the local database (PostgreSQL by default, SQL Server via the `sqlserver` profile).
 - Root build artifacts: `build.csando`, `ando-pre.csando`, `Dockerfile`, `SelfMX.slnx`, `mise.toml`.
 
 ## Build, Test, and Development Commands
 - NEVER publish/deploy/release SelfMX or its artifacts. You may build and run tests only.
-- `mise install` installs the pinned .NET 9 toolchain.
-- `docker compose -f docker-compose.dev.yml up -d` starts the local SQL Server on port `17402`.
+- `mise install` installs the pinned .NET toolchain.
+- `docker compose -f docker-compose.dev.yml up -d` starts the local PostgreSQL on port `17403`; add `--profile sqlserver` and target `sqlserver` for SQL Server on `17402`.
 - `dotnet run --project src/SelfMX.Api` runs the API on port `17400`.
 - `dotnet build SelfMX.slnx` builds the backend solution.
 - `dotnet test SelfMX.slnx` runs all xUnit tests.
@@ -36,8 +36,8 @@
 - Commits follow a Conventional-Commits style: `feat:`, `fix(ui):`, `docs:`, `chore:`, `refactor(api):`.
 - Version bumps use `Bump version to X.Y.Z`.
 - PRs should include a clear summary, testing performed, and screenshots for UI changes.
-- Link related issues and note any config changes (ports `17400-17402`, new env vars).
+- Link related issues and note any config changes (ports `17400-17403`, new env vars).
 
 ## Configuration Notes
-- SQL Server is the only supported database; see `appsettings.json`/env vars for `ConnectionStrings:DefaultConnection`.
+- PostgreSQL is the default database and SQL Server is supported; set `Database:Provider` (`Postgres` | `SqlServer`) or let it be inferred from `ConnectionStrings:DefaultConnection` (`Host=` means Postgres, `Server=`/`Data Source=` means SQL Server).
 - CORS and admin UI defaults rely on `App:Fqdn`; local dev assumes `http://localhost:17401`.

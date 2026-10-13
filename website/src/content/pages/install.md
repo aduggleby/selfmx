@@ -13,7 +13,7 @@ SelfMX is a self-hosted email sending platform providing a Resend-compatible API
 - **Resend-Compatible API**: Drop-in replacement for Resend's email sending API (sending only).
 - **AWS SES Integration**: Reliable email delivery powered by Amazon Simple Email Service.
 - **Cloudflare DNS Integration**: Optional automatic DNS record creation for domain verification.
-- **SQL Server Database**: Containerized SQL Server 2022 with automated backups.
+- **PostgreSQL Database**: Containerized PostgreSQL 17 with automated backups (SQL Server is supported as an alternative).
 - **Automatic HTTPS**: Caddy reverse proxy with Let's Encrypt certificates.
 
 ## Installation
@@ -41,8 +41,8 @@ For TrueNAS SCALE installations, see the dedicated guide: **[TrueNAS Installatio
 | Requirement | Minimum |
 |-------------|---------|
 | OS | Ubuntu 22.04 LTS or newer |
-| RAM | 4GB (SQL Server requires 2GB minimum) |
-| Disk | 10GB free space |
+| RAM | 1GB (4GB if you use SQL Server) |
+| Disk | 5GB free space (10GB if you use SQL Server) |
 | Ports | 80 and 443 available |
 | AWS | Account with SES access ([setup guide](/aws-setup)) |
 
@@ -90,7 +90,7 @@ All configuration is via environment variables.
 |----------|-------------|
 | `App__Fqdn` | FQDN where SelfMX is hosted (e.g., `mail.example.com`) |
 | `App__AdminPasswordHash` | SHA-512 hash of admin password |
-| `ConnectionStrings__DefaultConnection` | SQL Server connection string |
+| `ConnectionStrings__DefaultConnection` | PostgreSQL (`Host=...`) or SQL Server (`Server=...`) connection string |
 | `Aws__Region` | AWS region (e.g., `us-east-1`) |
 | `Aws__AccessKeyId` | AWS access key ID |
 | `Aws__SecretAccessKey` | AWS secret access key |
@@ -99,6 +99,8 @@ All configuration is via environment variables.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `Database__Provider` | inferred | `Postgres` or `SqlServer`. If unset, inferred from the connection string (`Host=` is Postgres, `Server=` or `Data Source=` is SQL Server) |
+| `App__HangfireWorkers` | CPU count x 2 (max 20) | Background job worker count |
 | `App__SessionExpirationDays` | `30` | Admin session duration |
 | `App__MaxLoginAttemptsPerMinute` | `5` | Login rate limit |
 | `App__MaxApiRequestsPerMinute` | `100` | API rate limit per key |
@@ -123,9 +125,16 @@ This produces a hash like `$6$salt$hash...` which you set as `App__AdminPassword
 - 'App__AdminPasswordHash=$6$salt$hash...'
 ```
 
-## Using External SQL Server
+## Using an External Database
 
-To use an existing SQL Server instead of the containerized one, see **[External SQL Server Setup](/external-sql-server)**.
+The installer runs PostgreSQL 17 in a container. To use an existing database instead:
+
+- **PostgreSQL**: see **[External PostgreSQL Setup](/external-postgres)**
+- **SQL Server**: see **[External SQL Server Setup](/external-sql-server)**
+
+### Existing SQL Server Installs
+
+Installations created before PostgreSQL became the default keep running on SQL Server. Re-running the installer detects this (via `/data/selfmx/sqlserver` or `MSSQL_SA_PASSWORD` in `/opt/selfmx/.env`) and leaves your database untouched. Migrating to PostgreSQL will be possible with SelfMX's upcoming export/import feature.
 
 ## Server Management
 
@@ -147,7 +156,7 @@ For backup and restore procedures, see **[Database Backups](/backups)**.
 | Path | Description |
 |------|-------------|
 | `/opt/selfmx/` | Installation directory (docker-compose.yml, .env) |
-| `/data/selfmx/sqlserver/` | SQL Server database files |
+| `/data/selfmx/postgres/` | PostgreSQL database files (`/data/selfmx/sqlserver/` on SQL Server installs) |
 | `/data/selfmx/backups/` | Database backups |
 | `/data/selfmx/logs/` | Application logs |
 
@@ -169,14 +178,14 @@ Check logs for errors:
 
 ```bash
 docker logs selfmx-app
-docker logs selfmx-sqlserver
+docker logs selfmx-postgres   # selfmx-sqlserver on SQL Server installs
 ```
 
 ### Database Connection Failed
 
-1. Verify SQL Server is running: `docker ps | grep sqlserver`
-2. Check SQL Server has enough memory (requires 2GB minimum)
-3. Test connection with sqlcmd
+1. Verify the database is running: `docker ps | grep -E "postgres|sqlserver"`
+2. Check the database container is healthy: `docker inspect --format '{{.State.Health.Status}}' selfmx-postgres`
+3. Test the connection: `docker exec -it selfmx-postgres psql -U selfmx -d selfmx` (SQL Server installs: use sqlcmd, and make sure it has at least 2GB of memory)
 
 ### AWS SES Errors
 

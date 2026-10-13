@@ -1,12 +1,12 @@
 ---
 title: Database Backups
-description: Backup and restore procedures for SelfMX SQL Server database.
+description: Backup and restore procedures for the SelfMX PostgreSQL or SQL Server database.
 toc: true
 ---
 
 ## Overview
 
-SelfMX stores domains, API keys, and audit logs in SQL Server. Regular backups protect against data loss.
+SelfMX stores domains, API keys, and audit logs in PostgreSQL (or SQL Server on older installs). Regular backups protect against data loss.
 
 ## Automated Backups (Linux Install)
 
@@ -18,7 +18,7 @@ The standard Linux installation includes automated daily backups.
 /data/selfmx/backups/
 ```
 
-Backups are named `selfmx_YYYYMMDD_HHMMSS.bak`.
+Backups are named `selfmx_YYYYMMDD_HHMMSS.dump` (PostgreSQL custom format, created with `pg_dump -Fc`). Installs that run SQL Server use `.bak` files instead.
 
 ### Manual Backup
 
@@ -37,12 +37,28 @@ List available backups and restore:
 ls /data/selfmx/backups/
 
 # Restore specific backup
-selfmx-restore selfmx_20240115_030000.bak
+selfmx-restore selfmx_20240115_030000.dump
 ```
 
-## External SQL Server / TrueNAS
+The restore script stops the app, runs `pg_restore --clean --if-exists`, and starts the app again.
 
-For TrueNAS or external SQL Server installations, backups must be configured manually using your SQL Server's standard backup procedures.
+## External PostgreSQL / TrueNAS
+
+For TrueNAS or external PostgreSQL installations, backups must be configured manually. The standard tools work:
+
+```bash
+# Backup
+pg_dump -h YOUR_HOST -U selfmx -d selfmx -Fc -f selfmx_backup.dump
+
+# Restore (stop SelfMX first)
+pg_restore -h YOUR_HOST -U selfmx -d selfmx --clean --if-exists --no-owner selfmx_backup.dump
+```
+
+The dump includes the Hangfire job tables (schema `hangfire`) stored in the same database.
+
+## SQL Server (Alternative)
+
+SQL Server installs created by the installer use the same `selfmx-backup` and `selfmx-restore` commands, with `.bak` files (`BACKUP DATABASE` / `RESTORE DATABASE`). For external SQL Server instances, backups must be configured manually using your SQL Server's standard backup procedures.
 
 ## Backup Strategy
 
@@ -72,7 +88,7 @@ For TrueNAS or external SQL Server installations, backups must be configured man
 
 1. Install SelfMX on new server (without starting the app)
 2. Stop the SelfMX service: `systemctl stop selfmx`
-3. Restore the database from backup
+3. Restore the database from backup (`selfmx-restore <file>` on installer-managed installs)
 4. Start the SelfMX service: `systemctl start selfmx`
 5. Verify domains show correct status in admin UI
 
