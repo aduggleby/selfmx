@@ -49,8 +49,8 @@ WORKDIR /app
 RUN mkdir -p /var/lib/selfmx/keys /var/log/selfmx && \
     chown -R app:app /var/lib/selfmx /var/log/selfmx
 
-# Install wget for health checks and ICU libraries for SQL Server globalization
-RUN apk add --no-cache wget icu-libs
+# wget for health checks, ICU for SQL Server globalization, krb5-libs for Npgsql GSS probing
+RUN apk add --no-cache wget icu-libs krb5-libs
 
 # Copy published backend
 COPY --from=backend-build --chown=app:app /app/publish ./
