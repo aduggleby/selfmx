@@ -217,6 +217,7 @@ client/src/
 | `POST /api-keys` | Admin | Create API key |
 | `GET /api-keys/revoked` | Admin | List archived API keys |
 | `GET /api-keys/stats` | Admin | Emails sent per key in the last 24h / 7d / 30d / 90d |
+| `GET /domains/stats` | Admin | Emails sent per domain (same windows) and active keys per domain |
 | `PATCH /api-keys/{id}` | Admin | Rename an API key |
 | `GET /audit-logs` | Admin | Audit logs (paginated) |
 | `GET /admin/export` | Admin | Download gzipped export (domains, API keys, revoked keys, audit logs) |

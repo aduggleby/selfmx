@@ -114,3 +114,11 @@ export function useVerifyDomain() {
     },
   });
 }
+
+export function useDomainStats() {
+  return useQuery({
+    queryKey: [...domainKeys.all, 'stats'] as const,
+    queryFn: () => api.getDomainStats(),
+    refetchInterval: 60_000,
+  });
+}

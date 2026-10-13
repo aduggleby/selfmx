@@ -11,6 +11,7 @@ import type { ApiKey, ApiKeyCreated, ApiKeyStats, Domain, RevokedApiKey } from '
 import { formatDateTime } from '@/lib/date';
 import { byNumber, byText, compareNullable, nextSort, type SortState as SortStateOf } from '@/lib/sort';
 import { SortableHeader } from '@/components/SortableHeader';
+import { STAT_UNAVAILABLE, STAT_WINDOWS, statValue, type StatKey } from '@/lib/sendStats';
 
 interface CreateApiKeyModalProps {
   domains: Domain[];
@@ -278,25 +279,8 @@ function RelativeDate({ value }: { value: string | null }) {
   return <span title={value ? formatDateTime(value) : undefined}>{formatRelativeDate(value)}</span>;
 }
 
-const STAT_WINDOWS = [
-  { key: 'last24h', label: '24h', title: 'Emails sent in the last 24 hours' },
-  { key: 'last7d', label: '7d', title: 'Emails sent in the last 7 days' },
-  { key: 'last30d', label: '30d', title: 'Emails sent in the last 30 days' },
-  { key: 'last90d', label: '90d', title: 'Emails sent in the last 90 days' },
-] as const;
-
-type StatKey = (typeof STAT_WINDOWS)[number]['key'];
 type SortKey = 'name' | 'keyPrefix' | 'access' | 'createdAt' | 'lastUsedAt' | StatKey;
 type SortState = SortStateOf<SortKey>;
-
-const STAT_UNAVAILABLE =
-  'Not available: stats are loading or failed, or the window is longer than the sent-email retention.';
-
-// A missing entry with loaded stats means no sends in the last 90 days; null means unknown.
-function statValue(stats: ApiKeyStats | undefined, key: StatKey, available: boolean): number | null {
-  if (!available) return null;
-  return stats ? stats[key] : 0;
-}
 
 function accessLabel(apiKey: ApiKey, domains: Domain[]): string {
   if (apiKey.isAdmin) return 'Admin';

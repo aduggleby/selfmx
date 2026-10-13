@@ -1,24 +1,32 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { useDomains, useCreateDomain } from '@/hooks/useDomains';
+import { useDomains, useCreateDomain, useDomainStats } from '@/hooks/useDomains';
 import { DomainStatusBadge } from '@/components/DomainStatusBadge';
 import { SortableHeader } from '@/components/SortableHeader';
 import { formatDateTime } from '@/lib/date';
-import { byText, compareNullable, nextSort, type SortState } from '@/lib/sort';
-import type { Domain } from '@/lib/schemas';
+import { byNumber, byText, compareNullable, nextSort, type SortState } from '@/lib/sort';
+import type { Domain, DomainStats } from '@/lib/schemas';
+import { STAT_UNAVAILABLE, STAT_WINDOWS, statValue, type StatKey } from '@/lib/sendStats';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
-type DomainSortKey = 'name' | 'status' | 'createdAt' | 'verifiedAt' | 'lastCheckedAt';
+type DomainSortKey = 'name' | 'status' | 'createdAt' | 'verifiedAt' | 'lastCheckedAt' | 'activeApiKeys' | StatKey;
+
+type StatsLookup = { byDomain: Map<string, DomainStats>; available: boolean };
+
+// Active keys: missing entry with loaded stats = none; unknown while loading
+function activeKeysValue(stats: DomainStats | undefined, available: boolean): number | null {
+  return available ? (stats?.activeApiKeys ?? 0) : null;
+}
 
 // The list endpoint returns at most 100 per page; load them all so sorting covers every domain
 const ALL_DOMAINS_LIMIT = 100;
 
-function sortDomains(domains: Domain[], sort: SortState<DomainSortKey>): Domain[] {
+function sortDomains(domains: Domain[], sort: SortState<DomainSortKey>, stats: StatsLookup): Domain[] {
   const dir = sort.dir === 'asc' ? 1 : -1;
   const compare = (a: Domain, b: Domain): number => {
     switch (sort.key) {
@@ -28,8 +36,23 @@ function sortDomains(domains: Domain[], sort: SortState<DomainSortKey>): Domain[
         return byText(a.status, b.status) * dir;
       case 'createdAt':
         return byText(a.createdAt, b.createdAt) * dir; // ISO 8601 UTC sorts as text
-      default:
+      case 'verifiedAt':
+      case 'lastCheckedAt':
         return compareNullable(a[sort.key], b[sort.key], byText, dir);
+      case 'activeApiKeys':
+        return compareNullable(
+          activeKeysValue(stats.byDomain.get(a.id), stats.available),
+          activeKeysValue(stats.byDomain.get(b.id), stats.available),
+          byNumber,
+          dir,
+        );
+      default:
+        return compareNullable(
+          statValue(stats.byDomain.get(a.id), sort.key, stats.available),
+          statValue(stats.byDomain.get(b.id), sort.key, stats.available),
+          byNumber,
+          dir,
+        );
     }
   };
   return [...domains].sort((a, b) => compare(a, b) || byText(a.name, b.name));
@@ -50,6 +73,17 @@ function DomainTableHeader({
         <SortableHeader label="Added" sortKey="createdAt" sort={sort} onSort={onSort} />
         <SortableHeader label="Verified" sortKey="verifiedAt" sort={sort} onSort={onSort} />
         <SortableHeader label="Last checked" sortKey="lastCheckedAt" sort={sort} onSort={onSort} />
+        <SortableHeader
+          label="Active keys"
+          sortKey="activeApiKeys"
+          sort={sort}
+          onSort={onSort}
+          title="Non-revoked API keys scoped to this domain (admin keys can use every domain and are not counted)"
+          align="right"
+        />
+        {STAT_WINDOWS.map((w) => (
+          <SortableHeader key={w.key} label={`Sent ${w.label}`} sortKey={w.key} sort={sort} onSort={onSort} title={w.title} align="right" />
+        ))}
         <th className="py-2 px-2 font-medium">Notes</th>
         <th className="py-2 px-2 font-medium"></th>
       </tr>
@@ -57,7 +91,10 @@ function DomainTableHeader({
   );
 }
 
-function DomainRow({ domain }: { domain: Domain }) {
+const numberCell = 'py-3 px-2 text-right font-mono text-xs tabular-nums text-muted-foreground';
+
+function DomainRow({ domain, stats, statsAvailable }: { domain: Domain; stats?: DomainStats; statsAvailable: boolean }) {
+  const activeKeys = activeKeysValue(stats, statsAvailable);
   const note =
     domain.failureReason ?? (domain.status === 'verifying' ? 'Verifying DNS records...' : null);
   return (
@@ -77,6 +114,17 @@ function DomainRow({ domain }: { domain: Domain }) {
       <td className="py-3 px-2 text-xs text-muted-foreground whitespace-nowrap">
         {domain.lastCheckedAt ? formatDateTime(domain.lastCheckedAt) : '—'}
       </td>
+      <td className={numberCell} title={activeKeys === null ? STAT_UNAVAILABLE : 'Non-revoked API keys scoped to this domain'}>
+        {activeKeys ?? '—'}
+      </td>
+      {STAT_WINDOWS.map((w) => {
+        const value = statValue(stats, w.key, statsAvailable);
+        return (
+          <td key={w.key} className={numberCell} title={value === null ? STAT_UNAVAILABLE : w.title}>
+            {value ?? '—'}
+          </td>
+        );
+      })}
       <td
         className={`py-3 px-2 text-xs max-w-md truncate ${domain.failureReason ? 'text-[var(--status-failed-text)]' : 'text-muted-foreground'}`}
         title={note ?? undefined}
@@ -104,6 +152,9 @@ function DomainRowSkeleton() {
       <td className="py-3 px-2"><Skeleton className="h-4 w-32" /></td>
       <td className="py-3 px-2"><Skeleton className="h-4 w-32" /></td>
       <td className="py-3 px-2"><Skeleton className="h-4 w-32" /></td>
+      {[...Array(1 + STAT_WINDOWS.length)].map((_, i) => (
+        <td key={i} className="py-3 px-2"><Skeleton className="ml-auto h-4 w-8" /></td>
+      ))}
       <td className="py-3 px-2"><Skeleton className="h-4 w-24" /></td>
       <td className="py-3 px-2"><Skeleton className="ml-auto h-4 w-12" /></td>
     </tr>
@@ -117,6 +168,11 @@ export function DomainsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const { data, isLoading, error } = useDomains(1, ALL_DOMAINS_LIMIT);
+  const { data: statsData, isSuccess: statsAvailable } = useDomainStats();
+  const stats = useMemo<StatsLookup>(
+    () => ({ byDomain: new Map((statsData ?? []).map((s) => [s.domainId, s])), available: statsAvailable }),
+    [statsData, statsAvailable],
+  );
   const createMutation = useCreateDomain();
   const domains = data?.data ?? [];
   const totalDomains = data?.total ?? 0;
@@ -213,8 +269,13 @@ export function DomainsPage() {
               <table className="w-full text-sm">
                 <DomainTableHeader sort={sort} onSort={handleSort} />
                 <tbody>
-                  {sortDomains(domains, sort).map((domain) => (
-                    <DomainRow key={domain.id} domain={domain} />
+                  {sortDomains(domains, sort, stats).map((domain) => (
+                    <DomainRow
+                      key={domain.id}
+                      domain={domain}
+                      stats={stats.byDomain.get(domain.id)}
+                      statsAvailable={stats.available}
+                    />
                   ))}
                 </tbody>
               </table>

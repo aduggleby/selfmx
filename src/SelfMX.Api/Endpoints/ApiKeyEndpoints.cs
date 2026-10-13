@@ -21,6 +21,8 @@ public static class ApiKeyEndpoints
         keys.MapPost("/", CreateApiKey);
         keys.MapGet("/revoked", ListRevokedApiKeys);
         keys.MapGet("/stats", GetApiKeyStats);
+        // Admin-only like the rest of this group; lives here so /domains keeps its key-scoped auth
+        group.MapGet("/domains/stats", GetDomainStats);
         keys.MapGet("/{id}", GetApiKey);
         keys.MapPatch("/{id}", RenameApiKey);
         keys.MapDelete("/{id}", RevokeApiKey);
@@ -112,6 +114,12 @@ public static class ApiKeyEndpoints
         IOptions<AppSettings> appSettings,
         CancellationToken ct = default) =>
         TypedResults.Ok(await ApiKeySendStats.GetAsync(db, appSettings.Value.SentEmailRetentionDays, DateTime.UtcNow, ct));
+
+    private static async Task<Ok<DomainStatsResponse[]>> GetDomainStats(
+        AppDbContext db,
+        IOptions<AppSettings> appSettings,
+        CancellationToken ct = default) =>
+        TypedResults.Ok(await ApiKeySendStats.GetForDomainsAsync(db, appSettings.Value.SentEmailRetentionDays, DateTime.UtcNow, ct));
 
     private static async Task<Results<Ok<ApiKeyResponse>, BadRequest<object>, NotFound<object>>> RenameApiKey(
         string id,

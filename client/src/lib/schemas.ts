@@ -77,6 +77,14 @@ export const ApiKeyStatsSchema = z.object({
 export type ApiKeyStats = z.infer<typeof ApiKeyStatsSchema>;
 export const ApiKeyStatsListSchema = z.array(ApiKeyStatsSchema);
 
+// Per domain: emails sent (any key or the admin UI) and active API keys scoped to it
+export const DomainStatsSchema = ApiKeyStatsSchema.omit({ apiKeyId: true }).extend({
+  domainId: z.string(),
+  activeApiKeys: z.number(),
+});
+export type DomainStats = z.infer<typeof DomainStatsSchema>;
+export const DomainStatsListSchema = z.array(DomainStatsSchema);
+
 export const ApiKeyCreatedSchema = z.object({
   id: z.string(),
   name: z.string(),

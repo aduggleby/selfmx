@@ -191,6 +191,13 @@ public class DatabaseMigrationIntegrationTests
         await using (var app = CreateAppDb(provider, db.ConnectionString))
         {
             app.Domains.Add(new Domain { Id = "d1", Name = "a.example", Status = DomainStatus.Verified });
+            app.Domains.Add(new Domain { Id = "d2", Name = "b.example", Status = DomainStatus.Verified });
+            app.ApiKeys.AddRange(
+                new ApiKey { Id = "k1", Name = "active", KeyHash = "h", KeySalt = "s", KeyPrefix = "re_aaaaaaaa" },
+                new ApiKey { Id = "k2", Name = "revoked", KeyHash = "h", KeySalt = "s", KeyPrefix = "re_bbbbbbbb", RevokedAt = now });
+            app.ApiKeyDomains.AddRange(
+                new ApiKeyDomain { ApiKeyId = "k1", DomainId = "d1" }, new ApiKeyDomain { ApiKeyId = "k2", DomainId = "d1" },
+                new ApiKeyDomain { ApiKeyId = "k1", DomainId = "d2" });
             SentEmail Sent(DateTime at, string? key) => new()
             {
                 Id = Guid.NewGuid().ToString(), MessageId = Guid.NewGuid().ToString(), SentAt = at, FromAddress = "a@a.example",
@@ -208,6 +215,15 @@ public class DatabaseMigrationIntegrationTests
                 .Should().Equal(new ApiKeyStatsResponse("k1", 1, 2, 3, 4));
             (await ApiKeySendStats.GetAsync(app, retentionDays: 30, now))
                 .Should().Equal(new ApiKeyStatsResponse("k1", 1, 2, 3, null));
+
+            // Domain d1: the five keyed sends plus one admin-UI send; one active key (k2 is revoked).
+            // Domain d2: no sends, still listed for its active key.
+            (await ApiKeySendStats.GetForDomainsAsync(app, retentionDays: null, now))
+                .Should().BeEquivalentTo(new[]
+                {
+                    new DomainStatsResponse("d1", ActiveApiKeys: 1, Last24h: 2, Last7d: 3, Last30d: 4, Last90d: 5),
+                    new DomainStatsResponse("d2", ActiveApiKeys: 1, Last24h: 0, Last7d: 0, Last30d: 0, Last90d: 0)
+                });
         }
     }
 
@@ -250,7 +266,7 @@ public class DatabaseMigrationIntegrationTests
             await app.Database.ExecuteSqlRawAsync("ALTER TABLE [Domains] DROP COLUMN [LastCheckedAt]; DROP TABLE [RevokedApiKeys];");
             // EnsureCreated uses the current model; remove what later migrations add, as legacy databases never had it
             await app.Database.ExecuteSqlRawAsync(
-                "DROP INDEX [IX_SentEmails_SentAt_ApiKeyId] ON [SentEmails]; CREATE INDEX [IX_SentEmails_SentAt] ON [SentEmails] ([SentAt]);");
+                "DROP INDEX [IX_SentEmails_SentAt_ApiKeyId_DomainId] ON [SentEmails]; CREATE INDEX [IX_SentEmails_SentAt] ON [SentEmails] ([SentAt]);");
             await app.Database.ExecuteSqlRawAsync(
                 "INSERT INTO [Domains] ([Id], [Name], [Status], [CreatedAt]) VALUES ('d1', 'legacy.example', 'Verified', SYSUTCDATETIME())");
         }

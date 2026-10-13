@@ -6,6 +6,7 @@ import {
   PaginatedApiKeysSchema,
   ApiKeySchema,
   ApiKeyStatsListSchema,
+  DomainStatsListSchema,
   PaginatedRevokedApiKeysSchema,
   ApiKeyCreatedSchema,
   CursorPagedSentEmailsSchema,
@@ -18,6 +19,7 @@ import {
   type PaginatedApiKeys,
   type ApiKey,
   type ApiKeyStats,
+  type DomainStats,
   type PaginatedRevokedApiKeys,
   type ApiKeyCreated,
   type CursorPagedSentEmails,
@@ -299,6 +301,10 @@ class ApiClient {
 
   async getApiKeyStats(): Promise<ApiKeyStats[]> {
     return this.request('/api-keys/stats', ApiKeyStatsListSchema);
+  }
+
+  async getDomainStats(): Promise<DomainStats[]> {
+    return this.request('/domains/stats', DomainStatsListSchema);
   }
 
   async deleteApiKey(id: string): Promise<void> {

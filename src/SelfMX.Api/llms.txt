@@ -320,6 +320,11 @@ All /api-keys and /audit-logs endpoints require AdminOnly (ActorType=admin).
   - Response: [{ apiKeyId, last24h, last7d, last30d, last90d }]; keys without sends in the last 90 days are omitted
   - A window is null when it is longer than App:SentEmailRetentionDays (older sends are deleted, so it would undercount)
 
+- GET /domains/stats (admin-only)
+  - Per domain: emails sent (any key or the admin UI) and active API keys scoped to it
+  - Response: [{ domainId, activeApiKeys, last24h, last7d, last30d, last90d }]; admin keys are not counted
+    (they can use every domain); windows longer than App:SentEmailRetentionDays are null
+
 - GET /api-keys/{id}
   - Response: ApiKeyResponse or 404
 

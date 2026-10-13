@@ -238,7 +238,7 @@ namespace SelfMX.Api.Data.Migrations.Postgres.App
 
                     b.HasIndex("DomainId", "SentAt");
 
-                    b.HasIndex("SentAt", "ApiKeyId");
+                    b.HasIndex("SentAt", "ApiKeyId", "DomainId");
 
                     b.ToTable("SentEmails");
                 });

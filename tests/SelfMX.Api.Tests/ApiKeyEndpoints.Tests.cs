@@ -69,6 +69,7 @@ public class ApiKeyEndpointsTests : IClassFixture<SelfMxTestFactory>
 
         (await client.PatchAsJsonAsync("/api-keys/any", new { name = "x" })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await client.GetAsync("/api-keys/stats")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await client.GetAsync("/domains/stats")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
