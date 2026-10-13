@@ -184,7 +184,7 @@ public class DataTransferTests : IAsyncLifetime
         await auditDb.SaveChangesAsync();
 
         var keys = scope.ServiceProvider.GetRequiredService<ApiKeyService>();
-        var admin = await keys.CreateAsync("admin", null, isAdmin: true);
+        var admin = await keys.CreateAsync("admin", [], isAdmin: true);
         var sender = await keys.CreateAsync("sender", [verified.Id], isAdmin: false);
         return new Seeded(admin.PlainTextKey, sender.PlainTextKey, verified.Id);
     }

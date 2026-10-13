@@ -175,7 +175,7 @@ Why: these are hard requirements of `deploy-app.sh` and the hardened container.
 | Logs to stdout + daily files, 90 days | in-memory sink + console | **Serilog**: console + daily rolling file `selfmx-.log` (`App:Logging:File:{Enabled,Path,RetainedDays}`, off by default); keep the in-memory provider for `/system/logs` |
 | Honors `X-Forwarded-*` | not configured | `UseForwardedHeaders` with known proxies/networks from config |
 | Postgres as the `<app>_migrator` role, migrate at startup, Hangfire creates schema `hangfire` | — | covered by Phases A/B; Hangfire.PostgreSql schema name `hangfire` |
-| Image pushed to `registry.dualconsult.net/dualconsult/selfmx` | ghcr only | add the push step to `build.csando` (don't run it in this effort) |
+| Image pushed to `registry.dualconsult.net/dualconsult/selfmx` | ghcr only | **dropped from code**: SelfMX is public, so the DualConsult push stays a manual deploy step (as Hawk does) |
 
 ## Out of scope for this effort (stop before deploying)
 

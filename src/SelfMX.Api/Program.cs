@@ -29,6 +29,7 @@ var builder = WebApplication.CreateBuilder(args);
 var logSink = new InMemoryLogSink(maxEntries: 2000);
 builder.Services.AddSingleton(logSink);
 builder.Logging.AddProvider(new InMemoryLoggerProvider(logSink, LogLevel.Debug));
+builder.AddSelfMxFileLogging();
 
 // Configure JSON serialization for consistent datetime format (ISO 8601 with Z)
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -42,6 +43,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("App"));
 builder.Services.Configure<AwsSettings>(builder.Configuration.GetSection("Aws"));
 builder.Services.Configure<CloudflareSettings>(builder.Configuration.GetSection("Cloudflare"));
+builder.AddSelfMxDataProtection();
+builder.AddSelfMxForwardedHeaders();
 
 // Database configuration: PostgreSQL (default) or SQL Server; SQLite for the Test environment
 var useSqlite = builder.Environment.IsEnvironment("Test");
@@ -243,6 +246,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Must run first so client IPs and the https scheme are known to everything after it
+app.UseForwardedHeaders();
+
 // Global exception handler
 app.UseExceptionHandler(errorApp =>
 {
@@ -288,6 +294,9 @@ app.UseStaticFiles(new StaticFileOptions
 
 // Health endpoint (no auth)
 app.MapHealthChecks("/health");
+// Container platform probes: /live = process up, /ready = databases reachable
+app.MapHealthChecks("/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/ready");
 
 // Public LLM-oriented API reference
 app.MapGet("/llms.txt", (IWebHostEnvironment env) =>

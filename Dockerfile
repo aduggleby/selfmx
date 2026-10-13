@@ -44,24 +44,22 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS production
 
 WORKDIR /app
 
-# Create non-root user
-RUN addgroup -g 1001 -S selfmx && \
-    adduser -S selfmx -u 1001 -G selfmx
-
-# Create data directory
-RUN mkdir -p /app/data && chown -R selfmx:selfmx /app/data
+# Run as the base image's non-root "app" user (UID 1654). Writable paths for
+# hardened read-only containers: DataProtection keys and log files.
+RUN mkdir -p /var/lib/selfmx/keys /var/log/selfmx && \
+    chown -R app:app /var/lib/selfmx /var/log/selfmx
 
 # Install wget for health checks and ICU libraries for SQL Server globalization
 RUN apk add --no-cache wget icu-libs
 
 # Copy published backend
-COPY --from=backend-build --chown=selfmx:selfmx /app/publish ./
+COPY --from=backend-build --chown=app:app /app/publish ./
 
 # Copy built frontend to wwwroot
-COPY --from=frontend-build --chown=selfmx:selfmx /app/client/dist ./wwwroot
+COPY --from=frontend-build --chown=app:app /app/client/dist ./wwwroot
 
 # Copy health check script
-COPY --chown=selfmx:selfmx scripts/healthcheck.sh /app/healthcheck.sh
+COPY --chown=app:app scripts/healthcheck.sh /app/healthcheck.sh
 RUN chmod +x /app/healthcheck.sh
 
 # Environment configuration
@@ -74,7 +72,7 @@ ENV ASPNETCORE_URLS=http://+:17400 \
     DOTNET_EnableDiagnostics=0
 
 # Switch to non-root user
-USER selfmx
+USER app
 
 # Expose port (SelfMX reserved port range: 17400-17499)
 EXPOSE 17400

@@ -251,6 +251,18 @@ Environment variables or `appsettings.json`:
 
 CORS origins are derived from `App:Fqdn` (becomes `https://{Fqdn}`). Falls back to `http://localhost:17401` for development.
 
+**Hosting options** (all optional; unset keeps the previous behaviour):
+
+| Setting | Purpose |
+|---------|---------|
+| `App:TrustedProxies` | Comma-separated IPs/CIDRs of reverse proxies whose `X-Forwarded-For`/`-Proto` are trusted (client IPs in audit logs, `Secure` cookies behind TLS termination) |
+| `App:DataProtectionKeysPath` | Directory for ASP.NET DataProtection keys, so admin sessions survive restarts (image provides `/var/lib/selfmx/keys`) |
+| `App:Logging:File:Enabled` / `Path` / `RetainedDays` | Daily rolling log files `selfmx-YYYYMMDD.log` (default path `/var/log/selfmx`, 90 days) in addition to stdout |
+| `App:HangfireWorkers` | Background job worker count (default ProcessorCount × 2, max 20) |
+
+Probes: `GET /live` (process up, no checks), `GET /ready` (databases reachable), `GET /health` (same as `/ready`, kept for existing setups).
+The container runs as the .NET image's `app` user (UID 1654); the health check script follows the port in `ASPNETCORE_URLS`.
+
 ## Naming Convention
 
 The project uses "SelfMX" casing (capital M and X) for:
