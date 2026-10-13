@@ -1,6 +1,6 @@
 # feat: PostgreSQL support, export/import, and move to prod1
 
-Status: draft, revised 2026-10-12. Botrax is decommissioned; SelfMX is now a shared dependency of the other prod1 apps.
+Status: code phases 0, A–D done and reviewed (up to 476b49e, 2026-10-13). Next: TrueNAS schema check, container/UI verification, release, then prod1 deployment (re-read prod1 docs first).
 
 ## 1. Goal (product view)
 
