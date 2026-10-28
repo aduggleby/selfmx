@@ -12,6 +12,9 @@ public class CloudflareService : ICloudflareService
     private readonly CloudflareSettings _settings;
     private readonly ILogger<CloudflareService> _logger;
 
+    /// <summary>Comment set on every record SelfMX creates; only records carrying it are ever deleted.</summary>
+    public const string ManagedRecordComment = "Managed by SelfMX";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -123,7 +126,8 @@ public class CloudflareService : ICloudflareService
             content,
             priority = type == "MX" ? priority : (int?)null,
             proxied,
-            ttl = 1 // Auto TTL
+            ttl = 1, // Auto TTL
+            comment = ManagedRecordComment
         };
 
         var result = await SendAsync<DnsRecordResult>(
@@ -146,17 +150,9 @@ public class CloudflareService : ICloudflareService
     {
         _logger.LogInformation("Deleting DNS record: {RecordId}", recordId);
 
-        var response = await _http.DeleteAsync(
-            $"zones/{zoneId}/dns_records/{recordId}",
-            ct);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            var content = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogWarning(
-                "Failed to delete DNS record {RecordId}: {StatusCode} {Content}",
-                recordId, response.StatusCode, content);
-        }
+        await SendAsync<JsonElement>(
+            () => _http.DeleteAsync($"zones/{zoneId}/dns_records/{recordId}", ct),
+            $"Failed to delete DNS record {recordId}", ct);
     }
 
     public async Task<List<DnsRecordResult>> ListDnsRecordsAsync(
@@ -201,18 +197,31 @@ public class CloudflareService : ICloudflareService
             return;
         }
 
-        // Only delete records matching what SelfMX created (type, name, content); never anything else under the domain.
+        // Only delete records SelfMX created: same type, name and content, and carrying SelfMX's comment.
+        // A matching record without the comment (e.g. the user's own SPF/DMARC) is left alone.
+        var failed = 0;
         foreach (var expected in records)
         {
             var existing = await ListDnsRecordsAsync(zoneId, expected.Name, expected.Type, ct);
             foreach (var record in existing.Where(r =>
+                         r.Comment == ManagedRecordComment &&
                          string.Equals(r.Name, expected.Name, StringComparison.OrdinalIgnoreCase) &&
                          string.Equals(r.Type, expected.Type, StringComparison.OrdinalIgnoreCase) &&
                          NormalizeContent(r.Content) == NormalizeContent(expected.Value)))
             {
-                await DeleteDnsRecordAsync(zoneId, record.Id, ct);
+                try
+                {
+                    await DeleteDnsRecordAsync(zoneId, record.Id, ct);
+                }
+                catch (CloudflareException)
+                {
+                    failed++; // Already logged; keep deleting the rest.
+                }
             }
         }
+
+        if (failed > 0)
+            throw new CloudflareException($"Failed to delete {failed} DNS record(s) for {domainName}");
     }
 
     private static string NormalizeContent(string content) =>
@@ -258,4 +267,5 @@ public class DnsRecordResult
     public string Content { get; set; } = "";
     public int Priority { get; set; }
     public bool Proxied { get; set; }
+    public string? Comment { get; set; }
 }

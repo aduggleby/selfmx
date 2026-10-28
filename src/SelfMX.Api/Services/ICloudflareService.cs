@@ -21,7 +21,7 @@ public interface ICloudflareService
         string? type = null,
         CancellationToken ct = default);
 
-    /// <summary>Deletes only the given records (matched by type, name and content) from the domain's zone.</summary>
+    /// <summary>Deletes only the given records (matched by type, name and content, and tagged with SelfMX's record comment) from the domain's zone.</summary>
     Task DeleteDnsRecordsForDomainAsync(
         string domainName,
         IReadOnlyCollection<DnsRecordInfo> records,

@@ -271,9 +271,9 @@ public class CloudflareServiceTests
                 success = true,
                 result = new[]
                 {
-                    new { id = "ours", type = "CNAME", name = "tok1._domainkey.family.example.com", content = "tok1.dkim.amazonses.com.", priority = 0, proxied = false },
-                    new { id = "other-content", type = "CNAME", name = "tok1._domainkey.family.example.com", content = "elsewhere.example.net", priority = 0, proxied = false },
-                    new { id = "website", type = "A", name = "family.example.com", content = "1.2.3.4", priority = 0, proxied = true }
+                    new { id = "ours", type = "CNAME", name = "tok1._domainkey.family.example.com", content = "tok1.dkim.amazonses.com.", priority = 0, proxied = false, comment = CloudflareService.ManagedRecordComment },
+                    new { id = "other-content", type = "CNAME", name = "tok1._domainkey.family.example.com", content = "elsewhere.example.net", priority = 0, proxied = false, comment = CloudflareService.ManagedRecordComment },
+                    new { id = "website", type = "A", name = "family.example.com", content = "1.2.3.4", priority = 0, proxied = true, comment = CloudflareService.ManagedRecordComment }
                 }
             },
             new { success = true }
@@ -327,7 +327,7 @@ public class CloudflareServiceTests
                 success = true,
                 result = new[]
                 {
-                    new { id = "spf", type = "TXT", name = "family.example.com", content = "\"v=spf1 include:amazonses.com ~all\"", priority = 0, proxied = false }
+                    new { id = "spf", type = "TXT", name = "family.example.com", content = "\"v=spf1 include:amazonses.com ~all\"", priority = 0, proxied = false, comment = CloudflareService.ManagedRecordComment }
                 }
             },
             new { success = true }
@@ -337,6 +337,64 @@ public class CloudflareServiceTests
             [new DnsRecordInfo("TXT", "family.example.com", "v=spf1 include:amazonses.com ~all")]);
 
         handler.RequestUris.Last().Should().EndWith("zones/zone-1/dns_records/spf");
+    }
+
+    [Fact]
+    public async Task CreateDnsRecordAsync_TagsRecordWithManagedComment()
+    {
+        _mockHandler.SetResponse(new { success = true, result = new { id = "r1", type = "TXT", name = "t", content = "v" } });
+
+        await _service.CreateDnsRecordAsync("test-zone-id", "TXT", "t", "v");
+
+        _mockHandler.LastRequestBody.Should().Contain($"\"comment\":\"{CloudflareService.ManagedRecordComment}\"");
+    }
+
+    [Fact]
+    public async Task DeleteDnsRecordsForDomainAsync_KeepsMatchingRecordsWithoutSelfMxComment()
+    {
+        // The user's own identical SPF record (Cloudflare rejected SelfMX's duplicate) must survive.
+        var (service, handler) = CreateConfiguredZoneService();
+        handler.SetResponseSequence([
+            new
+            {
+                success = true,
+                result = new[]
+                {
+                    new { id = "users-spf", type = "TXT", name = "family.example.com", content = "\"v=spf1 include:amazonses.com ~all\"", priority = 0, proxied = false, comment = (string?)null }
+                }
+            }
+        ]);
+
+        await service.DeleteDnsRecordsForDomainAsync("family.example.com",
+            [new DnsRecordInfo("TXT", "family.example.com", "v=spf1 include:amazonses.com ~all")]);
+
+        handler.RequestMethods.Should().NotContain(HttpMethod.Delete);
+    }
+
+    [Fact]
+    public async Task DeleteDnsRecordsForDomainAsync_ContinuesAfterFailedDeleteAndThrows()
+    {
+        var (service, handler) = CreateConfiguredZoneService();
+        object Listed(string id, string name) => new
+        {
+            success = true,
+            result = new[] { new { id, type = "CNAME", name, content = "x.dkim.amazonses.com", priority = 0, proxied = false, comment = CloudflareService.ManagedRecordComment } }
+        };
+        handler.SetResponseSequence([
+            Listed("a", "a._domainkey.family.example.com"),
+            new { success = false, errors = new[] { new { code = 1, message = "boom" } } },
+            Listed("b", "b._domainkey.family.example.com"),
+            new { success = true }
+        ]);
+
+        var act = async () => await service.DeleteDnsRecordsForDomainAsync("family.example.com",
+        [
+            new DnsRecordInfo("CNAME", "a._domainkey.family.example.com", "x.dkim.amazonses.com"),
+            new DnsRecordInfo("CNAME", "b._domainkey.family.example.com", "x.dkim.amazonses.com")
+        ]);
+
+        await act.Should().ThrowAsync<CloudflareException>().WithMessage("*1 DNS record*");
+        handler.RequestUris.Last().Should().EndWith("zones/zone-1/dns_records/b");
     }
 
     [Fact]
@@ -369,6 +427,7 @@ public class MockHttpMessageHandler : HttpMessageHandler
 {
     private readonly Queue<(object Response, HttpStatusCode StatusCode)> _responses = new();
     public string? LastRequestUri { get; private set; }
+    public string? LastRequestBody { get; private set; }
     public HttpMethod? LastRequestMethod { get; private set; }
     public int RequestCount { get; private set; }
     public List<string> RequestUris { get; } = [];
@@ -404,6 +463,7 @@ public class MockHttpMessageHandler : HttpMessageHandler
     {
         LastRequestUri = request.RequestUri?.ToString();
         LastRequestMethod = request.Method;
+        LastRequestBody = request.Content?.ReadAsStringAsync(cancellationToken).GetAwaiter().GetResult();
         RequestCount++;
         RequestUris.Add(LastRequestUri ?? "");
         RequestMethods.Add(request.Method);
