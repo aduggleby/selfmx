@@ -165,4 +165,35 @@ public class SetupDomainJobTests : IDisposable
         var updatedDomain = await _domainService.GetByIdAsync(domain.Id);
         updatedDomain!.Status.Should().Be(DomainStatus.Verifying);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_StopsCloudflareAfterFirstZoneNotFound_AndKeepsManualDns()
+    {
+        // Arrange
+        var domain = await _domainService.CreateAsync("family.example.com");
+
+        var dnsRecords = new[]
+        {
+            new DnsRecordInfo("CNAME", "token1._domainkey.family.example.com", "token1.dkim.amazonses.com"),
+            new DnsRecordInfo("CNAME", "token2._domainkey.family.example.com", "token2.dkim.amazonses.com")
+        };
+        _mockSesService.CreateDomainIdentityAsync("family.example.com", Arg.Any<CancellationToken>())
+            .Returns(("arn", dnsRecords));
+
+        _mockCloudflareService.CreateDnsRecordAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new CloudflareZoneNotFoundException("family.example.com"));
+
+        // Act
+        await _job.ExecuteAsync(domain.Id, null);
+
+        // Assert - one attempt only, domain still Verifying with records stored for manual setup
+        await _mockCloudflareService.Received(1).CreateDnsRecordAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+        var updatedDomain = await _domainService.GetByIdAsync(domain.Id);
+        updatedDomain!.Status.Should().Be(DomainStatus.Verifying);
+        updatedDomain.DnsRecordsJson.Should().NotBeNullOrEmpty();
+    }
 }

@@ -37,5 +37,6 @@ public class AwsSettings
 public class CloudflareSettings
 {
     public required string ApiToken { get; set; }
-    public required string ZoneId { get; set; }
+    /// <summary>Optional override; when empty the zone is looked up from each record name.</summary>
+    public string ZoneId { get; set; } = "";
 }

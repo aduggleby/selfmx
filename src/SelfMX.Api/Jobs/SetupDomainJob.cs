@@ -98,6 +98,14 @@ public class SetupDomainJob
                     console.WriteSuccess("    Created successfully");
                     successCount++;
                 }
+                catch (CloudflareZoneNotFoundException ex)
+                {
+                    // Same zone for every record: report once and leave DNS to the user.
+                    console.WriteWarning($"    {ex.Message}");
+                    console.WriteWarning("    Skipping automatic DNS; add the records above manually.");
+                    failCount = dnsRecords.Length - successCount;
+                    break;
+                }
                 catch (CloudflareException ex)
                 {
                     console.WriteWarning($"    Failed to create: {ex.Message}");

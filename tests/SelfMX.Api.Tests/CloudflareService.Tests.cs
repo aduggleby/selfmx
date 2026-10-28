@@ -145,6 +145,103 @@ public class CloudflareServiceTests
         // Assert
         _mockHandler.RequestCount.Should().BeGreaterOrEqualTo(1); // At least list was called
     }
+
+    private (CloudflareService Service, MockHttpMessageHandler Handler) CreateLookupService()
+    {
+        var handler = new MockHttpMessageHandler();
+        var service = new CloudflareService(
+            new HttpClient(handler),
+            Options.Create(new CloudflareSettings { ApiToken = "test-api-token", ZoneId = "" }),
+            Substitute.For<ILogger<CloudflareService>>());
+        return (service, handler);
+    }
+
+    private static object ZoneList(params (string Id, string Name)[] zones) => new
+    {
+        success = true,
+        result = zones.Select(z => new { id = z.Id, name = z.Name }).ToArray()
+    };
+
+    [Fact]
+    public async Task ResolveZoneIdAsync_UsesConfiguredZoneWithoutLookup()
+    {
+        var result = await _service.ResolveZoneIdAsync("anything.example.com");
+
+        result.Should().Be("test-zone-id");
+        _mockHandler.RequestCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ResolveZoneIdAsync_FindsExactZone()
+    {
+        var (service, handler) = CreateLookupService();
+        handler.SetResponseSequence([ZoneList(("zone-1", "example.com"))]);
+
+        var result = await service.ResolveZoneIdAsync("example.com");
+
+        result.Should().Be("zone-1");
+        handler.LastRequestUri.Should().Contain("zones?name=example.com");
+    }
+
+    [Fact]
+    public async Task ResolveZoneIdAsync_WalksUpToParentZoneForSubdomain()
+    {
+        var (service, handler) = CreateLookupService();
+        handler.SetResponseSequence([
+            ZoneList(),
+            ZoneList(("zone-parent", "laurenduggleby.com"))
+        ]);
+
+        var result = await service.ResolveZoneIdAsync("family.laurenduggleby.com");
+
+        result.Should().Be("zone-parent");
+        handler.RequestCount.Should().Be(2);
+        handler.LastRequestUri.Should().Contain("name=laurenduggleby.com");
+    }
+
+    [Fact]
+    public async Task ResolveZoneIdAsync_ThrowsWhenNoZoneMatches()
+    {
+        var (service, handler) = CreateLookupService();
+        handler.SetResponseSequence([ZoneList(), ZoneList()]);
+
+        var act = async () => await service.ResolveZoneIdAsync("family.laurenduggleby.com");
+
+        await act.Should().ThrowAsync<CloudflareZoneNotFoundException>()
+            .WithMessage("*No Cloudflare zone found for family.laurenduggleby.com in this account*");
+        handler.RequestCount.Should().Be(2); // never queries the bare TLD
+    }
+
+    [Fact]
+    public async Task CreateDnsRecordAsync_WithNoZone_DoesNotCallDnsRecordsEndpoint()
+    {
+        var (service, handler) = CreateLookupService();
+        handler.SetResponseSequence([ZoneList(), ZoneList()]);
+
+        var act = async () => await service.CreateDnsRecordAsync("CNAME", "t._domainkey.sub.example.com", "v");
+
+        await act.Should().ThrowAsync<CloudflareZoneNotFoundException>();
+        handler.LastRequestUri.Should().NotContain("dns_records");
+        handler.LastRequestMethod.Should().Be(HttpMethod.Get);
+    }
+
+    [Fact]
+    public async Task CreateDnsRecordAsync_ResolvesZoneFromRecordName()
+    {
+        var (service, handler) = CreateLookupService();
+        handler.SetResponseSequence([
+            ZoneList(),
+            ZoneList(),
+            ZoneList(),
+            ZoneList(("zone-parent", "example.com")),
+            new { success = true, result = new { id = "rec-1" } }
+        ]);
+
+        var id = await service.CreateDnsRecordAsync("CNAME", "t._domainkey.sub.example.com", "v");
+
+        id.Should().Be("rec-1");
+        handler.LastRequestUri.Should().Contain("zones/zone-parent/dns_records");
+    }
 }
 
 public class MockHttpMessageHandler : HttpMessageHandler
