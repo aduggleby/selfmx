@@ -195,7 +195,9 @@ public static class DomainEndpoints
             var created = domain.DnsRecordsJson?.DeserializeDnsRecords() ?? [];
             await cloudflareService.DeleteDnsRecordsForDomainAsync(domain.Name, created, ct);
         }
-        catch (Exception ex) when (ex is CloudflareException or HttpRequestException or JsonException)
+        catch (Exception ex) when (
+            ex is CloudflareException or HttpRequestException or JsonException ||
+            (ex is TaskCanceledException && !ct.IsCancellationRequested))
         {
             loggerFactory.CreateLogger("DomainEndpoints")
                 .LogWarning(ex, "Could not delete Cloudflare DNS records for {Domain}", domain.Name);

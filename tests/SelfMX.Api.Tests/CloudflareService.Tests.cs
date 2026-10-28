@@ -287,6 +287,76 @@ public class CloudflareServiceTests
     }
 
     [Fact]
+    public async Task ResolveZoneIdAsync_WrapsTimeoutAsCloudflareException()
+    {
+        var (service, handler) = CreateLookupService();
+        handler.Exception = new TaskCanceledException("timeout");
+
+        var act = async () => await service.ResolveZoneIdAsync("example.com");
+
+        await act.Should().ThrowAsync<CloudflareException>().WithMessage("*timed out*");
+    }
+
+    [Fact]
+    public async Task CreateDnsRecordAsync_WrapsNonJson5xxAsCloudflareException()
+    {
+        _mockHandler.SetRawResponse("<html>bad gateway</html>", HttpStatusCode.BadGateway);
+
+        var act = async () => await _service.CreateDnsRecordAsync("test-zone-id", "CNAME", "t", "v");
+
+        await act.Should().ThrowAsync<CloudflareException>().WithMessage("*HTTP 502*");
+    }
+
+    private (CloudflareService Service, MockHttpMessageHandler Handler) CreateConfiguredZoneService()
+    {
+        var handler = new MockHttpMessageHandler();
+        var service = new CloudflareService(
+            new HttpClient(handler),
+            Options.Create(new CloudflareSettings { ApiToken = "t", ZoneId = "zone-1" }),
+            Substitute.For<ILogger<CloudflareService>>());
+        return (service, handler);
+    }
+
+    [Fact]
+    public async Task DeleteDnsRecordsForDomainAsync_MatchesQuotedTxtContent()
+    {
+        var (service, handler) = CreateConfiguredZoneService();
+        handler.SetResponseSequence([
+            new
+            {
+                success = true,
+                result = new[]
+                {
+                    new { id = "spf", type = "TXT", name = "family.example.com", content = "\"v=spf1 include:amazonses.com ~all\"", priority = 0, proxied = false }
+                }
+            },
+            new { success = true }
+        ]);
+
+        await service.DeleteDnsRecordsForDomainAsync("family.example.com",
+            [new DnsRecordInfo("TXT", "family.example.com", "v=spf1 include:amazonses.com ~all")]);
+
+        handler.RequestUris.Last().Should().EndWith("zones/zone-1/dns_records/spf");
+    }
+
+    [Fact]
+    public async Task DeleteDnsRecordsForDomainAsync_ThrowsAndDeletesNothingWhenListFails()
+    {
+        var (service, handler) = CreateConfiguredZoneService();
+        handler.SetResponse(new
+        {
+            success = false,
+            errors = new[] { new { code = 10000, message = "Authentication error" } }
+        }, HttpStatusCode.Forbidden);
+
+        var act = async () => await service.DeleteDnsRecordsForDomainAsync("family.example.com",
+            [new DnsRecordInfo("CNAME", "t._domainkey.family.example.com", "t.dkim.amazonses.com")]);
+
+        await act.Should().ThrowAsync<CloudflareException>().WithMessage("*Authentication error*");
+        handler.RequestMethods.Should().OnlyContain(m => m == HttpMethod.Get);
+    }
+
+    [Fact]
     public async Task DeleteDnsRecordsForDomainAsync_WithNoStoredRecords_DoesNothing()
     {
         await _service.DeleteDnsRecordsForDomainAsync("family.example.com", []);
@@ -310,6 +380,14 @@ public class MockHttpMessageHandler : HttpMessageHandler
         _responses.Clear();
         _responses.Enqueue((response, statusCode));
     }
+
+    public void SetRawResponse(string body, HttpStatusCode statusCode)
+    {
+        _responses.Clear();
+        _responses.Enqueue((new RawBody(body), statusCode));
+    }
+
+    private sealed record RawBody(string Value);
 
     public void SetResponseSequence(object[] responses)
     {
@@ -339,7 +417,7 @@ public class MockHttpMessageHandler : HttpMessageHandler
         return Task.FromResult(new HttpResponseMessage(statusCode)
         {
             Content = new StringContent(
-                JsonSerializer.Serialize(response),
+                response is RawBody raw ? raw.Value : JsonSerializer.Serialize(response),
                 System.Text.Encoding.UTF8,
                 "application/json")
         });

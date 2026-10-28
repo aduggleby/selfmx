@@ -57,28 +57,50 @@ public class CloudflareService : ICloudflareService
 
     private async Task<ZoneResult?> FindZoneAsync(string candidate, string requestedName, CancellationToken ct)
     {
+        var zones = await SendAsync<List<ZoneResult>>(
+            () => _http.GetAsync($"zones?name={Uri.EscapeDataString(candidate)}&status=active&per_page=1", ct),
+            $"Failed to look up Cloudflare zone for {requestedName}", ct);
+
+        return zones?.FirstOrDefault(z =>
+            string.Equals(z.Name, candidate, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(z.Id));
+    }
+
+    /// <summary>
+    /// Sends a request, parses the Cloudflare envelope and returns its result. Non-success responses,
+    /// transport errors, timeouts and non-JSON bodies are all raised as <see cref="CloudflareException"/>.
+    /// </summary>
+    private async Task<T?> SendAsync<T>(Func<Task<HttpResponseMessage>> send, string failureMessage, CancellationToken ct)
+    {
+        string detail;
         try
         {
-            var response = await _http.GetAsync(
-                $"zones?name={Uri.EscapeDataString(candidate)}&status=active&per_page=1", ct);
-            var result = await response.Content.ReadFromJsonAsync<CloudflareResponse<List<ZoneResult>>>(JsonOptions, ct);
-
-            if (!response.IsSuccessStatusCode || result?.Success != true)
+            using var response = await send();
+            CloudflareResponse<T>? envelope = null;
+            try
             {
-                var errors = result?.Errors?.Select(e => e.Message) ?? ["Unknown error"];
-                var errorMessage = string.Join(", ", errors);
-                _logger.LogError("Failed to look up Cloudflare zone {Zone}: {Errors}", candidate, errorMessage);
-                throw new CloudflareException($"Failed to look up Cloudflare zone for {requestedName}: {errorMessage}");
+                envelope = await response.Content.ReadFromJsonAsync<CloudflareResponse<T>>(JsonOptions, ct);
+            }
+            catch (JsonException) when (!response.IsSuccessStatusCode)
+            {
+                // Non-JSON error body: fall through to the status code message.
             }
 
-            return result.Result?.FirstOrDefault(z =>
-                string.Equals(z.Name, candidate, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(z.Id));
+            if (response.IsSuccessStatusCode && envelope?.Success == true)
+                return envelope.Result;
+
+            detail = envelope?.Errors is { Count: > 0 } errors
+                ? string.Join(", ", errors.Select(e => e.Message))
+                : $"HTTP {(int)response.StatusCode}";
         }
-        catch (Exception ex) when (ex is HttpRequestException or JsonException or NotSupportedException)
+        catch (Exception ex) when (
+            ex is HttpRequestException or JsonException or NotSupportedException ||
+            (ex is TaskCanceledException && !ct.IsCancellationRequested))
         {
-            _logger.LogError(ex, "Failed to look up Cloudflare zone {Zone}", candidate);
-            throw new CloudflareException($"Failed to look up Cloudflare zone for {requestedName}: {ex.Message}");
+            detail = ex is TaskCanceledException ? "request timed out" : ex.Message;
         }
+
+        _logger.LogError("{Failure}: {Detail}", failureMessage, detail);
+        throw new CloudflareException($"{failureMessage}: {detail}");
     }
 
     public async Task<string> CreateDnsRecordAsync(
@@ -104,24 +126,12 @@ public class CloudflareService : ICloudflareService
             ttl = 1 // Auto TTL
         };
 
-        var response = await _http.PostAsJsonAsync(
-            $"zones/{zoneId}/dns_records",
-            request,
-            JsonOptions,
-            ct);
+        var result = await SendAsync<DnsRecordResult>(
+            () => _http.PostAsJsonAsync($"zones/{zoneId}/dns_records", request, JsonOptions, ct),
+            "Failed to create DNS record", ct);
 
-        var result = await response.Content.ReadFromJsonAsync<CloudflareResponse<DnsRecordResult>>(JsonOptions, ct);
-
-        if (!response.IsSuccessStatusCode || result?.Success != true)
-        {
-            var errors = result?.Errors?.Select(e => e.Message) ?? ["Unknown error"];
-            var errorMessage = string.Join(", ", errors);
-            _logger.LogError("Failed to create DNS record: {Errors}", errorMessage);
-            throw new CloudflareException($"Failed to create DNS record: {errorMessage}");
-        }
-
-        _logger.LogInformation("DNS record created with ID: {RecordId}", result.Result?.Id);
-        return result.Result!.Id;
+        _logger.LogInformation("DNS record created with ID: {RecordId}", result?.Id);
+        return result?.Id ?? throw new CloudflareException("Failed to create DNS record: response had no record");
     }
 
     private string RequireConfiguredZoneId() =>
@@ -167,10 +177,8 @@ public class CloudflareService : ICloudflareService
         if (!string.IsNullOrEmpty(name)) query += $"&name={Uri.EscapeDataString(name)}";
         if (!string.IsNullOrEmpty(type)) query += $"&type={type}";
 
-        var response = await _http.GetAsync(query, ct);
-        var result = await response.Content.ReadFromJsonAsync<CloudflareResponse<List<DnsRecordResult>>>(JsonOptions, ct);
-
-        return result?.Result ?? [];
+        return await SendAsync<List<DnsRecordResult>>(
+            () => _http.GetAsync(query, ct), "Failed to list DNS records", ct) ?? [];
     }
 
     public async Task DeleteDnsRecordsForDomainAsync(
