@@ -170,6 +170,7 @@ public static class DomainEndpoints
         ApiKeyService apiKeyService,
         ISesService sesService,
         ICloudflareService cloudflareService,
+        ILoggerFactory loggerFactory,
         ClaimsPrincipal user,
         CancellationToken ct = default)
     {
@@ -188,7 +189,17 @@ public static class DomainEndpoints
         await sesService.DeleteDomainIdentityAsync(domain.Name, ct);
 
         // Delete DNS records from Cloudflare
-        await cloudflareService.DeleteDnsRecordsForDomainAsync(domain.Name, ct);
+        // (best effort: only the records SelfMX created; a Cloudflare problem must not block the delete)
+        try
+        {
+            var created = domain.DnsRecordsJson?.DeserializeDnsRecords() ?? [];
+            await cloudflareService.DeleteDnsRecordsForDomainAsync(domain.Name, created, ct);
+        }
+        catch (Exception ex) when (ex is CloudflareException or HttpRequestException or JsonException)
+        {
+            loggerFactory.CreateLogger("DomainEndpoints")
+                .LogWarning(ex, "Could not delete Cloudflare DNS records for {Domain}", domain.Name);
+        }
 
         await domainService.DeleteAsync(domain, ct);
 

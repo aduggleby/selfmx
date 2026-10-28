@@ -12,8 +12,6 @@ public class CloudflareService : ICloudflareService
     private readonly CloudflareSettings _settings;
     private readonly ILogger<CloudflareService> _logger;
 
-    private readonly Dictionary<string, string> _zoneCache = new(StringComparer.OrdinalIgnoreCase);
-
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -49,11 +47,20 @@ public class CloudflareService : ICloudflareService
         for (var i = 0; i <= labels.Length - 2; i++)
         {
             var candidate = string.Join('.', labels[i..]);
-            if (_zoneCache.TryGetValue(candidate, out var cached))
-                return cached;
+            var zone = await FindZoneAsync(candidate, name, ct);
+            if (zone is not null)
+                return zone.Id;
+        }
 
+        throw new CloudflareZoneNotFoundException(name);
+    }
+
+    private async Task<ZoneResult?> FindZoneAsync(string candidate, string requestedName, CancellationToken ct)
+    {
+        try
+        {
             var response = await _http.GetAsync(
-                $"zones?name={Uri.EscapeDataString(candidate)}&per_page=1", ct);
+                $"zones?name={Uri.EscapeDataString(candidate)}&status=active&per_page=1", ct);
             var result = await response.Content.ReadFromJsonAsync<CloudflareResponse<List<ZoneResult>>>(JsonOptions, ct);
 
             if (!response.IsSuccessStatusCode || result?.Success != true)
@@ -61,22 +68,21 @@ public class CloudflareService : ICloudflareService
                 var errors = result?.Errors?.Select(e => e.Message) ?? ["Unknown error"];
                 var errorMessage = string.Join(", ", errors);
                 _logger.LogError("Failed to look up Cloudflare zone {Zone}: {Errors}", candidate, errorMessage);
-                throw new CloudflareException($"Failed to look up Cloudflare zone for {name}: {errorMessage}");
+                throw new CloudflareException($"Failed to look up Cloudflare zone for {requestedName}: {errorMessage}");
             }
 
-            var zone = result.Result?.FirstOrDefault(z =>
+            return result.Result?.FirstOrDefault(z =>
                 string.Equals(z.Name, candidate, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(z.Id));
-            if (zone is not null)
-            {
-                _zoneCache[candidate] = zone.Id;
-                return zone.Id;
-            }
         }
-
-        throw new CloudflareZoneNotFoundException(name);
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or NotSupportedException)
+        {
+            _logger.LogError(ex, "Failed to look up Cloudflare zone {Zone}", candidate);
+            throw new CloudflareException($"Failed to look up Cloudflare zone for {requestedName}: {ex.Message}");
+        }
     }
 
     public async Task<string> CreateDnsRecordAsync(
+        string zoneId,
         string type,
         string name,
         string content,
@@ -97,8 +103,6 @@ public class CloudflareService : ICloudflareService
             proxied,
             ttl = 1 // Auto TTL
         };
-
-        var zoneId = await ResolveZoneIdAsync(name, ct);
 
         var response = await _http.PostAsJsonAsync(
             $"zones/{zoneId}/dns_records",
@@ -169,11 +173,15 @@ public class CloudflareService : ICloudflareService
         return result?.Result ?? [];
     }
 
-    public async Task DeleteDnsRecordsForDomainAsync(string domainName, CancellationToken ct = default)
+    public async Task DeleteDnsRecordsForDomainAsync(
+        string domainName,
+        IReadOnlyCollection<DnsRecordInfo> records,
+        CancellationToken ct = default)
     {
-        _logger.LogInformation("Deleting all DNS records for domain: {Domain}", domainName);
+        if (records.Count == 0) return;
 
-        // Find DKIM records for this domain
+        _logger.LogInformation("Deleting SelfMX-created DNS records for domain: {Domain}", domainName);
+
         string zoneId;
         try
         {
@@ -185,17 +193,22 @@ public class CloudflareService : ICloudflareService
             return;
         }
 
-        var records = await ListDnsRecordsAsync(zoneId, null, null, ct);
-        var domainRecords = records.Where(r =>
-            r.Name.EndsWith($"._domainkey.{domainName}") ||
-            r.Name == domainName ||
-            r.Name.EndsWith($".{domainName}"));
-
-        foreach (var record in domainRecords)
+        // Only delete records matching what SelfMX created (type, name, content); never anything else under the domain.
+        foreach (var expected in records)
         {
-            await DeleteDnsRecordAsync(zoneId, record.Id, ct);
+            var existing = await ListDnsRecordsAsync(zoneId, expected.Name, expected.Type, ct);
+            foreach (var record in existing.Where(r =>
+                         string.Equals(r.Name, expected.Name, StringComparison.OrdinalIgnoreCase) &&
+                         string.Equals(r.Type, expected.Type, StringComparison.OrdinalIgnoreCase) &&
+                         NormalizeContent(r.Content) == NormalizeContent(expected.Value)))
+            {
+                await DeleteDnsRecordAsync(zoneId, record.Id, ct);
+            }
         }
     }
+
+    private static string NormalizeContent(string content) =>
+        content.Trim().Trim('"').TrimEnd('.').ToLowerInvariant();
 }
 
 public class CloudflareException : Exception
@@ -207,7 +220,7 @@ public class CloudflareZoneNotFoundException : CloudflareException
 {
     public CloudflareZoneNotFoundException(string name)
         : base($"No Cloudflare zone found for {name} in this account. " +
-               "Add the zone to the Cloudflare account of the configured API token, or create the DNS records manually.") { }
+               "Add the zone to the Cloudflare account of the configured API token, ensure the token has Zone:Read, or create the DNS records manually.") { }
 }
 
 public class ZoneResult

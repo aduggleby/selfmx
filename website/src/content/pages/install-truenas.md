@@ -136,8 +136,8 @@ These environment variables have sensible defaults but can be customized:
 | `App__MaxApiRequestsPerMinute` | `100` | API rate limit per key |
 | `App__VerificationTimeout` | `72:00:00` | Domain verification timeout |
 | `App__VerificationPollInterval` | `00:05:00` | Verification check interval |
-| `Cloudflare__ApiToken` | | For automatic DNS record creation |
-| `Cloudflare__ZoneId` | | Cloudflare zone ID |
+| `Cloudflare__ApiToken` | | Token with Zone:Read and DNS:Edit permissions, for automatic DNS record creation |
+| `Cloudflare__ZoneId` | | Optional override. Leave empty to look up the zone automatically |
 
 ## Step 5: Install
 

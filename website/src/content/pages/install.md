@@ -106,8 +106,8 @@ All configuration is via environment variables.
 | `App__MaxApiRequestsPerMinute` | `100` | API rate limit per key |
 | `App__VerificationTimeout` | `72:00:00` | Timeout before marking domain as failed |
 | `App__VerificationPollInterval` | `00:05:00` | How often to check domain status |
-| `Cloudflare__ApiToken` | | API token with DNS edit permissions |
-| `Cloudflare__ZoneId` | | Zone ID for your domain |
+| `Cloudflare__ApiToken` | | API token with Zone:Read and DNS:Edit permissions |
+| `Cloudflare__ZoneId` | | Optional override. Leave empty to look up the zone (including parent zones of subdomains) automatically |
 
 ### Generating Admin Password Hash
 

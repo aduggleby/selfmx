@@ -40,6 +40,8 @@ public class SetupDomainJobTests : IDisposable
         _domainService = new DomainService(_db, appSettings);
         _mockSesService = Substitute.For<ISesService>();
         _mockCloudflareService = Substitute.For<ICloudflareService>();
+        _mockCloudflareService.ResolveZoneIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns("zone-1");
         _mockLogger = Substitute.For<ILogger<SetupDomainJob>>();
 
         _job = new SetupDomainJob(
@@ -95,7 +97,7 @@ public class SetupDomainJobTests : IDisposable
             .Returns(("arn:aws:ses:domain", dnsRecords));
 
         _mockCloudflareService.CreateDnsRecordAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
             Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns("cf-record-id");
 
@@ -105,7 +107,7 @@ public class SetupDomainJobTests : IDisposable
         // Assert
         await _mockSesService.Received(1).CreateDomainIdentityAsync("example.com", Arg.Any<CancellationToken>());
         await _mockCloudflareService.Received(1).CreateDnsRecordAsync(
-            "CNAME", "token._domainkey.example.com", "token.dkim.amazonses.com",
+            "zone-1", "CNAME", "token._domainkey.example.com", "token.dkim.amazonses.com",
             0, false, Arg.Any<CancellationToken>());
 
         var updatedDomain = await _domainService.GetByIdAsync(domain.Id);
@@ -148,13 +150,13 @@ public class SetupDomainJobTests : IDisposable
 
         // First call fails
         _mockCloudflareService.CreateDnsRecordAsync(
-            "CNAME", "token1._domainkey.example.com", Arg.Any<string>(),
+            "zone-1", "CNAME", "token1._domainkey.example.com", Arg.Any<string>(),
             Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new CloudflareException("DNS error"));
 
         // Second call succeeds
         _mockCloudflareService.CreateDnsRecordAsync(
-            "CNAME", "token2._domainkey.example.com", Arg.Any<string>(),
+            "zone-1", "CNAME", "token2._domainkey.example.com", Arg.Any<string>(),
             Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns("cf-id");
 
@@ -167,7 +169,7 @@ public class SetupDomainJobTests : IDisposable
     }
 
     [Fact]
-    public async Task ExecuteAsync_StopsCloudflareAfterFirstZoneNotFound_AndKeepsManualDns()
+    public async Task ExecuteAsync_SkipsCloudflareWhenZoneNotFound_AndKeepsManualDns()
     {
         // Arrange
         var domain = await _domainService.CreateAsync("family.example.com");
@@ -180,20 +182,33 @@ public class SetupDomainJobTests : IDisposable
         _mockSesService.CreateDomainIdentityAsync("family.example.com", Arg.Any<CancellationToken>())
             .Returns(("arn", dnsRecords));
 
-        _mockCloudflareService.CreateDnsRecordAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+        _mockCloudflareService.ResolveZoneIdAsync("family.example.com", Arg.Any<CancellationToken>())
             .ThrowsAsync(new CloudflareZoneNotFoundException("family.example.com"));
 
         // Act
         await _job.ExecuteAsync(domain.Id, null);
 
-        // Assert - one attempt only, domain still Verifying with records stored for manual setup
-        await _mockCloudflareService.Received(1).CreateDnsRecordAsync(
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+        // Assert - no record creation attempted, domain still Verifying with records stored for manual setup
+        await _mockCloudflareService.DidNotReceive().CreateDnsRecordAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
             Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
         var updatedDomain = await _domainService.GetByIdAsync(domain.Id);
         updatedDomain!.Status.Should().Be(DomainStatus.Verifying);
         updatedDomain.DnsRecordsJson.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DoesNotFailDomainWhenZoneLookupErrors()
+    {
+        var domain = await _domainService.CreateAsync("example.com");
+        _mockSesService.CreateDomainIdentityAsync("example.com", Arg.Any<CancellationToken>())
+            .Returns(("arn", new[] { new DnsRecordInfo("CNAME", "t._domainkey.example.com", "t.dkim.amazonses.com") }));
+        _mockCloudflareService.ResolveZoneIdAsync("example.com", Arg.Any<CancellationToken>())
+            .ThrowsAsync(new CloudflareException("Failed to look up Cloudflare zone for example.com: timeout"));
+
+        await _job.ExecuteAsync(domain.Id, null);
+
+        var updatedDomain = await _domainService.GetByIdAsync(domain.Id);
+        updatedDomain!.Status.Should().Be(DomainStatus.Verifying);
     }
 }

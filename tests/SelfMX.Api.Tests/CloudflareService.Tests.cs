@@ -46,7 +46,7 @@ public class CloudflareServiceTests
         });
 
         // Act
-        var result = await _service.CreateDnsRecordAsync("CNAME", "test.example.com", "target.example.com");
+        var result = await _service.CreateDnsRecordAsync("test-zone-id", "CNAME", "test.example.com", "target.example.com");
 
         // Assert
         result.Should().Be(recordId);
@@ -64,7 +64,7 @@ public class CloudflareServiceTests
         }, HttpStatusCode.BadRequest);
 
         // Act & Assert
-        var act = async () => await _service.CreateDnsRecordAsync("CNAME", "test", "value");
+        var act = async () => await _service.CreateDnsRecordAsync("test-zone-id", "CNAME", "test", "value");
         await act.Should().ThrowAsync<CloudflareException>()
             .WithMessage("*Invalid zone*");
     }
@@ -119,31 +119,6 @@ public class CloudflareServiceTests
         // Assert
         _mockHandler.LastRequestUri.Should().Contain("name=test.example.com");
         _mockHandler.LastRequestUri.Should().Contain("type=CNAME");
-    }
-
-    [Fact]
-    public async Task DeleteDnsRecordsForDomainAsync_DeletesMatchingRecords()
-    {
-        // Arrange
-        var domainName = "example.com";
-
-        // First call: list records
-        _mockHandler.SetResponse(new
-        {
-            success = true,
-            result = new[]
-            {
-                new { id = "1", type = "CNAME", name = "token1._domainkey.example.com", content = "v", priority = 0, proxied = false },
-                new { id = "2", type = "CNAME", name = "token2._domainkey.example.com", content = "v", priority = 0, proxied = false },
-                new { id = "3", type = "A", name = "other.com", content = "v", priority = 0, proxied = false }
-            }
-        });
-
-        // Act
-        await _service.DeleteDnsRecordsForDomainAsync(domainName);
-
-        // Assert
-        _mockHandler.RequestCount.Should().BeGreaterOrEqualTo(1); // At least list was called
     }
 
     private (CloudflareService Service, MockHttpMessageHandler Handler) CreateLookupService()
@@ -213,34 +188,110 @@ public class CloudflareServiceTests
     }
 
     [Fact]
-    public async Task CreateDnsRecordAsync_WithNoZone_DoesNotCallDnsRecordsEndpoint()
+    public async Task ResolveZoneIdAsync_PrefersLongerZoneWhenParentAlsoExists()
     {
         var (service, handler) = CreateLookupService();
-        handler.SetResponseSequence([ZoneList(), ZoneList()]);
+        handler.SetResponseSequence([ZoneList(("zone-sub", "family.example.com"))]);
 
-        var act = async () => await service.CreateDnsRecordAsync("CNAME", "t._domainkey.sub.example.com", "v");
+        var result = await service.ResolveZoneIdAsync("family.example.com");
 
-        await act.Should().ThrowAsync<CloudflareZoneNotFoundException>();
-        handler.LastRequestUri.Should().NotContain("dns_records");
-        handler.LastRequestMethod.Should().Be(HttpMethod.Get);
+        result.Should().Be("zone-sub");
+        handler.RequestCount.Should().Be(1); // parent never queried
     }
 
     [Fact]
-    public async Task CreateDnsRecordAsync_ResolvesZoneFromRecordName()
+    public async Task ResolveZoneIdAsync_OnlyRequestsActiveZones()
     {
         var (service, handler) = CreateLookupService();
+        handler.SetResponseSequence([ZoneList(("zone-1", "example.com"))]);
+
+        await service.ResolveZoneIdAsync("example.com");
+
+        handler.LastRequestUri.Should().Contain("status=active");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.OK)]
+    public async Task ResolveZoneIdAsync_WrapsLookupErrorsAsCloudflareException(HttpStatusCode status)
+    {
+        var (service, handler) = CreateLookupService();
+        handler.SetResponse(new
+        {
+            success = false,
+            errors = new[] { new { code = 9109, message = "Invalid access token" } }
+        }, status);
+
+        var act = async () => await service.ResolveZoneIdAsync("example.com");
+
+        var ex = await act.Should().ThrowAsync<CloudflareException>().WithMessage("*Invalid access token*");
+        ex.Which.Should().NotBeOfType<CloudflareZoneNotFoundException>();
+    }
+
+    [Fact]
+    public async Task ResolveZoneIdAsync_WrapsTransportErrorsAsCloudflareException()
+    {
+        var (service, handler) = CreateLookupService();
+        handler.Exception = new HttpRequestException("connection refused");
+
+        var act = async () => await service.ResolveZoneIdAsync("example.com");
+
+        await act.Should().ThrowAsync<CloudflareException>().WithMessage("*connection refused*");
+    }
+
+    [Fact]
+    public async Task ResolveZoneIdAsync_WrapsMalformedJsonAsCloudflareException()
+    {
+        var (service, handler) = CreateLookupService();
+        handler.SetResponse(new { success = true, result = "not-a-list" });
+
+        var act = async () => await service.ResolveZoneIdAsync("example.com");
+
+        await act.Should().ThrowAsync<CloudflareException>();
+    }
+
+    [Fact]
+    public async Task DeleteDnsRecordsForDomainAsync_DeletesOnlyRecordsSelfMxCreated()
+    {
+        var handler = new MockHttpMessageHandler();
+        var service = new CloudflareService(
+            new HttpClient(handler),
+            Options.Create(new CloudflareSettings { ApiToken = "t", ZoneId = "zone-1" }),
+            Substitute.For<ILogger<CloudflareService>>());
+
+        var created = new[]
+        {
+            new DnsRecordInfo("CNAME", "tok1._domainkey.family.example.com", "tok1.dkim.amazonses.com")
+        };
+
+        // Listing by name returns SelfMX's record plus a same-name record of another type/content.
         handler.SetResponseSequence([
-            ZoneList(),
-            ZoneList(),
-            ZoneList(),
-            ZoneList(("zone-parent", "example.com")),
-            new { success = true, result = new { id = "rec-1" } }
+            new
+            {
+                success = true,
+                result = new[]
+                {
+                    new { id = "ours", type = "CNAME", name = "tok1._domainkey.family.example.com", content = "tok1.dkim.amazonses.com.", priority = 0, proxied = false },
+                    new { id = "other-content", type = "CNAME", name = "tok1._domainkey.family.example.com", content = "elsewhere.example.net", priority = 0, proxied = false },
+                    new { id = "website", type = "A", name = "family.example.com", content = "1.2.3.4", priority = 0, proxied = true }
+                }
+            },
+            new { success = true }
         ]);
 
-        var id = await service.CreateDnsRecordAsync("CNAME", "t._domainkey.sub.example.com", "v");
+        await service.DeleteDnsRecordsForDomainAsync("family.example.com", created);
 
-        id.Should().Be("rec-1");
-        handler.LastRequestUri.Should().Contain("zones/zone-parent/dns_records");
+        handler.RequestCount.Should().Be(2); // one list, one delete
+        handler.RequestUris.Last().Should().EndWith("zones/zone-1/dns_records/ours");
+        handler.RequestMethods.Last().Should().Be(HttpMethod.Delete);
+    }
+
+    [Fact]
+    public async Task DeleteDnsRecordsForDomainAsync_WithNoStoredRecords_DoesNothing()
+    {
+        await _service.DeleteDnsRecordsForDomainAsync("family.example.com", []);
+
+        _mockHandler.RequestCount.Should().Be(0);
     }
 }
 
@@ -250,6 +301,9 @@ public class MockHttpMessageHandler : HttpMessageHandler
     public string? LastRequestUri { get; private set; }
     public HttpMethod? LastRequestMethod { get; private set; }
     public int RequestCount { get; private set; }
+    public List<string> RequestUris { get; } = [];
+    public List<HttpMethod> RequestMethods { get; } = [];
+    public Exception? Exception { get; set; }
 
     public void SetResponse(object response, HttpStatusCode statusCode = HttpStatusCode.OK)
     {
@@ -273,10 +327,14 @@ public class MockHttpMessageHandler : HttpMessageHandler
         LastRequestUri = request.RequestUri?.ToString();
         LastRequestMethod = request.Method;
         RequestCount++;
+        RequestUris.Add(LastRequestUri ?? "");
+        RequestMethods.Add(request.Method);
 
-        var (response, statusCode) = _responses.Count > 0
-            ? _responses.Dequeue()
-            : (new { success = true }, HttpStatusCode.OK);
+        if (Exception is not null) throw Exception;
+        if (_responses.Count == 0)
+            throw new InvalidOperationException($"Unexpected request (no queued response): {request.Method} {LastRequestUri}");
+
+        var (response, statusCode) = _responses.Dequeue();
 
         return Task.FromResult(new HttpResponseMessage(statusCode)
         {

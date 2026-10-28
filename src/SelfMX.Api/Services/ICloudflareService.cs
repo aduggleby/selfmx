@@ -6,6 +6,7 @@ public interface ICloudflareService
     Task<string> ResolveZoneIdAsync(string name, CancellationToken ct = default);
 
     Task<string> CreateDnsRecordAsync(
+        string zoneId,
         string type,
         string name,
         string content,
@@ -20,5 +21,9 @@ public interface ICloudflareService
         string? type = null,
         CancellationToken ct = default);
 
-    Task DeleteDnsRecordsForDomainAsync(string domainName, CancellationToken ct = default);
+    /// <summary>Deletes only the given records (matched by type, name and content) from the domain's zone.</summary>
+    Task DeleteDnsRecordsForDomainAsync(
+        string domainName,
+        IReadOnlyCollection<DnsRecordInfo> records,
+        CancellationToken ct = default);
 }

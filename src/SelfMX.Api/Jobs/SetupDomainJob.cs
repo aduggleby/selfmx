@@ -84,12 +84,26 @@ public class SetupDomainJob
             var successCount = 0;
             var failCount = 0;
 
-            foreach (var record in dnsRecords)
+            string? zoneId = null;
+            try
+            {
+                zoneId = await _cloudflareService.ResolveZoneIdAsync(domain.Name);
+            }
+            catch (CloudflareException ex)
+            {
+                // Zone is the same for every record: report once and leave DNS to the user.
+                console.WriteWarning($"  {ex.Message}");
+                console.WriteWarning("  Skipping automatic DNS; add the records above manually.");
+                failCount = dnsRecords.Length;
+            }
+
+            foreach (var record in zoneId is null ? [] : dnsRecords)
             {
                 console.WriteLine($"  Creating {record.Type} record: {record.Name}");
                 try
                 {
                     await _cloudflareService.CreateDnsRecordAsync(
+                        zoneId!,
                         record.Type,
                         record.Name,
                         record.Value,
@@ -97,14 +111,6 @@ public class SetupDomainJob
                         proxied: false);
                     console.WriteSuccess("    Created successfully");
                     successCount++;
-                }
-                catch (CloudflareZoneNotFoundException ex)
-                {
-                    // Same zone for every record: report once and leave DNS to the user.
-                    console.WriteWarning($"    {ex.Message}");
-                    console.WriteWarning("    Skipping automatic DNS; add the records above manually.");
-                    failCount = dnsRecords.Length - successCount;
-                    break;
                 }
                 catch (CloudflareException ex)
                 {
