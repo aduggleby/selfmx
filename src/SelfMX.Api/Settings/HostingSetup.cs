@@ -33,7 +33,9 @@ public static class HostingSetup
                 Path.Combine(path, "selfmx-.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: retainedDays,
-                shared: true,
+                // Not shared: one process per container writes this file. Shared mode needs a .NET
+                // named mutex, which (from .NET 10.0.14, kept under $HOME) fails on a read-only
+                // rootfs, and Serilog then drops every event silently.
                 flushToDiskInterval: TimeSpan.FromSeconds(2),
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
