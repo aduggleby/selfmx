@@ -28,7 +28,7 @@ var frontend = Directory("./client");
 Log.Info($"Building SelfMX version: {project.Version}");
 
 // Install .NET SDK
-Dotnet.SdkInstall();
+Dotnet.SdkInstall("10.0"); // projects target net10.0; Ando defaults to SDK 9.0
 
 // Restore and build backend
 Log.Info("Building .NET backend...");
